@@ -1,0 +1,17 @@
+{
+  "name": "conductor",
+  "version": "0.1.0",
+  "description": "Plugin orientador de desenvolvimento de software, independente de tecnologia. Reúne 36 cargos da indústria, cada um como um Agent (prompt de sistema ancorado em livros de referência) com sua Skill acionável.",
+  "author": {
+    "name": "Elton Souza"
+  },
+  "keywords": [
+    "agents",
+    "skills",
+    "software-roles",
+    "architecture",
+    "ddd",
+    "sdd",
+    "tdd"
+  ]
+}
