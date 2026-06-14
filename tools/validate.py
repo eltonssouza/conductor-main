@@ -192,6 +192,30 @@ def check_frontmatter(ctx: Context) -> List[Violation]:
     return v
 
 
+# --- R3: segurança YAML (description aspeada e parseável) --------------------
+
+# Escalar YAML entre aspas duplas: aspas internas devem vir escapadas como \".
+DQUOTED_RE = re.compile(r'^"(?:\\.|[^"\\])*"$')
+
+
+@rule("R3-yaml-safety", "description entre aspas duplas, escapada e parseável")
+def check_yaml_safety(ctx: Context) -> List[Violation]:
+    v: List[Violation] = []
+    for path in list(ctx.agent_files) + list(ctx.skill_files):
+        rel = ctx.rel(path)
+        fm, _ = split_frontmatter(path.read_text(encoding="utf-8"))
+        desc = frontmatter_field(fm, "description")
+        if desc is None:
+            continue  # ausência é problema de R2, não de R3
+        if not desc.startswith('"'):
+            v.append(Violation("R3-yaml-safety", rel,
+                               "description não está entre aspas duplas (risco de quebrar o parser)"))
+        elif not DQUOTED_RE.match(desc):
+            v.append(Violation("R3-yaml-safety", rel,
+                               'description com aspas internas não escapadas (use \\")'))
+    return v
+
+
 # --- runner ------------------------------------------------------------------
 
 def run() -> List[Violation]:
