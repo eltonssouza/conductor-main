@@ -98,3 +98,22 @@ e *failure modes* definidos. Sem ADR das decisões estruturais, não implemente.
 
 **Livros-base:** *Clean Architecture*, *Fundamentals of Software Architecture*,
 *A Philosophy of Software Design*, *Design Patterns* (GoF), *Release It!*.
+
+---
+
+## Portão 5 — Teste-primeiro / especificação executável
+
+**Objetivo:** derivar testes dos critérios de aceite; ciclo red-green-refactor;
+testes de aceitação automatizados (ATDD). O teste falha antes de existir código.
+
+**Cargos:** `sdet`, `quality-assurance`, `software-engineer` (skills
+`automatizar-testes`, `estrategia-de-testes`, `implementar-feature-tdd`).
+
+**Portão de qualidade:** casos de teste derivados dos critérios de aceite;
+testes escritos **falhando** antes da implementação; níveis certos da pirâmide
+escolhidos; sem *flakiness*. Não implemente comportamento sem teste que o
+descreva.
+
+**Livros-base:** *Test-Driven Development by Example* (Beck), *Growing
+Object-Oriented Software, Guided by Tests*, *Unit Testing* (Khorikov), *xUnit
+Test Patterns*, *Agile Testing*.
