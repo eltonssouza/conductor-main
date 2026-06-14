@@ -135,3 +135,20 @@ casos-limite tratados; nada marcado como pronto com teste falhando.
 
 **Livros-base:** *Clean Code*, *Code Complete*, *Refactoring* (Fowler), *The
 Pragmatic Programmer*, *Working Effectively with Legacy Code*.
+
+---
+
+## Portão 7 — Integração contínua + quality gate
+
+**Objetivo:** build, testes e análise estática automatizados a cada commit.
+Nada avança sem passar no portão de qualidade. Tudo versionado e reproduzível.
+
+**Cargos:** `devops-engineer`, `platform-engineer`, `sdet` (skills
+`montar-pipeline-cicd`, `construir-capacidade-plataforma`, `automatizar-testes`).
+
+**Portão de qualidade:** pipeline roda build + testes + análise estática e está
+**verde**; gate bloqueia merge em falha; artefatos imutáveis. Para este próprio
+repo, `python tools/validate.py` deve sair com código 0.
+
+**Livros-base:** *Continuous Delivery* (Humble/Farley), *The DevOps Handbook*,
+*Accelerate*, *Spec-Driven Development* (cap. 20, Quality Gate).
