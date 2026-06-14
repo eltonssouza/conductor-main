@@ -152,3 +152,20 @@ repo, `python tools/validate.py` deve sair com código 0.
 
 **Livros-base:** *Continuous Delivery* (Humble/Farley), *The DevOps Handbook*,
 *Accelerate*, *Spec-Driven Development* (cap. 20, Quality Gate).
+
+---
+
+## Portão 8 — Validação contra a spec (loop de feedback)
+
+**Objetivo:** comparar o que foi gerado/escrito com o que foi especificado;
+*living documentation*. Os critérios de aceite do Portão 2 são executados contra
+o que foi construído.
+
+**Cargos:** `quality-assurance`, `business-analyst`, `product-owner` (skills
+`estrategia-de-testes`, `mapear-requisitos`, `refinar-backlog`).
+
+**Portão de qualidade:** todo critério de aceite da spec verificado contra o
+resultado; divergências viram defeito ou ajuste de spec — não passam batido. A
+spec e o produto convergem.
+
+**Livros-base:** *Spec-Driven Development* (cap. 13), *Specification by Example*.
