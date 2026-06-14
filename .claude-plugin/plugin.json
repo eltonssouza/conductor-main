@@ -1,7 +1,7 @@
 {
   "name": "conductor",
   "version": "0.1.0",
-  "description": "Plugin orientador de desenvolvimento de software, independente de tecnologia. Reúne 36 cargos da indústria, cada um como um Agent (prompt de sistema ancorado em livros de referência) com sua Skill acionável.",
+  "description": "Technology-agnostic software-development guidance plugin. Brings together 36 industry roles, each as an Agent (a system prompt anchored in reference books) with its actionable Skill.",
   "author": {
     "name": "Elton Souza"
   },

@@ -19,7 +19,7 @@ Question: **$ARGUMENTS**
    python -m rag.query --json -k 6 "$ARGUMENTS"
    ```
 
-2. If it returns `ERRO na busca`, diagnose: the index may not be built
+2. If it returns `Search failed:`, diagnose: the index may not be built
    (`python -m rag.ingest`) or Ollama/bge-m3 may be down.
 
 3. Read the returned passages (`source`, `section`, `text`) and **ground the

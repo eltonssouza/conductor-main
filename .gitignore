@@ -1,5 +1,6 @@
 __pycache__/
 *.py[cod]
 
-# Índice vetorial do RAG — construído localmente via `python -m rag.ingest`
+# RAG vector index — built locally via `python -m rag.ingest`
 rag/chroma/
+rag/*.log

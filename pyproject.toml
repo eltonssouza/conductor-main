@@ -1,10 +1,10 @@
 [project]
 name = "conductor"
 version = "0.1.0"
-description = "Plugin orientador de desenvolvimento de software com 36 cargos (Agents + Skills) ancorados em livros de referência."
+description = "Software-development guidance plugin with 36 roles (Agents + Skills) anchored in reference books."
 requires-python = ">=3.9"
 
-# RAG é opcional: o plugin (agents/skills/commands) funciona sem deps.
-# Para a busca semântica no acervo: pip install -e .[rag] + Ollama com bge-m3.
+# RAG is optional: the plugin (agents/skills/commands) works without deps.
+# For semantic search over the library: pip install -e .[rag] + Ollama with bge-m3.
 [project.optional-dependencies]
 rag = ["chromadb>=1.5"]

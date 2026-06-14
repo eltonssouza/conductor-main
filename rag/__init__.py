@@ -1,1 +1,1 @@
-"""RAG do Conductor — busca semântica sobre o acervo (bge-m3 + ChromaDB)."""
+"""Conductor RAG — semantic search over the acervo (bge-m3 + ChromaDB)."""

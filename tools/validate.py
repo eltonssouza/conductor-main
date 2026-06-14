@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Validador de invariantes do plugin Conductor.
+"""Invariant validator for the Conductor plugin.
 
-Codifica como código executável as "regras de ouro" que mantêm o plugin
-coerente com o `plano.md` (fonte da verdade). Cada regra é uma função
-registrada via `@rule(...)`; rodar este arquivo executa todas e falha
-(exit code 1) se qualquer invariante for violada.
+Encodes the "golden rules" that keep the plugin consistent with `plano.md`
+(source of truth) as executable code. Each rule is a function registered via
+`@rule(...)`; running this file executes all rules and fails (exit code 1) if
+any invariant is violated.
 
-Sem dependências de terceiros (apenas stdlib). Uso duplo:
+No third-party dependencies (stdlib only). Dual-mode:
 
   - CLI:    python tools/validate.py
   - import: from tools.validate import run; violations = run()
@@ -38,23 +38,23 @@ EXPECTED_ROLES = 36
 
 @dataclass(frozen=True)
 class Violation:
-    """Uma quebra de invariante: qual regra, em qual arquivo, e o motivo."""
+    """An invariant violation: which rule, in which file, and the reason."""
 
     rule: str
     path: str
     message: str
 
-    def __str__(self) -> str:  # pragma: no cover - formatação trivial
+    def __str__(self) -> str:  # pragma: no cover - trivial formatting
         rel = self.path
         return f"  [{self.rule}] {rel}: {self.message}"
 
 
-# --- parsing utilitário (frontmatter YAML mínimo, sem PyYAML) ----------------
+# --- utility parsing (minimal YAML frontmatter, no PyYAML) -------------------
 
 def split_frontmatter(text: str):
-    """Devolve (frontmatter_str, corpo_str) ou (None, text) se não houver.
+    """Returns (frontmatter_str, body_str) or (None, text) if none found.
 
-    Frontmatter = bloco entre a primeira e a segunda linha `---`.
+    Frontmatter = block between the first and second `---` line.
     """
     if not text.startswith("---"):
         return None, text
@@ -70,7 +70,7 @@ def split_frontmatter(text: str):
 
 
 def frontmatter_field(fm: str, key: str):
-    """Valor cru (com aspas, se houver) da primeira linha `key:` do frontmatter."""
+    """Raw value (with quotes, if any) of the first `key:` line in the frontmatter."""
     if fm is None:
         return None
     for line in fm.splitlines():
@@ -80,7 +80,7 @@ def frontmatter_field(fm: str, key: str):
     return None
 
 
-# --- registro de regras ------------------------------------------------------
+# --- rule registry -----------------------------------------------------------
 
 RuleFn = Callable[["Context"], List[Violation]]
 RULES: List[tuple] = []
@@ -96,7 +96,7 @@ def rule(rule_id: str, description: str):
 
 @dataclass
 class Context:
-    """Arquivos carregados uma vez, compartilhados por todas as regras."""
+    """Files loaded once, shared across all rules."""
 
     agent_files: List[Path]
     skill_files: List[Path]
@@ -116,45 +116,45 @@ class Context:
             return str(p)
 
 
-# --- R1: paridade plano <-> fonte -------------------------------------------
+# --- R1: plan <-> source parity ---------------------------------------------
 
-@rule("R1-parity", "36 agentes + 36 skills; toda skill do plano tem diretório")
+@rule("R1-parity", "36 agents + 36 skills; every plan skill has a directory")
 def check_parity(ctx: Context) -> List[Violation]:
     v: List[Violation] = []
 
     n_agents = len(ctx.agent_files)
     if n_agents != EXPECTED_ROLES:
         v.append(Violation("R1-parity", ctx.rel(AGENTS_DIR),
-                           f"esperado {EXPECTED_ROLES} agentes, encontrado {n_agents}"))
+                           f"expected {EXPECTED_ROLES} agents, found {n_agents}"))
 
     n_skills = len(ctx.skill_files)
     if n_skills != EXPECTED_ROLES:
         v.append(Violation("R1-parity", ctx.rel(SKILLS_DIR),
-                           f"esperado {EXPECTED_ROLES} skills, encontrado {n_skills}"))
+                           f"expected {EXPECTED_ROLES} skills, found {n_skills}"))
 
-    # Diretórios de skill sem SKILL.md.
+    # Skill directories missing SKILL.md.
     if SKILLS_DIR.is_dir():
         for d in sorted(SKILLS_DIR.iterdir()):
             if d.is_dir() and not (d / "SKILL.md").is_file():
-                v.append(Violation("R1-parity", ctx.rel(d), "diretório de skill sem SKILL.md"))
+                v.append(Violation("R1-parity", ctx.rel(d), "skill directory missing SKILL.md"))
 
-    # Toda skill nomeada no plano (`**Skill — `nome`:**`) tem um diretório.
+    # Every skill named in the plan (`**Skill — `name`:**`) has a directory.
     plano_skills = set(re.findall(r"\*\*Skill\s*—\s*`([a-z0-9_]+)`", ctx.plano_text))
     existing_dirs = {p.parent.name for p in ctx.skill_files}
     for name in sorted(plano_skills):
         kebab = name.replace("_", "-")
         if kebab not in existing_dirs:
             v.append(Violation("R1-parity", "plano.md",
-                               f"skill `{name}` do plano sem diretório skills/{kebab}/"))
+                               f"skill `{name}` from plan has no skills/{kebab}/ directory"))
 
     if plano_skills and len(plano_skills) != EXPECTED_ROLES:
         v.append(Violation("R1-parity", "plano.md",
-                           f"plano nomeia {len(plano_skills)} skills, esperado {EXPECTED_ROLES}"))
+                           f"plan names {len(plano_skills)} skills, expected {EXPECTED_ROLES}"))
 
     return v
 
 
-# --- R2: frontmatter (name + description; name kebab == arquivo/diretório) ---
+# --- R2: frontmatter (name + description; name kebab == file/directory) ------
 
 KEBAB_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 
@@ -165,11 +165,11 @@ def _strip_quotes(value: str) -> str:
     return value
 
 
-@rule("R2-frontmatter", "frontmatter com name+description; name kebab == arquivo/diretório")
+@rule("R2-frontmatter", "frontmatter has name+description; kebab name == file/directory")
 def check_frontmatter(ctx: Context) -> List[Violation]:
     v: List[Violation] = []
 
-    # (arquivo, slug_esperado) — agente usa nome do arquivo; skill usa o diretório.
+    # (file, expected_slug) — agent uses filename stem; skill uses its directory name.
     targets = [(p, p.stem) for p in ctx.agent_files]
     targets += [(p, p.parent.name) for p in ctx.skill_files]
 
@@ -178,36 +178,36 @@ def check_frontmatter(ctx: Context) -> List[Violation]:
         text = path.read_text(encoding="utf-8")
         fm, _body = split_frontmatter(text)
         if fm is None:
-            v.append(Violation("R2-frontmatter", rel, "sem frontmatter YAML (--- ... ---)"))
+            v.append(Violation("R2-frontmatter", rel, "missing YAML frontmatter (--- ... ---)"))
             continue
 
         name = frontmatter_field(fm, "name")
         if name is None:
-            v.append(Violation("R2-frontmatter", rel, "frontmatter sem campo name"))
+            v.append(Violation("R2-frontmatter", rel, "frontmatter missing 'name' field"))
         else:
             name = _strip_quotes(name)
             if not KEBAB_RE.match(name):
-                v.append(Violation("R2-frontmatter", rel, f"name '{name}' não é kebab-case"))
+                v.append(Violation("R2-frontmatter", rel, f"name '{name}' is not kebab-case"))
             elif name != expected_slug:
                 v.append(Violation("R2-frontmatter", rel,
-                                   f"name '{name}' != esperado '{expected_slug}'"))
+                                   f"name '{name}' != expected '{expected_slug}'"))
 
         desc = frontmatter_field(fm, "description")
         if desc is None:
-            v.append(Violation("R2-frontmatter", rel, "frontmatter sem campo description"))
+            v.append(Violation("R2-frontmatter", rel, "frontmatter missing 'description' field"))
         elif not _strip_quotes(desc).strip():
-            v.append(Violation("R2-frontmatter", rel, "description vazia"))
+            v.append(Violation("R2-frontmatter", rel, "description is empty"))
 
     return v
 
 
-# --- R3: segurança YAML (description aspeada e parseável) --------------------
+# --- R3: YAML safety (description quoted and parseable) ----------------------
 
-# Escalar YAML entre aspas duplas: aspas internas devem vir escapadas como \".
+# Double-quoted YAML scalar: internal quotes must be escaped as \".
 DQUOTED_RE = re.compile(r'^"(?:\\.|[^"\\])*"$')
 
 
-@rule("R3-yaml-safety", "description entre aspas duplas, escapada e parseável")
+@rule("R3-yaml-safety", "description double-quoted, escaped, and parseable")
 def check_yaml_safety(ctx: Context) -> List[Violation]:
     v: List[Violation] = []
     for path in list(ctx.agent_files) + list(ctx.skill_files):
@@ -215,19 +215,19 @@ def check_yaml_safety(ctx: Context) -> List[Violation]:
         fm, _ = split_frontmatter(path.read_text(encoding="utf-8"))
         desc = frontmatter_field(fm, "description")
         if desc is None:
-            continue  # ausência é problema de R2, não de R3
+            continue  # absence is a R2 problem, not R3
         if not desc.startswith('"'):
             v.append(Violation("R3-yaml-safety", rel,
-                               "description não está entre aspas duplas (risco de quebrar o parser)"))
+                               "description is not double-quoted (risk of breaking the parser)"))
         elif not DQUOTED_RE.match(desc):
             v.append(Violation("R3-yaml-safety", rel,
-                               'description com aspas internas não escapadas (use \\")'))
+                               'description has unescaped internal quotes (use \\")'))
     return v
 
 
-# --- R4: versão sincronizada (plugin.json == pyproject.toml, semver) ---------
+# --- R4: version sync (plugin.json == pyproject.toml, semver) ----------------
 
-@rule("R4-version-sync", "plugin.json e pyproject.toml na mesma versão semver")
+@rule("R4-version-sync", "plugin.json and pyproject.toml on the same semver version")
 def check_version_sync(ctx: Context) -> List[Violation]:
     v: List[Violation] = []
 
@@ -236,39 +236,39 @@ def check_version_sync(ctx: Context) -> List[Violation]:
         try:
             plugin_ver = json.loads(PLUGIN_JSON.read_text(encoding="utf-8")).get("version")
         except (ValueError, OSError) as e:
-            v.append(Violation("R4-version-sync", ctx.rel(PLUGIN_JSON), f"JSON inválido: {e}"))
+            v.append(Violation("R4-version-sync", ctx.rel(PLUGIN_JSON), f"invalid JSON: {e}"))
     else:
-        v.append(Violation("R4-version-sync", ctx.rel(PLUGIN_JSON), "arquivo ausente"))
+        v.append(Violation("R4-version-sync", ctx.rel(PLUGIN_JSON), "file not found"))
 
     pyproj_ver = None
     if PYPROJECT.is_file():
         m = re.search(r'(?m)^version\s*=\s*"([^"]+)"', PYPROJECT.read_text(encoding="utf-8"))
         pyproj_ver = m.group(1) if m else None
         if pyproj_ver is None:
-            v.append(Violation("R4-version-sync", ctx.rel(PYPROJECT), "sem campo version"))
+            v.append(Violation("R4-version-sync", ctx.rel(PYPROJECT), "missing version field"))
     else:
-        v.append(Violation("R4-version-sync", ctx.rel(PYPROJECT), "arquivo ausente"))
+        v.append(Violation("R4-version-sync", ctx.rel(PYPROJECT), "file not found"))
 
     for label, ver, path in (("plugin.json", plugin_ver, PLUGIN_JSON),
                              ("pyproject.toml", pyproj_ver, PYPROJECT)):
         if ver is not None and not SEMVER_RE.match(ver):
             v.append(Violation("R4-version-sync", ctx.rel(path),
-                               f"versão '{ver}' não é semver MAJOR.MINOR.PATCH"))
+                               f"version '{ver}' is not semver MAJOR.MINOR.PATCH"))
 
     if plugin_ver is not None and pyproj_ver is not None and plugin_ver != pyproj_ver:
         v.append(Violation("R4-version-sync", ctx.rel(PYPROJECT),
-                           f"versão {pyproj_ver} != plugin.json {plugin_ver}"))
+                           f"version {pyproj_ver} != plugin.json {plugin_ver}"))
 
     return v
 
 
-# --- R5: ancoragem do agente (prompt de sistema + Livros-base) ---------------
+# --- R5: agent anchor (system prompt + Reference books) ----------------------
 
 MIN_PROMPT_CHARS = 200
 LIVROS_RE = re.compile(r"\*\*Reference books:\*\*")
 
 
-@rule("R5-agent-anchor", "agente tem prompt de sistema e linha **Reference books:**")
+@rule("R5-agent-anchor", "agent has a system prompt and a **Reference books:** line")
 def check_agent_anchor(ctx: Context) -> List[Violation]:
     v: List[Violation] = []
     for path in ctx.agent_files:
@@ -276,24 +276,24 @@ def check_agent_anchor(ctx: Context) -> List[Violation]:
         _fm, body = split_frontmatter(path.read_text(encoding="utf-8"))
 
         if not LIVROS_RE.search(body):
-            v.append(Violation("R5-agent-anchor", rel, "sem linha **Livros-base:**"))
+            v.append(Violation("R5-agent-anchor", rel, "missing **Reference books:** line"))
 
-        # Prompt = corpo antes da linha Livros-base; precisa ser substancial.
+        # Prompt = body before the Reference books line; must be substantial.
         prompt = LIVROS_RE.split(body)[0].strip()
         if len(prompt) < MIN_PROMPT_CHARS:
             v.append(Violation("R5-agent-anchor", rel,
-                               f"prompt de sistema muito curto ({len(prompt)} < {MIN_PROMPT_CHARS} chars)"))
+                               f"system prompt too short ({len(prompt)} < {MIN_PROMPT_CHARS} chars)"))
     return v
 
 
-# --- R6: estrutura da skill (Quando usar + Passos numerados) -----------------
+# --- R6: skill structure ('When to use' + numbered steps) -------------------
 
 QUANDO_RE = re.compile(r"(?im)^\W*When to use")
 NUM_STEP_RE = re.compile(r"(?m)^\s*\d+\.\s+\S")
 MIN_STEPS = 2
 
 
-@rule("R6-skill-structure", "skill tem 'When to use' e passos numerados")
+@rule("R6-skill-structure", "skill has 'When to use' and numbered steps")
 def check_skill_structure(ctx: Context) -> List[Violation]:
     v: List[Violation] = []
     for path in ctx.skill_files:
@@ -301,26 +301,26 @@ def check_skill_structure(ctx: Context) -> List[Violation]:
         _fm, body = split_frontmatter(path.read_text(encoding="utf-8"))
 
         if not QUANDO_RE.search(body):
-            v.append(Violation("R6-skill-structure", rel, "sem seção 'Quando usar'"))
+            v.append(Violation("R6-skill-structure", rel, "missing 'When to use' section"))
 
         n_steps = len(NUM_STEP_RE.findall(body))
         if n_steps < MIN_STEPS:
             v.append(Violation("R6-skill-structure", rel,
-                               f"Passos numerados insuficientes ({n_steps} < {MIN_STEPS})"))
+                               f"insufficient numbered steps ({n_steps} < {MIN_STEPS})"))
     return v
 
 
-# --- R7: integridade do fluxo /conductor -------------------------------------
+# --- R7: /conductor flow integrity -------------------------------------------
 
 GATE_RE = re.compile(r"(?m)^##\s*Gate\s+(\d+)\s*—")
 BACKTICK_RE = re.compile(r"`([a-z0-9]+(?:-[a-z0-9]+)+)`")
 
 
-@rule("R7-flow-integrity", "/conductor tem 11 portões e só referencia cargos/skills reais")
+@rule("R7-flow-integrity", "/cdt has 11 gates and only references real roles/skills/commands")
 def check_flow_integrity(ctx: Context) -> List[Violation]:
     v: List[Violation] = []
     if not CONDUCTOR_CMD.is_file():
-        v.append(Violation("R7-flow-integrity", ctx.rel(CONDUCTOR_CMD), "comando /conductor ausente"))
+        v.append(Violation("R7-flow-integrity", ctx.rel(CONDUCTOR_CMD), "/conductor command not found"))
         return v
 
     text = CONDUCTOR_CMD.read_text(encoding="utf-8")
@@ -329,9 +329,9 @@ def check_flow_integrity(ctx: Context) -> List[Violation]:
     gates = [int(n) for n in GATE_RE.findall(body)]
     if sorted(gates) != list(range(1, EXPECTED_GATES + 1)):
         v.append(Violation("R7-flow-integrity", ctx.rel(CONDUCTOR_CMD),
-                           f"portões {sorted(gates)} != 1..{EXPECTED_GATES}"))
+                           f"gates {sorted(gates)} != 1..{EXPECTED_GATES}"))
 
-    # Tokens em crase devem ser um agente, skill OU comando existente.
+    # Backtick tokens must be an existing agent, skill, OR command.
     agent_slugs = {p.stem for p in ctx.agent_files}
     skill_slugs = {p.parent.name for p in ctx.skill_files}
     command_slugs = {p.stem for p in COMMANDS_DIR.glob("*.md")} if COMMANDS_DIR.is_dir() else set()
@@ -339,14 +339,14 @@ def check_flow_integrity(ctx: Context) -> List[Violation]:
     for token in sorted(set(BACKTICK_RE.findall(body))):
         if token not in known:
             v.append(Violation("R7-flow-integrity", ctx.rel(CONDUCTOR_CMD),
-                               f"referência `{token}` não é agente nem skill existente"))
+                               f"reference `{token}` is not an existing agent or skill"))
     return v
 
 
 # --- runner ------------------------------------------------------------------
 
 def run() -> List[Violation]:
-    """Executa todas as regras e devolve a lista plana de violações."""
+    """Run all rules and return the flat list of violations."""
     ctx = Context.load()
     violations: List[Violation] = []
     for _id, _desc, fn in RULES:
@@ -360,18 +360,18 @@ def main(argv: List[str]) -> int:
     for vi in violations:
         by_rule[vi.rule] = by_rule.get(vi.rule, 0) + 1
 
-    print(f"Conductor validate — {len(RULES)} regra(s), {len(violations)} violação(ões)")
+    print(f"Conductor validate — {len(RULES)} rule(s), {len(violations)} violation(s)")
     for rule_id, desc, _fn in RULES:
         n = by_rule.get(rule_id, 0)
         mark = "OK  " if n == 0 else "FAIL"
         print(f"  [{mark}] {rule_id}: {desc}" + (f"  ({n})" if n else ""))
 
     if violations:
-        print("\nViolações:")
+        print("\nViolations:")
         for vi in violations:
             print(vi)
         return 1
-    print("\nTodas as invariantes passaram.")
+    print("\nAll invariants passed.")
     return 0
 
 

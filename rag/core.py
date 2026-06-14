@@ -1,13 +1,13 @@
-"""Núcleo do RAG do Conductor.
+"""Core of the Conductor RAG.
 
-Pipeline: markdown do acervo → chunks → embeddings bge-m3 (via Ollama) →
-ChromaDB persistente. Compartilhado pelos CLIs `ingest.py` e `query.py`.
+Pipeline: acervo markdown → chunks → bge-m3 embeddings (via Ollama) →
+persistent ChromaDB. Shared by the `ingest.py` and `query.py` CLIs.
 
-Dependências de runtime (decisão do dono, 2026-06-14):
-- Ollama servindo `bge-m3` em http://localhost:11434 (embeddings 1024-d).
-- chromadb como vector store.
+Runtime dependencies (owner decision, 2026-06-14):
+- Ollama serving `bge-m3` at http://localhost:11434 (1024-d embeddings).
+- chromadb as the vector store.
 
-O acesso ao Ollama usa só urllib (stdlib); só o ChromaDB é de terceiros.
+Ollama access uses only urllib (stdlib); only ChromaDB is third-party.
 """
 from __future__ import annotations
 
@@ -22,14 +22,14 @@ from typing import Iterable, List
 
 
 def force_utf8() -> None:
-    """Garante stdout/stderr em UTF-8 (console Windows usa cp1252 por padrão)."""
+    """Ensures stdout/stderr use UTF-8 (Windows console defaults to cp1252)."""
     for stream in (sys.stdout, sys.stderr):
         try:
             stream.reconfigure(encoding="utf-8")
         except (AttributeError, ValueError):
             pass
 
-# --- configuração ------------------------------------------------------------
+# --- configuration -----------------------------------------------------------
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 ACERVO_DIR = Path(os.environ.get("CONDUCTOR_ACERVO", r"C:\development\to-brain"))
@@ -40,12 +40,12 @@ OLLAMA_URL = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
 EMBED_MODEL = os.environ.get("CONDUCTOR_EMBED_MODEL", "bge-m3")
 EMBED_DIM = 1024
 
-# Chunking: alvo em caracteres (~512 tokens) com sobreposição de 1 parágrafo.
+# Chunking: target in characters (~512 tokens) with 1-paragraph overlap.
 CHUNK_TARGET_CHARS = 1500
 CHUNK_MAX_CHARS = 2400
 EMBED_BATCH = 48
-# Teto de segurança por texto enviado ao Ollama (bge-m3 ~8192 tokens). Acima
-# disso o /api/embed devolve HTTP 400; truncamos para nunca estourar.
+# Safety cap per text sent to Ollama (bge-m3 ~8192 tokens). Above this,
+# /api/embed returns HTTP 400; we truncate to never overflow.
 EMBED_CHAR_CAP = 6000
 
 
@@ -55,19 +55,19 @@ EMBED_CHAR_CAP = 6000
 class Chunk:
     chunk_id: str
     text: str
-    source: str       # nome do arquivo (livro)
-    category: str     # diretório de topo
-    section: str      # último heading markdown visto
-    path: str         # caminho relativo ao acervo
+    source: str       # file name (book)
+    category: str     # top-level directory
+    section: str      # last markdown heading seen
+    path: str         # path relative to the acervo
 
 
 _HEADING_RE = re.compile(r"^#{1,6}\s+(.*)$")
 
 
 def chunk_markdown(text: str, *, source: str, category: str, path: str) -> List[Chunk]:
-    """Quebra markdown em chunks por parágrafos, empacotando até ~alvo de chars.
+    """Splits markdown into chunks by paragraphs, packing up to ~target chars.
 
-    Mantém o último heading como `section` para dar contexto ao trecho.
+    Tracks the last heading as `section` to provide context for each chunk.
     """
     chunks: List[Chunk] = []
     section = ""
@@ -89,9 +89,9 @@ def chunk_markdown(text: str, *, source: str, category: str, path: str) -> List[
             idx += 1
         buf, buf_len = [], 0
 
-    # parágrafos separados por linha em branco; parágrafos gigantes (tabelas,
-    # blocos de código sem linha em branco) são fatiados para não estourar o
-    # contexto do modelo de embeddings.
+    # paragraphs separated by blank lines; oversized paragraphs (tables,
+    # code blocks without blank lines) are sliced to avoid overflowing the
+    # embedding model's context.
     raw_paras = re.split(r"\n\s*\n", text)
     paras: List[str] = []
     for p in raw_paras:
@@ -112,7 +112,7 @@ def chunk_markdown(text: str, *, source: str, category: str, path: str) -> List[
             tail = buf[-1] if buf_len + plen <= CHUNK_MAX_CHARS else None
             flush()
             if tail and len(tail) < CHUNK_TARGET_CHARS // 2:
-                buf, buf_len = [tail], len(tail)  # sobreposição leve
+                buf, buf_len = [tail], len(tail)  # light overlap
         buf.append(para)
         buf_len += plen
         if buf_len >= CHUNK_MAX_CHARS:
@@ -122,11 +122,11 @@ def chunk_markdown(text: str, *, source: str, category: str, path: str) -> List[
 
 
 def iter_corpus(acervo: Path = ACERVO_DIR) -> Iterable[Chunk]:
-    """Percorre `acervo/**/*.md` e gera todos os chunks."""
+    """Walks `acervo/**/*.md` and yields all chunks."""
     for md in sorted(acervo.rglob("*.md")):
         rel = md.relative_to(acervo)
         parts = rel.parts
-        category = parts[0] if len(parts) > 1 else "(raiz)"
+        category = parts[0] if len(parts) > 1 else "(root)"
         text = md.read_text(encoding="utf-8", errors="replace")
         yield from chunk_markdown(
             text, source=md.stem, category=category, path=str(rel).replace("\\", "/"),
@@ -136,10 +136,10 @@ def iter_corpus(acervo: Path = ACERVO_DIR) -> Iterable[Chunk]:
 # --- embeddings (Ollama bge-m3) ---------------------------------------------
 
 def embed(texts: List[str]) -> List[List[float]]:
-    """Embeda uma lista de textos via Ollama /api/embed (batch). 1024-d.
+    """Embeds a list of texts via Ollama /api/embed (batch). 1024-d.
 
-    Cada texto é truncado em EMBED_CHAR_CAP e o vazio vira espaço, para nunca
-    provocar HTTP 400 do Ollama.
+    Each text is truncated to EMBED_CHAR_CAP and empty strings become a space,
+    so Ollama never returns HTTP 400.
     """
     safe = [(t[:EMBED_CHAR_CAP] or " ") for t in texts]
     payload = json.dumps({"model": EMBED_MODEL, "input": safe}).encode("utf-8")
@@ -151,15 +151,15 @@ def embed(texts: List[str]) -> List[List[float]]:
         data = json.loads(resp.read().decode("utf-8"))
     embs = data.get("embeddings")
     if not embs or len(embs) != len(texts):
-        raise RuntimeError(f"Ollama retornou {len(embs or [])} embeddings para {len(texts)} textos")
+        raise RuntimeError(f"Ollama returned {len(embs or [])} embeddings for {len(texts)} texts")
     return embs
 
 
 # --- ChromaDB ----------------------------------------------------------------
 
 def get_collection(create: bool = True):
-    """Abre (ou cria) a coleção persistente do acervo."""
-    import chromadb  # import tardio: dependência pesada
+    """Opens (or creates) the persistent acervo collection."""
+    import chromadb  # late import: heavy dependency
 
     CHROMA_DIR.mkdir(parents=True, exist_ok=True)
     client = chromadb.PersistentClient(path=str(CHROMA_DIR))

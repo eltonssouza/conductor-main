@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Busca semântica no acervo. Embeda a pergunta e retorna os top-k trechos.
+"""Semantic search over the acervo. Embeds the question and returns the top-k passages.
 
-  python -m rag.query "como definir fronteiras de bounded context?"
+  python -m rag.query "how to define bounded context boundaries?"
   python -m rag.query -k 8 --json "circuit breaker vs bulkhead"
   python -m rag.query --category 09_seguranca_e_privacidade "STRIDE"
 """
@@ -30,7 +30,7 @@ def search(question: str, k: int = 5, category: str = "") -> List[dict]:
     dists = res.get("distances", [[]])[0]
     for doc, meta, dist in zip(docs, metas, dists):
         out.append({
-            "score": round(1.0 - float(dist), 4),  # cosine: 1 - distância
+            "score": round(1.0 - float(dist), 4),  # cosine: 1 - distance
             "source": meta.get("source", ""),
             "section": meta.get("section", ""),
             "category": meta.get("category", ""),
@@ -41,18 +41,18 @@ def search(question: str, k: int = 5, category: str = "") -> List[dict]:
 
 
 def main(argv: List[str]) -> int:
-    ap = argparse.ArgumentParser(description="Busca semântica no acervo Conductor.")
-    ap.add_argument("question", help="pergunta / consulta")
-    ap.add_argument("-k", type=int, default=5, help="número de trechos (default 5)")
-    ap.add_argument("--category", default="", help="filtra por categoria do acervo")
-    ap.add_argument("--json", action="store_true", help="saída JSON")
+    ap = argparse.ArgumentParser(description="Semantic search over the Conductor acervo.")
+    ap.add_argument("question", help="question / query")
+    ap.add_argument("-k", type=int, default=5, help="number of passages (default 5)")
+    ap.add_argument("--category", default="", help="filter by acervo category")
+    ap.add_argument("--json", action="store_true", help="JSON output")
     args = ap.parse_args(argv)
     force_utf8()
 
     try:
         hits = search(args.question, k=args.k, category=args.category)
-    except Exception as e:  # coleção ausente, Ollama fora, etc.
-        print(f"ERRO na busca: {e}\nDica: rode `python -m rag.ingest` e confira o Ollama.",
+    except Exception as e:  # missing collection, Ollama down, etc.
+        print(f"Search failed: {e}\nHint: run `python -m rag.ingest` and check Ollama.",
               file=sys.stderr)
         return 1
 
@@ -61,7 +61,7 @@ def main(argv: List[str]) -> int:
         return 0
 
     if not hits:
-        print("Nenhum trecho encontrado.")
+        print("No passages found.")
         return 0
     for i, h in enumerate(hits, 1):
         loc = h["source"] + (f" — {h['section']}" if h["section"] else "")

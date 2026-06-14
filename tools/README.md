@@ -1,35 +1,35 @@
 # tools/
 
-Tooling de desenvolvimento do plugin (não faz parte do runtime do plugin).
+Development tooling for the plugin (not part of the plugin runtime).
 
-## `validate.py` — validador de invariantes
+## `validate.py` — invariant validator
 
-Codifica as **regras de ouro** do Conductor como verificações executáveis,
-para que a fonte não saia de sincronia com o `plano.md`. Sem dependências de
-terceiros (apenas stdlib).
+Encodes the **golden rules** of Conductor as executable checks, so that the
+source never drifts out of sync with `plano.md`. No third-party dependencies
+(stdlib only).
 
 ```bash
-python tools/validate.py     # sai com código 1 se alguma regra for violada
+python tools/validate.py     # exits with code 1 if any rule is violated
 ```
 
-Também é importável:
+Also importable:
 
 ```python
 from tools.validate import run
-violacoes = run()            # lista de Violation; vazia == tudo OK
+violations = run()            # list of Violation; empty == all OK
 ```
 
-### Regras
+### Rules
 
-| ID | Invariante |
-|----|------------|
-| **R1-parity** | 36 agentes + 36 skills; toda skill nomeada no `plano.md` tem diretório com `SKILL.md`. |
-| **R2-frontmatter** | Frontmatter YAML com `name` + `description`; `name` em kebab-case igual ao arquivo (agente) ou diretório (skill). |
-| **R3-yaml-safety** | `description` entre aspas duplas, com aspas internas escapadas — evita o parser do `claude plugin validate` descartar a metadata em silêncio. |
-| **R4-version-sync** | `plugin.json` e `pyproject.toml` na mesma versão semver `MAJOR.MINOR.PATCH`. |
-| **R5-agent-anchor** | Cada agente tem prompt de sistema substancial + linha `**Livros-base:**`. |
-| **R6-skill-structure** | Cada `SKILL.md` tem seção `Quando usar` + `Passos` numerados. |
-| **R7-flow-integrity** | O comando `/conductor` tem os 11 portões do fluxo e só referencia agentes/skills que existem. |
+| ID | Invariant |
+|----|-----------|
+| **R1-parity** | 36 agents + 36 skills; every skill named in `plano.md` has a directory with `SKILL.md`. |
+| **R2-frontmatter** | YAML frontmatter with `name` + `description`; `name` in kebab-case matching the file (agent) or directory (skill). |
+| **R3-yaml-safety** | `description` double-quoted with internal quotes escaped — prevents the `claude plugin validate` parser from silently discarding metadata. |
+| **R4-version-sync** | `plugin.json` and `pyproject.toml` on the same `MAJOR.MINOR.PATCH` semver. |
+| **R5-agent-anchor** | Each agent has a substantial system prompt + a `**Reference books:**` line. |
+| **R6-skill-structure** | Each `SKILL.md` has a `When to use` section + numbered steps. |
+| **R7-flow-integrity** | The `/conductor` command has all 11 flow gates and only references agents/skills that exist. |
 
-Para adicionar uma regra: escreva uma função decorada com `@rule("ID", "descrição")`
-que receba o `Context` e devolva uma lista de `Violation`.
+To add a rule: write a function decorated with `@rule("ID", "description")`
+that takes a `Context` and returns a list of `Violation`.
