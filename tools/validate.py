@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parent.parent
 AGENTS_DIR = ROOT / "agents"
 SKILLS_DIR = ROOT / "skills"
 COMMANDS_DIR = ROOT / "commands"
-CONDUCTOR_CMD = COMMANDS_DIR / "conductor.md"
+CONDUCTOR_CMD = COMMANDS_DIR / "cdt.md"
 PLANO = ROOT / "plano.md"
 
 EXPECTED_GATES = 11
@@ -312,7 +312,7 @@ def check_skill_structure(ctx: Context) -> List[Violation]:
 
 # --- R7: integridade do fluxo /conductor -------------------------------------
 
-GATE_RE = re.compile(r"(?m)^##\s*Portão\s+(\d+)\s*—")
+GATE_RE = re.compile(r"(?m)^##\s*Gate\s+(\d+)\s*—")
 BACKTICK_RE = re.compile(r"`([a-z0-9]+(?:-[a-z0-9]+)+)`")
 
 
