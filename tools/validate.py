@@ -258,6 +258,30 @@ def check_version_sync(ctx: Context) -> List[Violation]:
     return v
 
 
+# --- R5: ancoragem do agente (prompt de sistema + Livros-base) ---------------
+
+MIN_PROMPT_CHARS = 200
+LIVROS_RE = re.compile(r"\*\*Livros-base:\*\*")
+
+
+@rule("R5-agent-anchor", "agente tem prompt de sistema e linha **Livros-base:**")
+def check_agent_anchor(ctx: Context) -> List[Violation]:
+    v: List[Violation] = []
+    for path in ctx.agent_files:
+        rel = ctx.rel(path)
+        _fm, body = split_frontmatter(path.read_text(encoding="utf-8"))
+
+        if not LIVROS_RE.search(body):
+            v.append(Violation("R5-agent-anchor", rel, "sem linha **Livros-base:**"))
+
+        # Prompt = corpo antes da linha Livros-base; precisa ser substancial.
+        prompt = LIVROS_RE.split(body)[0].strip()
+        if len(prompt) < MIN_PROMPT_CHARS:
+            v.append(Violation("R5-agent-anchor", rel,
+                               f"prompt de sistema muito curto ({len(prompt)} < {MIN_PROMPT_CHARS} chars)"))
+    return v
+
+
 # --- runner ------------------------------------------------------------------
 
 def run() -> List[Violation]:
