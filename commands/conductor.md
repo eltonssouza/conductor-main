@@ -117,3 +117,21 @@ descreva.
 **Livros-base:** *Test-Driven Development by Example* (Beck), *Growing
 Object-Oriented Software, Guided by Tests*, *Unit Testing* (Khorikov), *xUnit
 Test Patterns*, *Agile Testing*.
+
+---
+
+## Portão 6 — Implementação com código limpo
+
+**Objetivo:** passos pequenos, refatoração contínua, legibilidade. Implemente o
+mínimo para os testes passarem; refatore com testes verdes; nomes claros,
+funções pequenas, baixo acoplamento, DRY, sem *broken windows*.
+
+**Cargos:** `software-engineer`, `frontend-engineer`, `backend-engineer`,
+`fullstack-engineer` (skills `implementar-feature-tdd`, `construir-componente-ui`,
+`projetar-servico`, `entregar-feature-vertical`).
+
+**Portão de qualidade:** testes verdes; código legível e refatorado; erros e
+casos-limite tratados; nada marcado como pronto com teste falhando.
+
+**Livros-base:** *Clean Code*, *Code Complete*, *Refactoring* (Fowler), *The
+Pragmatic Programmer*, *Working Effectively with Legacy Code*.
