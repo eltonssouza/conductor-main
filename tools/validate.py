@@ -145,6 +145,53 @@ def check_parity(ctx: Context) -> List[Violation]:
     return v
 
 
+# --- R2: frontmatter (name + description; name kebab == arquivo/diretório) ---
+
+KEBAB_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
+
+
+def _strip_quotes(value: str) -> str:
+    if value and value[0] in "\"'" and value[-1] == value[0] and len(value) >= 2:
+        return value[1:-1]
+    return value
+
+
+@rule("R2-frontmatter", "frontmatter com name+description; name kebab == arquivo/diretório")
+def check_frontmatter(ctx: Context) -> List[Violation]:
+    v: List[Violation] = []
+
+    # (arquivo, slug_esperado) — agente usa nome do arquivo; skill usa o diretório.
+    targets = [(p, p.stem) for p in ctx.agent_files]
+    targets += [(p, p.parent.name) for p in ctx.skill_files]
+
+    for path, expected_slug in targets:
+        rel = ctx.rel(path)
+        text = path.read_text(encoding="utf-8")
+        fm, _body = split_frontmatter(text)
+        if fm is None:
+            v.append(Violation("R2-frontmatter", rel, "sem frontmatter YAML (--- ... ---)"))
+            continue
+
+        name = frontmatter_field(fm, "name")
+        if name is None:
+            v.append(Violation("R2-frontmatter", rel, "frontmatter sem campo name"))
+        else:
+            name = _strip_quotes(name)
+            if not KEBAB_RE.match(name):
+                v.append(Violation("R2-frontmatter", rel, f"name '{name}' não é kebab-case"))
+            elif name != expected_slug:
+                v.append(Violation("R2-frontmatter", rel,
+                                   f"name '{name}' != esperado '{expected_slug}'"))
+
+        desc = frontmatter_field(fm, "description")
+        if desc is None:
+            v.append(Violation("R2-frontmatter", rel, "frontmatter sem campo description"))
+        elif not _strip_quotes(desc).strip():
+            v.append(Violation("R2-frontmatter", rel, "description vazia"))
+
+    return v
+
+
 # --- runner ------------------------------------------------------------------
 
 def run() -> List[Violation]:
