@@ -1,0 +1,181 @@
+#!/usr/bin/env python3
+"""Validador de invariantes do plugin Conductor.
+
+Codifica como código executável as "regras de ouro" que mantêm o plugin
+coerente com o `plano.md` (fonte da verdade). Cada regra é uma função
+registrada via `@rule(...)`; rodar este arquivo executa todas e falha
+(exit code 1) se qualquer invariante for violada.
+
+Sem dependências de terceiros (apenas stdlib). Uso duplo:
+
+  - CLI:    python tools/validate.py
+  - import: from tools.validate import run; violations = run()
+"""
+from __future__ import annotations
+
+import re
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Callable, Dict, List
+
+ROOT = Path(__file__).resolve().parent.parent
+AGENTS_DIR = ROOT / "agents"
+SKILLS_DIR = ROOT / "skills"
+PLANO = ROOT / "plano.md"
+
+EXPECTED_ROLES = 36
+
+
+@dataclass(frozen=True)
+class Violation:
+    """Uma quebra de invariante: qual regra, em qual arquivo, e o motivo."""
+
+    rule: str
+    path: str
+    message: str
+
+    def __str__(self) -> str:  # pragma: no cover - formatação trivial
+        rel = self.path
+        return f"  [{self.rule}] {rel}: {self.message}"
+
+
+# --- parsing utilitário (frontmatter YAML mínimo, sem PyYAML) ----------------
+
+def split_frontmatter(text: str):
+    """Devolve (frontmatter_str, corpo_str) ou (None, text) se não houver.
+
+    Frontmatter = bloco entre a primeira e a segunda linha `---`.
+    """
+    if not text.startswith("---"):
+        return None, text
+    lines = text.splitlines()
+    if lines[0].strip() != "---":
+        return None, text
+    for i in range(1, len(lines)):
+        if lines[i].strip() == "---":
+            fm = "\n".join(lines[1:i])
+            body = "\n".join(lines[i + 1:])
+            return fm, body
+    return None, text
+
+
+def frontmatter_field(fm: str, key: str):
+    """Valor cru (com aspas, se houver) da primeira linha `key:` do frontmatter."""
+    if fm is None:
+        return None
+    for line in fm.splitlines():
+        m = re.match(rf"^{re.escape(key)}:\s*(.*)$", line)
+        if m:
+            return m.group(1).strip()
+    return None
+
+
+# --- registro de regras ------------------------------------------------------
+
+RuleFn = Callable[["Context"], List[Violation]]
+RULES: List[tuple] = []
+
+
+def rule(rule_id: str, description: str):
+    def deco(fn: RuleFn) -> RuleFn:
+        RULES.append((rule_id, description, fn))
+        return fn
+
+    return deco
+
+
+@dataclass
+class Context:
+    """Arquivos carregados uma vez, compartilhados por todas as regras."""
+
+    agent_files: List[Path]
+    skill_files: List[Path]
+    plano_text: str
+
+    @classmethod
+    def load(cls) -> "Context":
+        agents = sorted(AGENTS_DIR.glob("*.md")) if AGENTS_DIR.is_dir() else []
+        skills = sorted(SKILLS_DIR.glob("*/SKILL.md")) if SKILLS_DIR.is_dir() else []
+        plano = PLANO.read_text(encoding="utf-8") if PLANO.is_file() else ""
+        return cls(agent_files=agents, skill_files=skills, plano_text=plano)
+
+    def rel(self, p: Path) -> str:
+        try:
+            return str(p.relative_to(ROOT)).replace("\\", "/")
+        except ValueError:
+            return str(p)
+
+
+# --- R1: paridade plano <-> fonte -------------------------------------------
+
+@rule("R1-parity", "36 agentes + 36 skills; toda skill do plano tem diretório")
+def check_parity(ctx: Context) -> List[Violation]:
+    v: List[Violation] = []
+
+    n_agents = len(ctx.agent_files)
+    if n_agents != EXPECTED_ROLES:
+        v.append(Violation("R1-parity", ctx.rel(AGENTS_DIR),
+                           f"esperado {EXPECTED_ROLES} agentes, encontrado {n_agents}"))
+
+    n_skills = len(ctx.skill_files)
+    if n_skills != EXPECTED_ROLES:
+        v.append(Violation("R1-parity", ctx.rel(SKILLS_DIR),
+                           f"esperado {EXPECTED_ROLES} skills, encontrado {n_skills}"))
+
+    # Diretórios de skill sem SKILL.md.
+    if SKILLS_DIR.is_dir():
+        for d in sorted(SKILLS_DIR.iterdir()):
+            if d.is_dir() and not (d / "SKILL.md").is_file():
+                v.append(Violation("R1-parity", ctx.rel(d), "diretório de skill sem SKILL.md"))
+
+    # Toda skill nomeada no plano (`**Skill — `nome`:**`) tem um diretório.
+    plano_skills = set(re.findall(r"\*\*Skill\s*—\s*`([a-z0-9_]+)`", ctx.plano_text))
+    existing_dirs = {p.parent.name for p in ctx.skill_files}
+    for name in sorted(plano_skills):
+        kebab = name.replace("_", "-")
+        if kebab not in existing_dirs:
+            v.append(Violation("R1-parity", "plano.md",
+                               f"skill `{name}` do plano sem diretório skills/{kebab}/"))
+
+    if plano_skills and len(plano_skills) != EXPECTED_ROLES:
+        v.append(Violation("R1-parity", "plano.md",
+                           f"plano nomeia {len(plano_skills)} skills, esperado {EXPECTED_ROLES}"))
+
+    return v
+
+
+# --- runner ------------------------------------------------------------------
+
+def run() -> List[Violation]:
+    """Executa todas as regras e devolve a lista plana de violações."""
+    ctx = Context.load()
+    violations: List[Violation] = []
+    for _id, _desc, fn in RULES:
+        violations.extend(fn(ctx))
+    return violations
+
+
+def main(argv: List[str]) -> int:
+    violations = run()
+    by_rule: Dict[str, int] = {}
+    for vi in violations:
+        by_rule[vi.rule] = by_rule.get(vi.rule, 0) + 1
+
+    print(f"Conductor validate — {len(RULES)} regra(s), {len(violations)} violação(ões)")
+    for rule_id, desc, _fn in RULES:
+        n = by_rule.get(rule_id, 0)
+        mark = "OK  " if n == 0 else "FAIL"
+        print(f"  [{mark}] {rule_id}: {desc}" + (f"  ({n})" if n else ""))
+
+    if violations:
+        print("\nViolações:")
+        for vi in violations:
+            print(vi)
+        return 1
+    print("\nTodas as invariantes passaram.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))
