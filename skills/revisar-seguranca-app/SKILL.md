@@ -1,6 +1,6 @@
 ---
 name: revisar-seguranca-app
-description: Use para avaliar a segurança de uma aplicação, mapeando superfície de ataque e entradas, testando contra ASVS/OWASP Top 10, rastreando fluxo de dados origem→sumidouro e entregando achados com PoC, severidade e correções.
+description: "Use para avaliar a segurança de uma aplicação, mapeando superfície de ataque e entradas, testando contra ASVS/OWASP Top 10, rastreando fluxo de dados origem→sumidouro e entregando achados com PoC, severidade e correções."
 ---
 
 # Skill — revisar_seguranca_app

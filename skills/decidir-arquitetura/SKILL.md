@@ -1,6 +1,6 @@
 ---
 name: decidir-arquitetura
-description: Use para definir ou revisar a arquitetura de um sistema, elicitando atributos de qualidade e restrições, gerando opções de estilo com trade-offs, avaliando por cenários (ATAM-lite) e registrando a decisão como ADR.
+description: "Use para definir ou revisar a arquitetura de um sistema, elicitando atributos de qualidade e restrições, gerando opções de estilo com trade-offs, avaliando por cenários (ATAM-lite) e registrando a decisão como ADR."
 ---
 
 # Skill — decidir_arquitetura

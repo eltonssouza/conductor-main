@@ -1,6 +1,6 @@
 ---
 name: refinar-backlog
-description: Use ao receber requisitos brutos ou um épico, para quebrar em histórias verticais com critérios de aceite no formato Dado/Quando/Então, marcar dependências e priorizar.
+description: "Use ao receber requisitos brutos ou um épico, para quebrar em histórias verticais com critérios de aceite no formato Dado/Quando/Então, marcar dependências e priorizar."
 ---
 
 # Skill — refinar_backlog

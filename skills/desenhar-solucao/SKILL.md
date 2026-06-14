@@ -1,6 +1,6 @@
 ---
 name: desenhar-solucao
-description: Use para propor uma solução a um problema de negócio, capturando requisitos funcionais/não-funcionais e restrições, propondo arquitetura de componentes e integrações, avaliando custo/risco e definindo roadmap faseado.
+description: "Use para propor uma solução a um problema de negócio, capturando requisitos funcionais/não-funcionais e restrições, propondo arquitetura de componentes e integrações, avaliando custo/risco e definindo roadmap faseado."
 ---
 
 # Skill — desenhar_solucao

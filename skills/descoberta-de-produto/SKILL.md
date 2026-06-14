@@ -1,6 +1,6 @@
 ---
 name: descoberta-de-produto
-description: Use quando houver uma ideia, pedido de feature ou problema vago, para reformular como problema do usuário + hipótese, mapear riscos, propor validações de baixo custo e definir métricas de sucesso antes de construir.
+description: "Use quando houver uma ideia, pedido de feature ou problema vago, para reformular como problema do usuário + hipótese, mapear riscos, propor validações de baixo custo e definir métricas de sucesso antes de construir."
 ---
 
 # Skill — descoberta_de_produto

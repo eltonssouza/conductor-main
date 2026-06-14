@@ -1,6 +1,6 @@
 ---
 name: implementar-feature-tdd
-description: Use para implementar ou corrigir comportamento via TDD, derivando casos de teste dos critérios de aceite, escrevendo teste que falha, implementando o mínimo e refatorando com testes verdes.
+description: "Use para implementar ou corrigir comportamento via TDD, derivando casos de teste dos critérios de aceite, escrevendo teste que falha, implementando o mínimo e refatorando com testes verdes."
 ---
 
 # Skill — implementar_feature_tdd

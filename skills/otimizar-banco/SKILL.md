@@ -1,6 +1,6 @@
 ---
 name: otimizar-banco
-description: Use para problema de performance ou modelagem de banco, coletando plano de execução e métricas, identificando o gargalo (índice, lock, esquema, query), propondo correção e validando o ganho com medição antes/depois.
+description: "Use para problema de performance ou modelagem de banco, coletando plano de execução e métricas, identificando o gargalo (índice, lock, esquema, query), propondo correção e validando o ganho com medição antes/depois."
 ---
 
 # Skill — otimizar_banco

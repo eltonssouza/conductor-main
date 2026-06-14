@@ -1,6 +1,6 @@
 ---
 name: estrategia-tecnologica
-description: Use para decisões de plataforma, build-vs-buy ou roadmap técnico, enquadrando em objetivos de negócio, levantando opções com trade-offs e TCO, e registrando como ADR executivo com métricas.
+description: "Use para decisões de plataforma, build-vs-buy ou roadmap técnico, enquadrando em objetivos de negócio, levantando opções com trade-offs e TCO, e registrando como ADR executivo com métricas."
 ---
 
 # Skill — estrategia_tecnologica

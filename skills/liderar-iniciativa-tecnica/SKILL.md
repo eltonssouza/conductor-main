@@ -1,6 +1,6 @@
 ---
 name: liderar-iniciativa-tecnica
-description: Use para um problema técnico amplo/ambíguo, enquadrando e validando qual é o problema real, mapeando impacto entre times, propondo abordagem com trade-offs e escrevendo um technical strategy doc / RFC.
+description: "Use para um problema técnico amplo/ambíguo, enquadrando e validando qual é o problema real, mapeando impacto entre times, propondo abordagem com trade-offs e escrevendo um technical strategy doc / RFC."
 ---
 
 # Skill — liderar_iniciativa_tecnica

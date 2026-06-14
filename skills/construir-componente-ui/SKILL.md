@@ -1,6 +1,6 @@
 ---
 name: construir-componente-ui
-description: Use para criar ou ajustar um componente de interface, definindo estados (default/loading/erro/vazio/foco), HTML semântico acessível, estilo robusto e responsivo, e testando acessibilidade.
+description: "Use para criar ou ajustar um componente de interface, definindo estados (default/loading/erro/vazio/foco), HTML semântico acessível, estilo robusto e responsivo, e testando acessibilidade."
 ---
 
 # Skill — construir_componente_ui

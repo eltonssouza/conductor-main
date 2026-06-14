@@ -1,6 +1,6 @@
 ---
 name: entregar-feature-vertical
-description: Use para uma funcionalidade ponta a ponta, desenhando o fluxo do dado entre camadas, definindo o contrato de API, implementando backend e frontend acessível com testes e validando o caminho completo.
+description: "Use para uma funcionalidade ponta a ponta, desenhando o fluxo do dado entre camadas, definindo o contrato de API, implementando backend e frontend acessível com testes e validando o caminho completo."
 ---
 
 # Skill — entregar_feature_vertical

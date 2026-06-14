@@ -1,6 +1,6 @@
 ---
 name: produtizar-modelo
-description: Use para colocar ou operar um modelo em produção, definindo métrica de produto e SLOs, montando pipeline reprodutível de dados/treino, servindo com testes, instrumentando monitoração de drift e definindo retraining/rollback.
+description: "Use para colocar ou operar um modelo em produção, definindo métrica de produto e SLOs, montando pipeline reprodutível de dados/treino, servindo com testes, instrumentando monitoração de drift e definindo retraining/rollback."
 ---
 
 # Skill — produtizar_modelo

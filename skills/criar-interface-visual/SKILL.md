@@ -1,6 +1,6 @@
 ---
 name: criar-interface-visual
-description: Use para desenhar uma tela ou componente visual, partindo do conteúdo e da hierarquia da informação, aplicando espaçamento/tipografia/cor com propósito, definindo estados/responsividade e checando contraste e acessibilidade visual.
+description: "Use para desenhar uma tela ou componente visual, partindo do conteúdo e da hierarquia da informação, aplicando espaçamento/tipografia/cor com propósito, definindo estados/responsividade e checando contraste e acessibilidade visual."
 ---
 
 # Skill — criar_interface_visual

@@ -1,6 +1,6 @@
 ---
 name: mapear-arquitetura-corporativa
-description: Use para alinhar portfólio/estratégia, mapeando capacidades de negócio e sistemas atuais, identificando duplicação/lacunas/risco, definindo reference architectures e propondo roadmap de racionalização.
+description: "Use para alinhar portfólio/estratégia, mapeando capacidades de negócio e sistemas atuais, identificando duplicação/lacunas/risco, definindo reference architectures e propondo roadmap de racionalização."
 ---
 
 # Skill — mapear_arquitetura_corporativa

@@ -1,6 +1,6 @@
 ---
 name: programa-de-seguranca
-description: Use para estratégia/risco no nível organizacional, inventariando ativos e mapeando riscos, avaliando contra framework (NIST/ISO) e conformidade, priorizando tratamento por risco × custo e definindo políticas, métricas e resposta a incidentes.
+description: "Use para estratégia/risco no nível organizacional, inventariando ativos e mapeando riscos, avaliando contra framework (NIST/ISO) e conformidade, priorizando tratamento por risco × custo e definindo políticas, métricas e resposta a incidentes."
 ---
 
 # Skill — programa_de_seguranca

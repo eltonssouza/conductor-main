@@ -1,6 +1,6 @@
 ---
 name: estrategia-de-testes
-description: Use ao planejar a qualidade de uma feature, derivando exemplos dos critérios de aceite, mapeando cobertura pelos 4 quadrantes, listando edge cases e fluxos de erro e reportando riscos e defeitos priorizados.
+description: "Use ao planejar a qualidade de uma feature, derivando exemplos dos critérios de aceite, mapeando cobertura pelos 4 quadrantes, listando edge cases e fluxos de erro e reportando riscos e defeitos priorizados."
 ---
 
 # Skill — estrategia_de_testes

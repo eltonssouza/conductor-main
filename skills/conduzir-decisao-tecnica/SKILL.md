@@ -1,6 +1,6 @@
 ---
 name: conduzir-decisao-tecnica
-description: Use ao escolher abordagem, lib ou design, enunciando problema e restrições, levantando 2–3 opções com trade-offs e impacto na complexidade, recomendando e registrando como ADR.
+description: "Use ao escolher abordagem, lib ou design, enunciando problema e restrições, levantando 2–3 opções com trade-offs e impacto na complexidade, recomendando e registrando como ADR."
 ---
 
 # Skill — conduzir_decisao_tecnica

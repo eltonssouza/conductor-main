@@ -1,6 +1,6 @@
 ---
 name: construir-capacidade-plataforma
-description: Use para criar um recurso self-service da plataforma, entendendo a dor e a carga cognitiva dos times-clientes, projetando a abstração paved road, embutindo segurança/observabilidade por padrão e medindo adoção.
+description: "Use para criar um recurso self-service da plataforma, entendendo a dor e a carga cognitiva dos times-clientes, projetando a abstração paved road, embutindo segurança/observabilidade por padrão e medindo adoção."
 ---
 
 # Skill — construir_capacidade_plataforma

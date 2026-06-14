@@ -1,6 +1,6 @@
 ---
 name: automatizar-testes
-description: Use para criar ou estabilizar automação de testes, definindo o nível certo na pirâmide, escrevendo testes de comportamento observável, eliminando flakiness/test smells e integrando ao CI como gate rápido.
+description: "Use para criar ou estabilizar automação de testes, definindo o nível certo na pirâmide, escrevendo testes de comportamento observável, eliminando flakiness/test smells e integrando ao CI como gate rápido."
 ---
 
 # Skill — automatizar_testes

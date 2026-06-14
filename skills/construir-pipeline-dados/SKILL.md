@@ -1,6 +1,6 @@
 ---
 name: construir-pipeline-dados
-description: Use para um fluxo de ingestão/transformação, definindo fonte, latência e semântica de entrega, escolhendo batch/stream e modelo de dados, implementando com validação e idempotência e documentando linhagem.
+description: "Use para um fluxo de ingestão/transformação, definindo fonte, latência e semântica de entrega, escolhendo batch/stream e modelo de dados, implementando com validação e idempotência e documentando linhagem."
 ---
 
 # Skill — construir_pipeline_dados

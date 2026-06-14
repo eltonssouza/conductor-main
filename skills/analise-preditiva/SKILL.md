@@ -1,6 +1,6 @@
 ---
 name: analise-preditiva
-description: Use para uma pergunta analítica/preditiva, formulando hipótese e métrica de sucesso, explorando e limpando dados, definindo baseline e modelo candidato, validando com incerteza e comunicando achados e limites.
+description: "Use para uma pergunta analítica/preditiva, formulando hipótese e métrica de sucesso, explorando e limpando dados, definindo baseline e modelo candidato, validando com incerteza e comunicando achados e limites."
 ---
 
 # Skill — analise_preditiva

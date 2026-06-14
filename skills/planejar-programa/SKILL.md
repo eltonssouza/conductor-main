@@ -1,6 +1,6 @@
 ---
 name: planejar-programa
-description: Use ao iniciar ou destravar um programa multi-time, para listar marcos, montar o grafo de dependências e caminho crítico, identificar riscos/donos e produzir um RAID com a decisão pendente mais urgente.
+description: "Use ao iniciar ou destravar um programa multi-time, para listar marcos, montar o grafo de dependências e caminho crítico, identificar riscos/donos e produzir um RAID com a decisão pendente mais urgente."
 ---
 
 # Skill — planejar_programa

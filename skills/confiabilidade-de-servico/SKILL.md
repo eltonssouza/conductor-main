@@ -1,6 +1,6 @@
 ---
 name: confiabilidade-de-servico
-description: Use para melhorar confiabilidade ou responder a incidente, definindo/checando SLIs/SLOs e error budget, instrumentando observabilidade, aplicando padrões de estabilidade e conduzindo postmortem sem culpa com ações.
+description: "Use para melhorar confiabilidade ou responder a incidente, definindo/checando SLIs/SLOs e error budget, instrumentando observabilidade, aplicando padrões de estabilidade e conduzindo postmortem sem culpa com ações."
 ---
 
 # Skill — confiabilidade_de_servico

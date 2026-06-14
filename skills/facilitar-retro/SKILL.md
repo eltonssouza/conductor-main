@@ -1,6 +1,6 @@
 ---
 name: facilitar-retro
-description: Use para conduzir uma retrospectiva ou resolver atrito de processo, reunindo fatos do período, facilitando levantamento sem culpa e priorizando 1–2 melhorias com dono e prazo.
+description: "Use para conduzir uma retrospectiva ou resolver atrito de processo, reunindo fatos do período, facilitando levantamento sem culpa e priorizando 1–2 melhorias com dono e prazo."
 ---
 
 # Skill — facilitar_retro

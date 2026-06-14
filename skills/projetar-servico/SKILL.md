@@ -1,6 +1,6 @@
 ---
 name: projetar-servico
-description: Use ao criar ou alterar um serviço ou API, definindo contrato e modelo de dados, estratégia de consistência/índices, tratamento de falhas e idempotência, validação/autorização/telemetria e testes.
+description: "Use ao criar ou alterar um serviço ou API, definindo contrato e modelo de dados, estratégia de consistência/índices, tratamento de falhas e idempotência, validação/autorização/telemetria e testes."
 ---
 
 # Skill — projetar_servico

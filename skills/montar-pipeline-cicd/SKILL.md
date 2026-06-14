@@ -1,6 +1,6 @@
 ---
 name: montar-pipeline-cicd
-description: Use para criar ou melhorar entrega contínua, mapeando o fluxo do commit à produção, automatizando build/testes/quality gate, definindo infra como código e artefatos imutáveis e configurando deploy progressivo com rollback.
+description: "Use para criar ou melhorar entrega contínua, mapeando o fluxo do commit à produção, automatizando build/testes/quality gate, definindo infra como código e artefatos imutáveis e configurando deploy progressivo com rollback."
 ---
 
 # Skill — montar_pipeline_cicd

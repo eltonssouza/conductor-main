@@ -1,6 +1,6 @@
 ---
 name: mapear-requisitos
-description: Use ao analisar um processo ou demanda de negócio, para modelar atores/passos/decisões, extrair regras e exceções, escrever requisitos com exemplos verificáveis e montar glossário do domínio.
+description: "Use ao analisar um processo ou demanda de negócio, para modelar atores/passos/decisões, extrair regras e exceções, escrever requisitos com exemplos verificáveis e montar glossário do domínio."
 ---
 
 # Skill — mapear_requisitos
