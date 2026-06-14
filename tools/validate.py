@@ -23,7 +23,11 @@ from typing import Callable, Dict, List
 ROOT = Path(__file__).resolve().parent.parent
 AGENTS_DIR = ROOT / "agents"
 SKILLS_DIR = ROOT / "skills"
+COMMANDS_DIR = ROOT / "commands"
+CONDUCTOR_CMD = COMMANDS_DIR / "conductor.md"
 PLANO = ROOT / "plano.md"
+
+EXPECTED_GATES = 11
 PLUGIN_JSON = ROOT / ".claude-plugin" / "plugin.json"
 PYPROJECT = ROOT / "pyproject.toml"
 
@@ -303,6 +307,38 @@ def check_skill_structure(ctx: Context) -> List[Violation]:
         if n_steps < MIN_STEPS:
             v.append(Violation("R6-skill-structure", rel,
                                f"Passos numerados insuficientes ({n_steps} < {MIN_STEPS})"))
+    return v
+
+
+# --- R7: integridade do fluxo /conductor -------------------------------------
+
+GATE_RE = re.compile(r"(?m)^##\s*Portão\s+(\d+)\s*—")
+BACKTICK_RE = re.compile(r"`([a-z0-9]+(?:-[a-z0-9]+)+)`")
+
+
+@rule("R7-flow-integrity", "/conductor tem 11 portões e só referencia cargos/skills reais")
+def check_flow_integrity(ctx: Context) -> List[Violation]:
+    v: List[Violation] = []
+    if not CONDUCTOR_CMD.is_file():
+        v.append(Violation("R7-flow-integrity", ctx.rel(CONDUCTOR_CMD), "comando /conductor ausente"))
+        return v
+
+    text = CONDUCTOR_CMD.read_text(encoding="utf-8")
+    _fm, body = split_frontmatter(text)
+
+    gates = [int(n) for n in GATE_RE.findall(body)]
+    if sorted(gates) != list(range(1, EXPECTED_GATES + 1)):
+        v.append(Violation("R7-flow-integrity", ctx.rel(CONDUCTOR_CMD),
+                           f"portões {sorted(gates)} != 1..{EXPECTED_GATES}"))
+
+    # Tokens em crase devem ser um agente OU uma skill existente.
+    agent_slugs = {p.stem for p in ctx.agent_files}
+    skill_slugs = {p.parent.name for p in ctx.skill_files}
+    known = agent_slugs | skill_slugs
+    for token in sorted(set(BACKTICK_RE.findall(body))):
+        if token not in known:
+            v.append(Violation("R7-flow-integrity", ctx.rel(CONDUCTOR_CMD),
+                               f"referência `{token}` não é agente nem skill existente"))
     return v
 
 

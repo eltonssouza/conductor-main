@@ -29,6 +29,7 @@ violacoes = run()            # lista de Violation; vazia == tudo OK
 | **R4-version-sync** | `plugin.json` e `pyproject.toml` na mesma versão semver `MAJOR.MINOR.PATCH`. |
 | **R5-agent-anchor** | Cada agente tem prompt de sistema substancial + linha `**Livros-base:**`. |
 | **R6-skill-structure** | Cada `SKILL.md` tem seção `Quando usar` + `Passos` numerados. |
+| **R7-flow-integrity** | O comando `/conductor` tem os 11 portões do fluxo e só referencia agentes/skills que existem. |
 
 Para adicionar uma regra: escreva uma função decorada com `@rule("ID", "descrição")`
 que receba o `Context` e devolva uma lista de `Violation`.
