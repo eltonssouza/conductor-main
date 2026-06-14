@@ -12,6 +12,13 @@ regressões, o quality gate impede que erro avance, a entrega progressiva conté
 o que escapa, e a observabilidade + postmortems realimentam a spec — **cada
 volta reduz a taxa de defeito**.
 
+## Fundamentação no acervo (RAG)
+
+Em qualquer portão, **ancore decisões no acervo** antes de afirmar: use o comando
+`/acervo` (ou `python -m rag.query --json -k 6 "<pergunta>"`) para recuperar
+trechos dos livros de referência e cite a fonte. Não invente fonte; se o acervo
+não cobrir, diga e prossiga com raciocínio próprio explícito.
+
 ## Como reger
 
 Demanda do usuário: **$ARGUMENTS**

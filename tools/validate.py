@@ -331,10 +331,11 @@ def check_flow_integrity(ctx: Context) -> List[Violation]:
         v.append(Violation("R7-flow-integrity", ctx.rel(CONDUCTOR_CMD),
                            f"portões {sorted(gates)} != 1..{EXPECTED_GATES}"))
 
-    # Tokens em crase devem ser um agente OU uma skill existente.
+    # Tokens em crase devem ser um agente, skill OU comando existente.
     agent_slugs = {p.stem for p in ctx.agent_files}
     skill_slugs = {p.parent.name for p in ctx.skill_files}
-    known = agent_slugs | skill_slugs
+    command_slugs = {p.stem for p in COMMANDS_DIR.glob("*.md")} if COMMANDS_DIR.is_dir() else set()
+    known = agent_slugs | skill_slugs | command_slugs
     for token in sorted(set(BACKTICK_RE.findall(body))):
         if token not in known:
             v.append(Violation("R7-flow-integrity", ctx.rel(CONDUCTOR_CMD),
