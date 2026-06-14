@@ -187,3 +187,21 @@ mensurável. Nada vai a 100% sem caminho de reversão.
 
 **Livros-base:** *Continuous Delivery*, *Kubernetes Up and Running*, *Release
 It!*.
+
+---
+
+## Portão 10 — Observabilidade e operação
+
+**Objetivo:** SLOs, error budgets, monitoração e performance para detectar e
+conter problemas em produção em minutos. Métricas, logs e *traces* respondem a
+perguntas desconhecidas.
+
+**Cargos:** `site-reliability-engineer`, `devops-engineer` (skills
+`confiabilidade-de-servico`, `montar-pipeline-cicd`).
+
+**Portão de qualidade:** SLIs/SLOs definidos e instrumentados; alertas
+acionáveis baseados em sintoma do usuário; *failure modes* observáveis. Não
+opere às cegas.
+
+**Livros-base:** *Site Reliability Engineering*, *Observability Engineering*,
+*Systems Performance* (Gregg).
