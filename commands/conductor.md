@@ -205,3 +205,27 @@ opere às cegas.
 
 **Livros-base:** *Site Reliability Engineering*, *Observability Engineering*,
 *Systems Performance* (Gregg).
+
+---
+
+## Portão 11 — Aprendizado contínuo
+
+**Objetivo:** postmortems sem culpa e os "Três Caminhos" do DevOps; **todo
+incidente vira nova spec/teste**, fechando o ciclo de volta ao Portão 2.
+
+**Cargos:** `site-reliability-engineer`, `engineering-manager`, `agile-coach`
+(skills `confiabilidade-de-servico`, `diagnostico-de-time`, `diagnostico-agil`).
+
+**Portão de qualidade:** postmortem sem culpa com causa-raiz e ações com dono/
+prazo; cada aprendizado realimentado como spec/teste novo. O ciclo recomeça —
+**cada volta reduz a taxa de defeito**.
+
+**Livros-base:** *The DevOps Handbook*, *Accelerate*, *Site Reliability
+Engineering*.
+
+---
+
+> **Fim do fluxo.** 11 portões, dos 36 cargos do acervo. A spec elimina
+> ambiguidade, os testes-primeiro travam regressões, o quality gate impede que
+> erro avance, a entrega progressiva contém o que escapa, e a observabilidade +
+> postmortems realimentam a spec.
