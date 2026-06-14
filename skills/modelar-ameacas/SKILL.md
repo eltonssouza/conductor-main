@@ -1,15 +1,15 @@
 ---
 name: modelar-ameacas
-description: "Use ao avaliar a segurança de um sistema/feature, diagramando o sistema e trust boundaries, enumerando ameaças (STRIDE) por componente, avaliando risco e propondo mitigações priorizadas e secure defaults."
+description: "Use when assessing the security of a system or feature, by diagramming the system and trust boundaries, enumerating threats (STRIDE) per component, evaluating risk, and proposing prioritized mitigations and secure defaults."
 ---
 
 # Skill — modelar_ameacas
 
-**Quando usar:** Ao avaliar a segurança de um sistema/feature.
+**When to use:** When assessing the security of a system or feature.
 
-**Passos:**
-1. Diagramar o sistema e *trust boundaries*.
-2. Enumerar ameaças (STRIDE) por componente.
-3. Avaliar risco (prob. × impacto).
-4. Propor mitigações priorizadas e *secure defaults*.
-5. Definir como detectar e verificar.
+**Steps:**
+1. Diagram the system and *trust boundaries*.
+2. Enumerate threats (STRIDE) per component.
+3. Evaluate risk (probability × impact).
+4. Propose prioritized mitigations and *secure defaults*.
+5. Define how to detect and verify.

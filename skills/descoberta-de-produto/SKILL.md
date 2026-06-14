@@ -1,15 +1,15 @@
 ---
 name: descoberta-de-produto
-description: "Use quando houver uma ideia, pedido de feature ou problema vago, para reformular como problema do usuário + hipótese, mapear riscos, propor validações de baixo custo e definir métricas de sucesso antes de construir."
+description: "Use when there is a vague idea, feature request, or problem statement, to reframe it as a user problem plus hypothesis, map risks, propose low-cost validations, and define success metrics before building."
 ---
 
 # Skill — descoberta_de_produto
 
-**Quando usar:** Há uma ideia, pedido de feature ou problema vago.
+**When to use:** There is a vague idea, feature request, or problem statement.
 
-**Passos:**
-1. Reescrever como problema do usuário + hipótese.
-2. Mapear riscos (valor, usabilidade, viabilidade, negócio).
-3. Propor 2–3 formas de validar com baixo custo.
-4. Definir métricas de sucesso e *guardrails*.
-5. Entregar um *opportunity solution tree* enxuto e a próxima ação.
+**Steps:**
+1. Reframe as a user problem + hypothesis.
+2. Map risks (value, usability, feasibility, business).
+3. Propose 2–3 low-cost validation approaches.
+4. Define success metrics and *guardrails*.
+5. Deliver a lean *opportunity solution tree* and the next action.

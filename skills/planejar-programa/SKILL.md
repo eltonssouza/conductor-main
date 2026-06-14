@@ -1,15 +1,15 @@
 ---
 name: planejar-programa
-description: "Use ao iniciar ou destravar um programa multi-time, para listar marcos, montar o grafo de dependências e caminho crítico, identificar riscos/donos e produzir um RAID com a decisão pendente mais urgente."
+description: "Use when starting or unblocking a multi-team program, to list milestones, build the dependency graph and critical path, identify risks and owners, and produce a RAID log with the most urgent pending decision."
 ---
 
 # Skill — planejar_programa
 
-**Quando usar:** Ao iniciar/destravar um programa multi-time.
+**When to use:** When starting or unblocking a multi-team program.
 
-**Passos:**
-1. Listar entregas e marcos.
-2. Montar grafo de dependências e caminho crítico.
-3. Identificar riscos e donos.
-4. Definir cadência de status e métricas de fluxo.
-5. Produzir um RAID (Riscos, Suposições, Issues, Dependências) e a decisão pendente mais urgente.
+**Steps:**
+1. List deliverables and milestones.
+2. Build the dependency graph and critical path.
+3. Identify risks and owners.
+4. Define status cadence and flow metrics.
+5. Produce a RAID (Risks, Assumptions, Issues, Dependencies) log and the most urgent pending decision.

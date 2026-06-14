@@ -1,15 +1,15 @@
 ---
 name: projetar-sistema-llm
-description: "Use para uma feature baseada em LLM/RAG/agente, definindo tarefa, contexto necessário e critérios de qualidade, projetando recuperação/estrutura de contexto, elaborando prompts com saída validável e montando evals e guardrails."
+description: "Use for a feature based on LLM/RAG/agent, by defining the task, required context, and quality criteria, designing retrieval and context structure, crafting prompts with validatable output, and building evals and guardrails."
 ---
 
 # Skill — projetar_sistema_llm
 
-**Quando usar:** Para uma feature baseada em LLM/RAG/agente.
+**When to use:** For a feature based on LLM/RAG/agent.
 
-**Passos:**
-1. Definir tarefa, contexto necessário e critérios de qualidade.
-2. Projetar recuperação/estrutura de contexto.
-3. Elaborar prompts com saída validável.
-4. Montar *evals* e *guardrails* (incl. *prompt injection*).
-5. Medir custo/latência/qualidade e versionar.
+**Steps:**
+1. Define the task, required context, and quality criteria.
+2. Design retrieval and context structure.
+3. Craft prompts with validatable output.
+4. Build *evals* and *guardrails* (incl. *prompt injection*).
+5. Measure cost/latency/quality and version.

@@ -1,15 +1,15 @@
 ---
 name: analise-preditiva
-description: "Use para uma pergunta analítica/preditiva, formulando hipótese e métrica de sucesso, explorando e limpando dados, definindo baseline e modelo candidato, validando com incerteza e comunicando achados e limites."
+description: "Use for an analytical or predictive question by formulating a hypothesis and success metric, exploring and cleaning data, defining a baseline and candidate model, validating with uncertainty against overfitting, and communicating findings and limitations."
 ---
 
 # Skill — analise_preditiva
 
-**Quando usar:** Para uma pergunta analítica/preditiva.
+**When to use:** For an analytical or predictive question.
 
-**Passos:**
-1. Formular hipótese e métrica de sucesso.
-2. Explorar e limpar dados, checando vieses.
-3. Definir baseline e modelo candidato.
-4. Validar com incerteza e contra *overfitting*.
-5. Comunicar achados e limites para decisão.
+**Steps:**
+1. Formulate the hypothesis and success metric.
+2. Explore and clean data, checking for biases.
+3. Define the baseline and candidate model.
+4. Validate with uncertainty and guard against *overfitting*.
+5. Communicate findings and limitations to support the decision.

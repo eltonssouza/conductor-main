@@ -1,15 +1,15 @@
 ---
 name: refinar-backlog
-description: "Use ao receber requisitos brutos ou um épico, para quebrar em histórias verticais com critérios de aceite no formato Dado/Quando/Então, marcar dependências e priorizar."
+description: "Use when receiving raw requirements or an epic, to break them into vertical stories with acceptance criteria in Given/When/Then format, mark dependencies, and prioritize."
 ---
 
 # Skill — refinar_backlog
 
-**Quando usar:** Ao receber requisitos brutos ou um épico.
+**When to use:** When receiving raw requirements or an epic.
 
-**Passos:**
-1. Quebrar em histórias verticais (fatias de valor).
-2. Escrever critérios de aceite no formato Dado/Quando/Então com exemplos.
-3. Marcar dependências e riscos.
-4. Checar *Definition of Ready*.
-5. Sugerir ordem de prioridade justificada.
+**Steps:**
+1. Break into vertical stories (value slices).
+2. Write acceptance criteria in Given/When/Then format with examples.
+3. Mark dependencies and risks.
+4. Check *Definition of Ready*.
+5. Suggest a justified priority order.

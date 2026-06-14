@@ -1,15 +1,15 @@
 ---
 name: diagnostico-agil
-description: "Use para avaliar maturidade ágil de uma organização, mapeando fluxo de valor e gargalos, avaliando capacidades DORA/Accelerate, identificando antipadrões e propondo topologia de times com roadmap."
+description: "Use to assess an organization's agile maturity, mapping value stream and bottlenecks, evaluating DORA/Accelerate capabilities, identifying anti-patterns, and proposing a team topology with a roadmap."
 ---
 
 # Skill — diagnostico_agil
 
-**Quando usar:** Para avaliar maturidade ágil de uma organização.
+**When to use:** To assess an organization's agile maturity.
 
-**Passos:**
-1. Mapear fluxo de valor e gargalos.
-2. Avaliar capacidades DORA/Accelerate.
-3. Identificar antipadrões organizacionais.
-4. Propor topologia de times e melhorias de fluxo.
-5. Montar roadmap de evolução com métricas.
+**Steps:**
+1. Map the value stream and bottlenecks.
+2. Evaluate DORA/Accelerate capabilities.
+3. Identify organizational anti-patterns.
+4. Propose team topology and flow improvements.
+5. Build an evolution roadmap with metrics.

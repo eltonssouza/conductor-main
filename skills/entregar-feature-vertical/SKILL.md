@@ -1,15 +1,15 @@
 ---
 name: entregar-feature-vertical
-description: "Use para uma funcionalidade ponta a ponta, desenhando o fluxo do dado entre camadas, definindo o contrato de API, implementando backend e frontend acessível com testes e validando o caminho completo."
+description: "Use for an end-to-end feature, drawing the data flow across layers, defining the API contract, implementing an accessible backend and frontend with tests, and validating the full path."
 ---
 
 # Skill — entregar_feature_vertical
 
-**Quando usar:** Para uma funcionalidade ponta a ponta.
+**When to use:** For an end-to-end feature.
 
-**Passos:**
-1. Desenhar o fluxo do dado entre camadas.
-2. Definir o contrato de API.
-3. Implementar backend com testes.
-4. Implementar frontend acessível consumindo a API.
-5. Testar o caminho completo e os casos de erro.
+**Steps:**
+1. Draw the data flow across layers.
+2. Define the API contract.
+3. Implement the backend with tests.
+4. Implement the accessible frontend consuming the API.
+5. Test the complete path and error cases.

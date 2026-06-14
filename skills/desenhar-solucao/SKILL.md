@@ -1,15 +1,15 @@
 ---
 name: desenhar-solucao
-description: "Use para propor uma solução a um problema de negócio, capturando requisitos funcionais/não-funcionais e restrições, propondo arquitetura de componentes e integrações, avaliando custo/risco e definindo roadmap faseado."
+description: "Use to propose a solution to a business problem, capturing functional and non-functional requirements and constraints, proposing component architecture and integrations, evaluating cost and risk, and defining a phased roadmap."
 ---
 
 # Skill — desenhar_solucao
 
-**Quando usar:** Para propor uma solução a um problema de negócio.
+**When to use:** To propose a solution to a business problem.
 
-**Passos:**
-1. Capturar requisitos funcionais, não-funcionais e restrições.
-2. Propor arquitetura de componentes e integrações.
-3. Avaliar opções com custo e risco.
-4. Definir roadmap de implementação faseado.
-5. Produzir diagrama e resumo executivo.
+**Steps:**
+1. Capture functional, non-functional, and constraint requirements.
+2. Propose component architecture and integrations.
+3. Evaluate options by cost and risk.
+4. Define a phased implementation roadmap.
+5. Produce a diagram and executive summary.

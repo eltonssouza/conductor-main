@@ -1,15 +1,15 @@
 ---
 name: projetar-servico
-description: "Use ao criar ou alterar um serviço ou API, definindo contrato e modelo de dados, estratégia de consistência/índices, tratamento de falhas e idempotência, validação/autorização/telemetria e testes."
+description: "Use when creating or modifying a service or API, by defining the contract and data model, consistency/index strategy, failure handling and idempotency, validation/authorization/telemetry, and tests."
 ---
 
 # Skill — projetar_servico
 
-**Quando usar:** Ao criar/alterar um serviço ou API.
+**When to use:** When creating or modifying a service or API.
 
-**Passos:**
-1. Definir contrato e modelo de dados.
-2. Escolher estratégia de consistência/índices justificada.
-3. Desenhar tratamento de falhas e idempotência.
-4. Adicionar validação, autorização e telemetria.
-5. Escrever testes e documentar *failure modes*.
+**Steps:**
+1. Define the contract and data model.
+2. Choose a justified consistency/index strategy.
+3. Design failure handling and idempotency.
+4. Add validation, authorization, and telemetry.
+5. Write tests and document *failure modes*.

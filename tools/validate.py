@@ -265,10 +265,10 @@ def check_version_sync(ctx: Context) -> List[Violation]:
 # --- R5: ancoragem do agente (prompt de sistema + Livros-base) ---------------
 
 MIN_PROMPT_CHARS = 200
-LIVROS_RE = re.compile(r"\*\*Livros-base:\*\*")
+LIVROS_RE = re.compile(r"\*\*Reference books:\*\*")
 
 
-@rule("R5-agent-anchor", "agente tem prompt de sistema e linha **Livros-base:**")
+@rule("R5-agent-anchor", "agente tem prompt de sistema e linha **Reference books:**")
 def check_agent_anchor(ctx: Context) -> List[Violation]:
     v: List[Violation] = []
     for path in ctx.agent_files:
@@ -288,12 +288,12 @@ def check_agent_anchor(ctx: Context) -> List[Violation]:
 
 # --- R6: estrutura da skill (Quando usar + Passos numerados) -----------------
 
-QUANDO_RE = re.compile(r"(?im)^\W*Quando usar")
+QUANDO_RE = re.compile(r"(?im)^\W*When to use")
 NUM_STEP_RE = re.compile(r"(?m)^\s*\d+\.\s+\S")
 MIN_STEPS = 2
 
 
-@rule("R6-skill-structure", "skill tem 'Quando usar' e Passos numerados")
+@rule("R6-skill-structure", "skill tem 'When to use' e passos numerados")
 def check_skill_structure(ctx: Context) -> List[Violation]:
     v: List[Violation] = []
     for path in ctx.skill_files:

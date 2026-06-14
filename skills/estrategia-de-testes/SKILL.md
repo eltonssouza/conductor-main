@@ -1,15 +1,15 @@
 ---
 name: estrategia-de-testes
-description: "Use ao planejar a qualidade de uma feature, derivando exemplos dos critérios de aceite, mapeando cobertura pelos 4 quadrantes, listando edge cases e fluxos de erro e reportando riscos e defeitos priorizados."
+description: "Use when planning the quality strategy for a feature, deriving examples from acceptance criteria, mapping coverage across the 4 quadrants, listing edge cases and error flows, and reporting prioritized risks and defects."
 ---
 
 # Skill — estrategia_de_testes
 
-**Quando usar:** Ao planejar a qualidade de uma feature.
+**When to use:** When planning the quality strategy for a feature.
 
-**Passos:**
-1. Derivar exemplos dos critérios de aceite.
-2. Mapear cobertura pelos 4 quadrantes.
-3. Listar *edge cases* e fluxos de erro.
-4. Executar testes exploratórios direcionados.
-5. Reportar riscos e defeitos priorizados.
+**Steps:**
+1. Derive examples from acceptance criteria.
+2. Map coverage across the 4 quadrants.
+3. List *edge cases* and error flows.
+4. Execute targeted exploratory tests.
+5. Report prioritized risks and defects.

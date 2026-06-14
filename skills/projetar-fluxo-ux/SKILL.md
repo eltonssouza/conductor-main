@@ -1,15 +1,15 @@
 ---
 name: projetar-fluxo-ux
-description: "Use para desenhar ou avaliar um fluxo ou tela, definindo objetivo do usuário e contexto, mapeando a jornada e pontos de atrito, propondo solução com hierarquia/feedback/prevenção de erro e garantindo acessibilidade."
+description: "Use to design or evaluate a flow or screen, by defining the user goal and context, mapping the journey and friction points, proposing a solution with hierarchy/feedback/error prevention, and ensuring accessibility."
 ---
 
 # Skill — projetar_fluxo_ux
 
-**Quando usar:** Para desenhar/avaliar um fluxo ou tela.
+**When to use:** To design or evaluate a flow or screen.
 
-**Passos:**
-1. Definir objetivo do usuário e contexto.
-2. Mapear a jornada e pontos de atrito.
-3. Propor solução com hierarquia, *feedback* e prevenção de erro.
-4. Garantir acessibilidade.
-5. Definir como validar com usuários.
+**Steps:**
+1. Define the user goal and context.
+2. Map the journey and friction points.
+3. Propose a solution with hierarchy, *feedback*, and error prevention.
+4. Ensure accessibility.
+5. Define how to validate with users.

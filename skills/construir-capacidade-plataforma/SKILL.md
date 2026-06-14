@@ -1,15 +1,15 @@
 ---
 name: construir-capacidade-plataforma
-description: "Use para criar um recurso self-service da plataforma, entendendo a dor e a carga cognitiva dos times-clientes, projetando a abstração paved road, embutindo segurança/observabilidade por padrão e medindo adoção."
+description: "Use to create a platform self-service capability by understanding the pain and cognitive load of consumer teams, designing the paved-road abstraction, embedding security and observability by default, and measuring adoption."
 ---
 
 # Skill — construir_capacidade_plataforma
 
-**Quando usar:** Para criar um recurso *self-service* da plataforma.
+**When to use:** To create a *self-service* platform capability.
 
-**Passos:**
-1. Entender a dor e a carga cognitiva dos times-clientes.
-2. Projetar a abstração *self-service* (*paved road*).
-3. Embutir segurança/observabilidade por padrão.
-4. Documentar e versionar como produto.
-5. Medir adoção e iterar.
+**Steps:**
+1. Understand the pain and cognitive load of consumer teams.
+2. Design the *self-service* abstraction (*paved road*).
+3. Embed security and observability by default.
+4. Document and version it as a product.
+5. Measure adoption and iterate.

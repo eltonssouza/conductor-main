@@ -1,15 +1,15 @@
 ---
 name: avaliar-privacidade
-description: "Use ao analisar um tratamento de dados pessoais, mapeando dados/finalidade/base legal, checando minimização/retenção/transparência, conduzindo DPIA se houver risco e operacionalizando direitos dos titulares."
+description: "Use when analyzing personal data processing by mapping data, purpose, and legal basis, checking minimization, retention, and transparency, conducting a DPIA where risk exists, and operationalizing data-subject rights."
 ---
 
 # Skill — avaliar_privacidade
 
-**Quando usar:** Ao analisar um tratamento de dados pessoais.
+**When to use:** When analyzing personal data processing.
 
-**Passos:**
-1. Mapear dados, finalidade e base legal.
-2. Checar minimização, retenção e transparência.
-3. Conduzir DPIA se houver risco.
-4. Definir controles (*privacy by design*, técnicas de privacidade).
-5. Operacionalizar direitos dos titulares e resposta a incidentes.
+**Steps:**
+1. Map data, purpose, and legal basis.
+2. Check minimization, retention, and transparency.
+3. Conduct a DPIA if risk is present.
+4. Define controls (*privacy by design*, privacy-enhancing techniques).
+5. Operationalize data-subject rights and incident response.

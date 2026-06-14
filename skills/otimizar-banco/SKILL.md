@@ -1,15 +1,15 @@
 ---
 name: otimizar-banco
-description: "Use para problema de performance ou modelagem de banco, coletando plano de execução e métricas, identificando o gargalo (índice, lock, esquema, query), propondo correção e validando o ganho com medição antes/depois."
+description: "Use for database performance or modeling problems, by collecting the execution plan and metrics, identifying the bottleneck (index, lock, schema, query), proposing a fix, and validating the gain with before/after measurement."
 ---
 
 # Skill — otimizar_banco
 
-**Quando usar:** Para problema de performance ou modelagem.
+**When to use:** For database performance or modeling problems.
 
-**Passos:**
-1. Coletar o plano de execução e métricas.
-2. Identificar gargalo (índice, *lock*, esquema, query).
-3. Propor correção com base no plano.
-4. Validar ganho com medição antes/depois.
-5. Checar impacto em escrita, backup e segurança.
+**Steps:**
+1. Collect the execution plan and metrics.
+2. Identify the bottleneck (index, *lock*, schema, query).
+3. Propose a fix based on the plan.
+4. Validate the gain with before/after measurement.
+5. Check impact on writes, backups, and security.

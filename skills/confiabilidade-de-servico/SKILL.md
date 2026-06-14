@@ -1,15 +1,15 @@
 ---
 name: confiabilidade-de-servico
-description: "Use para melhorar confiabilidade ou responder a incidente, definindo/checando SLIs/SLOs e error budget, instrumentando observabilidade, aplicando padrões de estabilidade e conduzindo postmortem sem culpa com ações."
+description: "Use to improve reliability or respond to an incident by defining and checking SLIs, SLOs, and error budget, instrumenting observability, applying stability patterns, and conducting a blameless postmortem with action items."
 ---
 
 # Skill — confiabilidade_de_servico
 
-**Quando usar:** Para melhorar confiabilidade ou responder a incidente.
+**When to use:** To improve reliability or respond to an incident.
 
-**Passos:**
-1. Definir/checar SLIs e SLOs e o error budget.
-2. Instrumentar observabilidade nos pontos certos.
-3. Identificar *failure modes* e aplicar padrões de estabilidade.
-4. Automatizar *toil* e alertas acionáveis.
-5. Conduzir *postmortem* sem culpa com ações.
+**Steps:**
+1. Define or review SLIs, SLOs, and the error budget.
+2. Instrument observability at the right points.
+3. Identify *failure modes* and apply stability patterns.
+4. Automate *toil* and create actionable alerts.
+5. Conduct a blameless *postmortem* with follow-up actions.

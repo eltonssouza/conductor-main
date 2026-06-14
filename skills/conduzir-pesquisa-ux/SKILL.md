@@ -1,15 +1,15 @@
 ---
 name: conduzir-pesquisa-ux
-description: "Use para planejar ou realizar pesquisa com usuários, definindo a pergunta e a decisão informada, escolhendo método e recrutando participantes certos, elaborando roteiro sem perguntas enviesadas e sintetizando em insights."
+description: "Use to plan or conduct user research by defining the research question and the decision it will inform, choosing a method and recruiting the right participants, drafting an unbiased discussion guide, and synthesizing findings into insights."
 ---
 
 # Skill — conduzir_pesquisa_ux
 
-**Quando usar:** Para planejar/realizar pesquisa com usuários.
+**When to use:** To plan or conduct user research.
 
-**Passos:**
-1. Definir a pergunta e a decisão informada.
-2. Escolher método e recrutar participantes certos.
-3. Elaborar roteiro sem perguntas enviesadas.
-4. Coletar e sintetizar em *insights*.
-5. Recomendar ações com nível de confiança.
+**Steps:**
+1. Define the research question and the decision it will inform.
+2. Choose a method and recruit the right participants.
+3. Draft a discussion guide free of leading questions.
+4. Collect data and synthesize it into *insights*.
+5. Recommend actions with a confidence level.

@@ -1,15 +1,15 @@
 ---
 name: estrategia-tecnologica
-description: "Use para decisões de plataforma, build-vs-buy ou roadmap técnico, enquadrando em objetivos de negócio, levantando opções com trade-offs e TCO, e registrando como ADR executivo com métricas."
+description: "Use for platform decisions, build-vs-buy analysis, or technical roadmap planning, framing the decision in business objectives, surfacing options with trade-offs and TCO, and recording the outcome as an executive ADR with metrics."
 ---
 
 # Skill — estrategia_tecnologica
 
-**Quando usar:** Para decisões de plataforma, build-vs-buy ou roadmap técnico.
+**When to use:** For platform decisions, build-vs-buy analysis, or technical roadmap planning.
 
-**Passos:**
-1. Enquadrar a decisão em objetivos de negócio.
-2. Levantar opções com *trade-offs* e TCO.
-3. Avaliar risco, talento e impacto organizacional.
-4. Recomendar com princípios e métricas de acompanhamento.
-5. Registrar como decisão arquitetural (ADR executivo).
+**Steps:**
+1. Frame the decision within business objectives.
+2. Surface options with *trade-offs* and TCO.
+3. Evaluate risk, talent, and organizational impact.
+4. Recommend with guiding principles and tracking metrics.
+5. Record as an architectural decision record (executive ADR).

@@ -1,15 +1,15 @@
 ---
 name: facilitar-retro
-description: "Use para conduzir uma retrospectiva ou resolver atrito de processo, reunindo fatos do período, facilitando levantamento sem culpa e priorizando 1–2 melhorias com dono e prazo."
+description: "Use to run a retrospective or resolve process friction, gathering facts from the period, facilitating a blameless retrospective, and prioritizing 1–2 improvements with an owner and deadline."
 ---
 
 # Skill — facilitar_retro
 
-**Quando usar:** Para conduzir uma retrospectiva ou resolver atrito de processo.
+**When to use:** To run a retrospective or resolve process friction.
 
-**Passos:**
-1. Reunir fatos do período (métricas + eventos).
-2. Facilitar levantamento sem culpa.
-3. Priorizar 1–2 melhorias de maior impacto.
-4. Definir experimentos com dono/prazo.
-5. Acompanhar o resultado na próxima retro.
+**Steps:**
+1. Gather facts from the period (metrics + events).
+2. Facilitate a blameless retrospective.
+3. Prioritize the 1–2 highest-impact improvements.
+4. Define experiments with an owner and deadline.
+5. Track the outcome in the next retrospective.

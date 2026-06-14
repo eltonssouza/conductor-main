@@ -1,15 +1,15 @@
 ---
 name: escalar-organizacao
-description: "Use ao planejar crescimento, reorganização ou melhoria de previsibilidade, diagnosticando gargalos organizacionais com dados, modelando estrutura de times/papéis e planejando contratação sem violar a Lei de Brooks."
+description: "Use when planning growth, reorganization, or predictability improvements, diagnosing organizational bottlenecks with data, modeling team structure and roles, and planning hiring without violating Brooks's Law."
 ---
 
 # Skill — escalar_organizacao
 
-**Quando usar:** Ao planejar crescimento, reorganização ou melhoria de previsibilidade.
+**When to use:** When planning growth, reorganization, or predictability improvements.
 
-**Passos:**
-1. Diagnosticar gargalos organizacionais com dados.
-2. Modelar estrutura de times e papéis.
-3. Definir processos de decisão e *ladders*.
-4. Planejar contratação sem violar a Lei de Brooks.
-5. Estabelecer métricas de entrega e saúde.
+**Steps:**
+1. Diagnose organizational bottlenecks with data.
+2. Model team structure and roles.
+3. Define decision-making processes and *ladders*.
+4. Plan hiring without violating Brooks's Law.
+5. Establish delivery and health metrics.

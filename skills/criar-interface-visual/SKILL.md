@@ -1,15 +1,15 @@
 ---
 name: criar-interface-visual
-description: "Use para desenhar uma tela ou componente visual, partindo do conteúdo e da hierarquia da informação, aplicando espaçamento/tipografia/cor com propósito, definindo estados/responsividade e checando contraste e acessibilidade visual."
+description: "Use to design a screen or visual component by starting from content and information hierarchy, applying spacing, typography, and color with purpose, defining all states and responsiveness, and checking contrast and visual accessibility."
 ---
 
 # Skill — criar_interface_visual
 
-**Quando usar:** Para desenhar uma tela ou componente visual.
+**When to use:** To design a screen or visual component.
 
-**Passos:**
-1. Partir do conteúdo e da hierarquia da informação.
-2. Aplicar espaçamento, tipografia e cor com propósito.
-3. Definir todos os estados e responsividade.
-4. Checar contraste e acessibilidade visual.
-5. Alinhar com tokens do *design system* e viabilidade técnica.
+**Steps:**
+1. Start from content and information hierarchy.
+2. Apply spacing, typography, and color with purpose.
+3. Define all states and responsiveness.
+4. Check contrast and visual accessibility.
+5. Align with *design system* tokens and technical feasibility.

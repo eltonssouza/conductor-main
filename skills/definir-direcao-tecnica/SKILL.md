@@ -1,15 +1,15 @@
 ---
 name: definir-direcao-tecnica
-description: "Use para padrões/estratégia em escala organizacional, identificando quality attributes e drivers de negócio, avaliando riscos sistêmicos, definindo princípios/guardrails e escrevendo a visão técnica e o caminho de migração."
+description: "Use for standards and strategy at organizational scale by identifying quality attributes and business drivers, assessing systemic risks, defining architectural principles and guardrails, and writing the technical vision and migration path."
 ---
 
 # Skill — definir_direcao_tecnica
 
-**Quando usar:** Para padrões/estratégia em escala organizacional.
+**When to use:** For standards and strategy at organizational scale.
 
-**Passos:**
-1. Identificar os *quality attributes* e *drivers* de negócio.
-2. Avaliar o estado atual e riscos sistêmicos.
-3. Definir princípios e *guardrails* arquiteturais.
-4. Escrever a visão técnica e o caminho de migração.
-5. Estabelecer como medir adoção e resultado.
+**Steps:**
+1. Identify *quality attributes* and business *drivers*.
+2. Assess the current state and systemic risks.
+3. Define architectural principles and *guardrails*.
+4. Write the technical vision and migration path.
+5. Establish how to measure adoption and outcomes.
