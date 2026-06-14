@@ -41,3 +41,20 @@ não escreva spec.
 
 **Livros-base:** *Domain-Driven Design* (Evans), *Learning DDD*, *User Story
 Mapping*, *Inspired*, *Continuous Discovery Habits*.
+
+---
+
+## Portão 2 — Especificação como fonte de verdade (SDD)
+
+**Objetivo:** escrever a spec clara — objetivos/não-objetivos, requisitos
+FR/NFR, regras de negócio e critérios de aceite com exemplos concretos
+(Dado/Quando/Então). Ambiguidade é o inimigo nº 1.
+
+**Cargos:** `product-owner`, `business-analyst`, `quality-assurance` (skills
+`refinar-backlog`, `mapear-requisitos`, `estrategia-de-testes`).
+
+**Portão de qualidade:** cada item com critério de aceite **testável** e
+exemplos; objetivos e não-objetivos explícitos. Nada vira tarefa sem critério
+de aceite verificável.
+
+**Livros-base:** *Spec-Driven Development*, *Specification by Example* (Adzic).
