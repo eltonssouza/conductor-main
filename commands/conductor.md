@@ -78,3 +78,23 @@ parte da spec.
 
 **Livros-base:** *Threat Modeling* (Shostack), *Building Secure and Reliable
 Systems*, *Security Engineering*, *The Privacy Engineer's Manifesto*.
+
+---
+
+## Portão 4 — Arquitetura e design defensivo
+
+**Objetivo:** fronteiras limpas, regra de dependência, padrões de estabilidade
+(timeout, circuit breaker, bulkhead) e decisões registradas (ADRs) para que
+falhas não se propaguem. Minimize complexidade acidental.
+
+**Cargos:** `software-architect`, `solutions-architect`, `enterprise-architect`,
+`tech-lead`, `staff-engineer`, `principal-engineer` (skills
+`decidir-arquitetura`, `desenhar-solucao`, `conduzir-decisao-tecnica`,
+`liderar-iniciativa-tecnica`, `definir-direcao-tecnica`).
+
+**Portão de qualidade:** atributos de qualidade priorizados; estilo/padrões
+escolhidos com *trade-offs*; decisões-chave registradas como **ADR**; fronteiras
+e *failure modes* definidos. Sem ADR das decisões estruturais, não implemente.
+
+**Livros-base:** *Clean Architecture*, *Fundamentals of Software Architecture*,
+*A Philosophy of Software Design*, *Design Patterns* (GoF), *Release It!*.
