@@ -169,3 +169,21 @@ resultado; divergências viram defeito ou ajuste de spec — não passam batido.
 spec e o produto convergem.
 
 **Livros-base:** *Spec-Driven Development* (cap. 13), *Specification by Example*.
+
+---
+
+## Portão 9 — Entrega progressiva
+
+**Objetivo:** canary, blue-green, feature flags e rollback automático para
+limitar o raio de impacto de qualquer defeito que escape.
+
+**Cargos:** `devops-engineer`, `platform-engineer`, `site-reliability-engineer`
+(skills `montar-pipeline-cicd`, `construir-capacidade-plataforma`,
+`confiabilidade-de-servico`).
+
+**Portão de qualidade:** estratégia de rollout progressivo definida (flag/canary/
+blue-green) com gatilho e **rollback automático**; raio de impacto limitado e
+mensurável. Nada vai a 100% sem caminho de reversão.
+
+**Livros-base:** *Continuous Delivery*, *Kubernetes Up and Running*, *Release
+It!*.
