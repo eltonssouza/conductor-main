@@ -62,6 +62,14 @@ class Chunk:
 
 
 _HEADING_RE = re.compile(r"^#{1,6}\s+(.*)$")
+# Control chars except tab/newline/carriage-return. NUL bytes (UTF-16 leftovers
+# in some corpus files) make Ollama /api/embed return HTTP 400, so we strip them.
+_CTRL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
+
+
+def sanitize(text: str) -> str:
+    """Removes NUL and other C0 control chars that break the embeddings API."""
+    return _CTRL_RE.sub("", text)
 
 
 def chunk_markdown(text: str, *, source: str, category: str, path: str) -> List[Chunk]:
@@ -127,7 +135,7 @@ def iter_corpus(acervo: Path = ACERVO_DIR) -> Iterable[Chunk]:
         rel = md.relative_to(acervo)
         parts = rel.parts
         category = parts[0] if len(parts) > 1 else "(root)"
-        text = md.read_text(encoding="utf-8", errors="replace")
+        text = sanitize(md.read_text(encoding="utf-8", errors="replace"))
         yield from chunk_markdown(
             text, source=md.stem, category=category, path=str(rel).replace("\\", "/"),
         )
@@ -141,7 +149,7 @@ def embed(texts: List[str]) -> List[List[float]]:
     Each text is truncated to EMBED_CHAR_CAP and empty strings become a space,
     so Ollama never returns HTTP 400.
     """
-    safe = [(t[:EMBED_CHAR_CAP] or " ") for t in texts]
+    safe = [(sanitize(t)[:EMBED_CHAR_CAP] or " ") for t in texts]
     payload = json.dumps({"model": EMBED_MODEL, "input": safe}).encode("utf-8")
     req = urllib.request.Request(
         f"{OLLAMA_URL}/api/embed", data=payload,
