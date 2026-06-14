@@ -58,3 +58,23 @@ exemplos; objetivos e não-objetivos explícitos. Nada vira tarefa sem critério
 de aceite verificável.
 
 **Livros-base:** *Spec-Driven Development*, *Specification by Example* (Adzic).
+
+---
+
+## Portão 3 — Segurança e privacidade por design (shift-left)
+
+**Objetivo:** modelar ameaças e definir requisitos de segurança/privacidade já
+no design, não depois. Diagrame *trust boundaries*, enumere ameaças (STRIDE),
+verifique base legal e minimização de dados pessoais.
+
+**Cargos:** `security-engineer`, `application-security-engineer`,
+`data-protection-officer`, `ciso` (skills `modelar-ameacas`,
+`revisar-seguranca-app`, `avaliar-privacidade`, `programa-de-seguranca`).
+
+**Portão de qualidade:** ameaças priorizadas (prob. × impacto) com mitigações e
+*secure defaults*; tratamento de dados pessoais com base legal e minimização
+definidas; DPIA quando houver risco. Requisitos de segurança/privacidade viram
+parte da spec.
+
+**Livros-base:** *Threat Modeling* (Shostack), *Building Secure and Reliable
+Systems*, *Security Engineering*, *The Privacy Engineer's Manifesto*.
