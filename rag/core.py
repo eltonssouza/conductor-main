@@ -44,6 +44,9 @@ EMBED_DIM = 1024
 CHUNK_TARGET_CHARS = 1500
 CHUNK_MAX_CHARS = 2400
 EMBED_BATCH = 48
+# Teto de segurança por texto enviado ao Ollama (bge-m3 ~8192 tokens). Acima
+# disso o /api/embed devolve HTTP 400; truncamos para nunca estourar.
+EMBED_CHAR_CAP = 6000
 
 
 # --- chunking ----------------------------------------------------------------
@@ -86,11 +89,21 @@ def chunk_markdown(text: str, *, source: str, category: str, path: str) -> List[
             idx += 1
         buf, buf_len = [], 0
 
-    # parágrafos separados por linha em branco
-    for para in re.split(r"\n\s*\n", text):
-        para = para.strip()
-        if not para:
+    # parágrafos separados por linha em branco; parágrafos gigantes (tabelas,
+    # blocos de código sem linha em branco) são fatiados para não estourar o
+    # contexto do modelo de embeddings.
+    raw_paras = re.split(r"\n\s*\n", text)
+    paras: List[str] = []
+    for p in raw_paras:
+        p = p.strip()
+        if not p:
             continue
+        if len(p) > CHUNK_MAX_CHARS:
+            paras.extend(p[i:i + CHUNK_MAX_CHARS] for i in range(0, len(p), CHUNK_MAX_CHARS))
+        else:
+            paras.append(p)
+
+    for para in paras:
         m = _HEADING_RE.match(para.splitlines()[0])
         if m:
             section = m.group(1).strip()[:120]
@@ -123,8 +136,13 @@ def iter_corpus(acervo: Path = ACERVO_DIR) -> Iterable[Chunk]:
 # --- embeddings (Ollama bge-m3) ---------------------------------------------
 
 def embed(texts: List[str]) -> List[List[float]]:
-    """Embeda uma lista de textos via Ollama /api/embed (batch). 1024-d."""
-    payload = json.dumps({"model": EMBED_MODEL, "input": texts}).encode("utf-8")
+    """Embeda uma lista de textos via Ollama /api/embed (batch). 1024-d.
+
+    Cada texto é truncado em EMBED_CHAR_CAP e o vazio vira espaço, para nunca
+    provocar HTTP 400 do Ollama.
+    """
+    safe = [(t[:EMBED_CHAR_CAP] or " ") for t in texts]
+    payload = json.dumps({"model": EMBED_MODEL, "input": safe}).encode("utf-8")
     req = urllib.request.Request(
         f"{OLLAMA_URL}/api/embed", data=payload,
         headers={"Content-Type": "application/json"},

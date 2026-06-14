@@ -18,8 +18,7 @@ from .core import (ACERVO_DIR, CHROMA_DIR, EMBED_BATCH, Chunk, embed,
                    force_utf8, get_collection, iter_corpus)
 
 
-def _flush(coll, batch: List[Chunk]) -> None:
-    embs = embed([c.text for c in batch])
+def _upsert(coll, batch: List[Chunk], embs) -> None:
     coll.upsert(
         ids=[c.chunk_id for c in batch],
         embeddings=embs,
@@ -27,6 +26,26 @@ def _flush(coll, batch: List[Chunk]) -> None:
         metadatas=[{"source": c.source, "category": c.category,
                     "section": c.section, "path": c.path} for c in batch],
     )
+
+
+def _flush(coll, batch: List[Chunk]) -> int:
+    """Indexa um batch; se ele falhar, tenta por item e pula os ruins.
+
+    Devolve quantos chunks foram realmente indexados.
+    """
+    try:
+        _upsert(coll, batch, embed([c.text for c in batch]))
+        return len(batch)
+    except Exception as e:  # noqa: BLE001 — qualquer falha de rede/modelo
+        print(f"  ! batch de {len(batch)} falhou ({e}); tentando item a item", file=sys.stderr)
+        ok = 0
+        for c in batch:
+            try:
+                _upsert(coll, [c], embed([c.text]))
+                ok += 1
+            except Exception as e2:  # noqa: BLE001
+                print(f"  ! pulando chunk {c.chunk_id} ({e2})", file=sys.stderr)
+        return ok
 
 
 def main(argv: List[str]) -> int:
@@ -44,26 +63,27 @@ def main(argv: List[str]) -> int:
     print(f"Acervo: {ACERVO_DIR}\nChroma: {CHROMA_DIR}\nColeção: {coll.name}")
 
     batch: List[Chunk] = []
-    total = 0
+    total = 0   # indexados com sucesso
+    seen = 0    # processados (inclui pulados)
     t0 = time.monotonic()
     for chunk in iter_corpus():
         batch.append(chunk)
+        seen += 1
         if len(batch) >= args.batch:
-            _flush(coll, batch)
-            total += len(batch)
+            total += _flush(coll, batch)
             batch = []
-            if total % (args.batch * 10) == 0:
-                rate = total / max(time.monotonic() - t0, 1e-6)
-                print(f"  {total} chunks indexados ({rate:.0f}/s)")
-        if args.limit and total >= args.limit:
+            if seen % (args.batch * 10) == 0:
+                rate = seen / max(time.monotonic() - t0, 1e-6)
+                print(f"  {seen} chunks processados, {total} indexados ({rate:.0f}/s)")
+        if args.limit and seen >= args.limit:
             break
 
-    if batch and (not args.limit or total < args.limit):
-        _flush(coll, batch)
-        total += len(batch)
+    if batch and (not args.limit or seen < args.limit):
+        total += _flush(coll, batch)
 
     dt = time.monotonic() - t0
-    print(f"Concluído: {total} chunks em {dt:.0f}s. Total na coleção: {coll.count()}")
+    print(f"Concluído: {seen} processados, {total} indexados em {dt:.0f}s. "
+          f"Total na coleção: {coll.count()}")
     return 0
 
 
