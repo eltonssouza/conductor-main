@@ -282,6 +282,30 @@ def check_agent_anchor(ctx: Context) -> List[Violation]:
     return v
 
 
+# --- R6: estrutura da skill (Quando usar + Passos numerados) -----------------
+
+QUANDO_RE = re.compile(r"(?im)^\W*Quando usar")
+NUM_STEP_RE = re.compile(r"(?m)^\s*\d+\.\s+\S")
+MIN_STEPS = 2
+
+
+@rule("R6-skill-structure", "skill tem 'Quando usar' e Passos numerados")
+def check_skill_structure(ctx: Context) -> List[Violation]:
+    v: List[Violation] = []
+    for path in ctx.skill_files:
+        rel = ctx.rel(path)
+        _fm, body = split_frontmatter(path.read_text(encoding="utf-8"))
+
+        if not QUANDO_RE.search(body):
+            v.append(Violation("R6-skill-structure", rel, "sem seção 'Quando usar'"))
+
+        n_steps = len(NUM_STEP_RE.findall(body))
+        if n_steps < MIN_STEPS:
+            v.append(Violation("R6-skill-structure", rel,
+                               f"Passos numerados insuficientes ({n_steps} < {MIN_STEPS})"))
+    return v
+
+
 # --- runner ------------------------------------------------------------------
 
 def run() -> List[Violation]:
