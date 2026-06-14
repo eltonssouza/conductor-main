@@ -13,6 +13,7 @@ Sem dependências de terceiros (apenas stdlib). Uso duplo:
 """
 from __future__ import annotations
 
+import json
 import re
 import sys
 from dataclasses import dataclass
@@ -23,6 +24,10 @@ ROOT = Path(__file__).resolve().parent.parent
 AGENTS_DIR = ROOT / "agents"
 SKILLS_DIR = ROOT / "skills"
 PLANO = ROOT / "plano.md"
+PLUGIN_JSON = ROOT / ".claude-plugin" / "plugin.json"
+PYPROJECT = ROOT / "pyproject.toml"
+
+SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
 
 EXPECTED_ROLES = 36
 
@@ -213,6 +218,43 @@ def check_yaml_safety(ctx: Context) -> List[Violation]:
         elif not DQUOTED_RE.match(desc):
             v.append(Violation("R3-yaml-safety", rel,
                                'description com aspas internas não escapadas (use \\")'))
+    return v
+
+
+# --- R4: versão sincronizada (plugin.json == pyproject.toml, semver) ---------
+
+@rule("R4-version-sync", "plugin.json e pyproject.toml na mesma versão semver")
+def check_version_sync(ctx: Context) -> List[Violation]:
+    v: List[Violation] = []
+
+    plugin_ver = None
+    if PLUGIN_JSON.is_file():
+        try:
+            plugin_ver = json.loads(PLUGIN_JSON.read_text(encoding="utf-8")).get("version")
+        except (ValueError, OSError) as e:
+            v.append(Violation("R4-version-sync", ctx.rel(PLUGIN_JSON), f"JSON inválido: {e}"))
+    else:
+        v.append(Violation("R4-version-sync", ctx.rel(PLUGIN_JSON), "arquivo ausente"))
+
+    pyproj_ver = None
+    if PYPROJECT.is_file():
+        m = re.search(r'(?m)^version\s*=\s*"([^"]+)"', PYPROJECT.read_text(encoding="utf-8"))
+        pyproj_ver = m.group(1) if m else None
+        if pyproj_ver is None:
+            v.append(Violation("R4-version-sync", ctx.rel(PYPROJECT), "sem campo version"))
+    else:
+        v.append(Violation("R4-version-sync", ctx.rel(PYPROJECT), "arquivo ausente"))
+
+    for label, ver, path in (("plugin.json", plugin_ver, PLUGIN_JSON),
+                             ("pyproject.toml", pyproj_ver, PYPROJECT)):
+        if ver is not None and not SEMVER_RE.match(ver):
+            v.append(Violation("R4-version-sync", ctx.rel(path),
+                               f"versão '{ver}' não é semver MAJOR.MINOR.PATCH"))
+
+    if plugin_ver is not None and pyproj_ver is not None and plugin_ver != pyproj_ver:
+        v.append(Violation("R4-version-sync", ctx.rel(PYPROJECT),
+                           f"versão {pyproj_ver} != plugin.json {plugin_ver}"))
+
     return v
 
 
