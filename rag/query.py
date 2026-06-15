@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Semantic search over the acervo. Embeds the question and returns the top-k passages.
+"""Semantic search over the library. Embeds the question and returns the top-k passages.
 
   python -m rag.query "how to define bounded context boundaries?"
   python -m rag.query -k 8 --json "circuit breaker vs bulkhead"
@@ -41,10 +41,10 @@ def search(question: str, k: int = 5, category: str = "") -> List[dict]:
 
 
 def main(argv: List[str]) -> int:
-    ap = argparse.ArgumentParser(description="Semantic search over the Conductor acervo.")
+    ap = argparse.ArgumentParser(description="Semantic search over the Conductor library.")
     ap.add_argument("question", help="question / query")
     ap.add_argument("-k", type=int, default=5, help="number of passages (default 5)")
-    ap.add_argument("--category", default="", help="filter by acervo category")
+    ap.add_argument("--category", default="", help="filter by library category")
     ap.add_argument("--json", action="store_true", help="JSON output")
     args = ap.parse_args(argv)
     force_utf8()

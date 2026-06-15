@@ -1,6 +1,6 @@
 """Core of the Conductor RAG.
 
-Pipeline: acervo markdown → chunks → bge-m3 embeddings (via Ollama) →
+Pipeline: library markdown → chunks → bge-m3 embeddings (via Ollama) →
 persistent ChromaDB. Shared by the `ingest.py` and `query.py` CLIs.
 
 Runtime dependencies (owner decision, 2026-06-14):
@@ -32,9 +32,9 @@ def force_utf8() -> None:
 # --- configuration -----------------------------------------------------------
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-ACERVO_DIR = Path(os.environ.get("CONDUCTOR_ACERVO", r"C:\development\to-brain"))
+LIBRARY_DIR = Path(os.environ.get("CONDUCTOR_LIBRARY", r"C:\development\to-brain"))
 CHROMA_DIR = Path(os.environ.get("CONDUCTOR_CHROMA", str(REPO_ROOT / "rag" / "chroma")))
-COLLECTION = "acervo"
+COLLECTION = "library"
 
 OLLAMA_URL = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
 EMBED_MODEL = os.environ.get("CONDUCTOR_EMBED_MODEL", "bge-m3")
@@ -58,7 +58,7 @@ class Chunk:
     source: str       # file name (book)
     category: str     # top-level directory
     section: str      # last markdown heading seen
-    path: str         # path relative to the acervo
+    path: str         # path relative to the library
 
 
 _HEADING_RE = re.compile(r"^#{1,6}\s+(.*)$")
@@ -129,10 +129,10 @@ def chunk_markdown(text: str, *, source: str, category: str, path: str) -> List[
     return chunks
 
 
-def iter_corpus(acervo: Path = ACERVO_DIR) -> Iterable[Chunk]:
-    """Walks `acervo/**/*.md` and yields all chunks."""
-    for md in sorted(acervo.rglob("*.md")):
-        rel = md.relative_to(acervo)
+def iter_corpus(library: Path = LIBRARY_DIR) -> Iterable[Chunk]:
+    """Walks `library/**/*.md` and yields all chunks."""
+    for md in sorted(library.rglob("*.md")):
+        rel = md.relative_to(library)
         parts = rel.parts
         category = parts[0] if len(parts) > 1 else "(root)"
         text = sanitize(md.read_text(encoding="utf-8", errors="replace"))
@@ -166,7 +166,7 @@ def embed(texts: List[str]) -> List[List[float]]:
 # --- ChromaDB ----------------------------------------------------------------
 
 def get_collection(create: bool = True):
-    """Opens (or creates) the persistent acervo collection."""
+    """Opens (or creates) the persistent library collection."""
     import chromadb  # late import: heavy dependency
 
     CHROMA_DIR.mkdir(parents=True, exist_ok=True)

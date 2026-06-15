@@ -1,6 +1,6 @@
-# rag/ — semantic search over the acervo
+# rag/ — semantic search over the library
 
-Implements the RAG goal from `plano.md`: retrieve passages from the acervo
+Implements the RAG goal from `plano.md`: retrieve passages from the library
 books to **ground** the roles' answers (fights hallucination).
 
 ## Stack
@@ -25,7 +25,7 @@ pip install -e .[rag]
 
 ```bash
 # Build/update the index (idempotent; can be resumed)
-python -m rag.ingest                 # full acervo
+python -m rag.ingest                 # full library
 python -m rag.ingest --limit 200     # quick sample
 
 # Query
@@ -35,13 +35,13 @@ python -m rag.query --category 09_seguranca_e_privacidade "STRIDE"
 ```
 
 Or via the plugin: command `/library <question>` (and `/cdt` uses the
-acervo to anchor each gate).
+library to anchor each gate).
 
 ## Configuration (environment variables)
 
 | Var | Default | Purpose |
 |-----|---------|---------|
-| `CONDUCTOR_ACERVO` | `C:\development\to-brain` | corpus markdown root |
+| `CONDUCTOR_LIBRARY` | `C:\development\to-brain` | corpus markdown root |
 | `CONDUCTOR_CHROMA` | `rag/chroma` | where to persist the index |
 | `CONDUCTOR_EMBED_MODEL` | `bge-m3` | embeddings model in Ollama |
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama endpoint |

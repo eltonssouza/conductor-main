@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Indexes the acervo into ChromaDB: chunk → embed (bge-m3) → upsert.
+"""Indexes the library into ChromaDB: chunk → embed (bge-m3) → upsert.
 
 Idempotent: re-running updates the same chunk_ids (upsert), so it can be
 interrupted and resumed. Usage:
 
-  python -m rag.ingest               # full acervo
+  python -m rag.ingest               # full library
   python -m rag.ingest --limit 200   # only the first N chunks (quick test)
 """
 from __future__ import annotations
@@ -14,7 +14,7 @@ import sys
 import time
 from typing import List
 
-from .core import (ACERVO_DIR, CHROMA_DIR, EMBED_BATCH, Chunk, embed,
+from .core import (LIBRARY_DIR, CHROMA_DIR, EMBED_BATCH, Chunk, embed,
                    force_utf8, get_collection, iter_corpus)
 
 
@@ -49,18 +49,18 @@ def _flush(coll, batch: List[Chunk]) -> int:
 
 
 def main(argv: List[str]) -> int:
-    ap = argparse.ArgumentParser(description="Index the acervo into ChromaDB.")
+    ap = argparse.ArgumentParser(description="Index the library into ChromaDB.")
     ap.add_argument("--limit", type=int, default=0, help="max chunks (0 = all)")
     ap.add_argument("--batch", type=int, default=EMBED_BATCH, help="embed batch size")
     args = ap.parse_args(argv)
     force_utf8()
 
-    if not ACERVO_DIR.is_dir():
-        print(f"ERROR: acervo not found at {ACERVO_DIR}", file=sys.stderr)
+    if not LIBRARY_DIR.is_dir():
+        print(f"ERROR: library not found at {LIBRARY_DIR}", file=sys.stderr)
         return 2
 
     coll = get_collection(create=True)
-    print(f"Acervo: {ACERVO_DIR}\nChroma: {CHROMA_DIR}\nCollection: {coll.name}")
+    print(f"Library: {LIBRARY_DIR}\nChroma: {CHROMA_DIR}\nCollection: {coll.name}")
 
     batch: List[Chunk] = []
     total = 0   # successfully indexed
