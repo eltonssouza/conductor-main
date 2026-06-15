@@ -9,4 +9,4 @@ COPY . /app
 RUN pip install --no-cache-dir -e .[rag] py7zr
 
 ENV CONDUCTOR_LIBRARY=/data/library
-ENTRYPOINT ["python", "-m", "rag.bootstrap"]
+ENTRYPOINT ["python", "-m", "conductor.rag.bootstrap"]

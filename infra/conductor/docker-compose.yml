@@ -37,12 +37,9 @@ services:
       ANONYMIZED_TELEMETRY: "FALSE"
     ports:
       - "127.0.0.1:8001:8000"
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v2/heartbeat')"]
-      interval: 5s
-      timeout: 5s
-      retries: 30
-      start_period: 10s
+    # No healthcheck: the chromadb/chroma image has no `python`/`curl` on PATH to
+    # probe with. The `conductor` service polls Chroma's heartbeat itself before
+    # ingesting (see rag/bootstrap.step_chroma), so it waits correctly anyway.
     restart: unless-stopped
 
   conductor:
@@ -53,7 +50,7 @@ services:
       ollama:
         condition: service_healthy
       chroma:
-        condition: service_healthy
+        condition: service_started
     environment:
       OLLAMA_HOST: http://ollama:11434
       CONDUCTOR_CHROMA_HTTP: chroma:8000

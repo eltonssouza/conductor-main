@@ -11,4 +11,4 @@ Not a Claude Code plugin: the reasoning happens in the user's Claude, driven by
 the project-local `.claude/` and `CLAUDE.md` this tool generates.
 """
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
