@@ -118,7 +118,7 @@ class Context:
 
 # --- R1: plan <-> source parity ---------------------------------------------
 
-@rule("R1-parity", "36 agents + 36 skills; every plan skill has a directory")
+@rule("R1-parity", "36 agents + 36 skills, each with SKILL.md; plan names 36 skills")
 def check_parity(ctx: Context) -> List[Violation]:
     v: List[Violation] = []
 
@@ -138,15 +138,9 @@ def check_parity(ctx: Context) -> List[Violation]:
             if d.is_dir() and not (d / "SKILL.md").is_file():
                 v.append(Violation("R1-parity", ctx.rel(d), "skill directory missing SKILL.md"))
 
-    # Every skill named in the plan (`**Skill — `name`:**`) has a directory.
+    # Sanity on the plan itself: it still names 36 skills. (The dir slugs are
+    # English now while plano.md stays pt-BR, so we no longer map name -> dir.)
     plano_skills = set(re.findall(r"\*\*Skill\s*—\s*`([a-z0-9_]+)`", ctx.plano_text))
-    existing_dirs = {p.parent.name for p in ctx.skill_files}
-    for name in sorted(plano_skills):
-        kebab = name.replace("_", "-")
-        if kebab not in existing_dirs:
-            v.append(Violation("R1-parity", "plano.md",
-                               f"skill `{name}` from plan has no skills/{kebab}/ directory"))
-
     if plano_skills and len(plano_skills) != EXPECTED_ROLES:
         v.append(Violation("R1-parity", "plano.md",
                            f"plan names {len(plano_skills)} skills, expected {EXPECTED_ROLES}"))

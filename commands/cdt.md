@@ -39,8 +39,8 @@ any code**. Separate the user's problem from the solution; model the domain
 (actors, events, rules, glossary).
 
 **Roles:** `product-manager`, `product-owner`, `business-analyst`,
-`ux-researcher` (use the skills `descoberta-de-produto`, `mapear-requisitos`,
-`conduzir-pesquisa-ux`).
+`ux-researcher` (use the skills `product-discovery`, `map-requirements`,
+`conduct-ux-research`).
 
 **Quality gate:** problem and hypothesis stated; glossary/ubiquitous language
 started; main actors and business rules identified. Without this, do not write a
@@ -58,7 +58,7 @@ business rules, and acceptance criteria with concrete examples
 (Given/When/Then). Ambiguity is enemy #1.
 
 **Roles:** `product-owner`, `business-analyst`, `quality-assurance` (skills
-`refinar-backlog`, `mapear-requisitos`, `estrategia-de-testes`).
+`refine-backlog`, `map-requirements`, `test-strategy`).
 
 **Quality gate:** every item has **testable** acceptance criteria and examples;
 goals and non-goals are explicit. Nothing becomes a task without verifiable
@@ -75,8 +75,8 @@ design, not afterwards. Diagram *trust boundaries*, enumerate threats (STRIDE),
 check legal basis and personal-data minimization.
 
 **Roles:** `security-engineer`, `application-security-engineer`,
-`data-protection-officer`, `ciso` (skills `modelar-ameacas`,
-`revisar-seguranca-app`, `avaliar-privacidade`, `programa-de-seguranca`).
+`data-protection-officer`, `ciso` (skills `model-threats`,
+`review-app-security`, `assess-privacy`, `security-program`).
 
 **Quality gate:** prioritized threats (prob. × impact) with mitigations and
 *secure defaults*; personal-data handling with legal basis and minimization
@@ -96,8 +96,8 @@ failures do not propagate. Minimize accidental complexity.
 
 **Roles:** `software-architect`, `solutions-architect`, `enterprise-architect`,
 `tech-lead`, `staff-engineer`, `principal-engineer` (skills
-`decidir-arquitetura`, `desenhar-solucao`, `conduzir-decisao-tecnica`,
-`liderar-iniciativa-tecnica`, `definir-direcao-tecnica`).
+`decide-architecture`, `design-solution`, `drive-technical-decision`,
+`lead-technical-initiative`, `define-technical-direction`).
 
 **Quality gate:** prioritized quality attributes; style/patterns chosen with
 *trade-offs*; key decisions recorded as **ADR**; boundaries and *failure modes*
@@ -115,7 +115,7 @@ Architecture*, *A Philosophy of Software Design*, *Design Patterns* (GoF),
 cycle; automated acceptance tests (ATDD). The test fails before any code exists.
 
 **Roles:** `sdet`, `quality-assurance`, `software-engineer` (skills
-`automatizar-testes`, `estrategia-de-testes`, `implementar-feature-tdd`).
+`automate-tests`, `test-strategy`, `implement-feature-tdd`).
 
 **Quality gate:** test cases derived from the acceptance criteria; tests written
 **failing** before implementation; the right pyramid levels chosen; no
@@ -134,8 +134,8 @@ minimum to make the tests pass; refactor with green tests; clear names, small
 functions, low coupling, DRY, no *broken windows*.
 
 **Roles:** `software-engineer`, `frontend-engineer`, `backend-engineer`,
-`fullstack-engineer` (skills `implementar-feature-tdd`, `construir-componente-ui`,
-`projetar-servico`, `entregar-feature-vertical`).
+`fullstack-engineer` (skills `implement-feature-tdd`, `build-ui-component`,
+`design-service`, `deliver-vertical-feature`).
 
 **Quality gate:** green tests; readable, refactored code; errors and edge cases
 handled; nothing marked done with a failing test.
@@ -152,7 +152,7 @@ Nothing advances without passing the quality gate. Everything versioned and
 reproducible.
 
 **Roles:** `devops-engineer`, `platform-engineer`, `sdet` (skills
-`montar-pipeline-cicd`, `construir-capacidade-plataforma`, `automatizar-testes`).
+`build-cicd-pipeline`, `build-platform-capability`, `automate-tests`).
 
 **Quality gate:** the pipeline runs build + tests + static analysis and is
 **green**; the gate blocks merge on failure; immutable artifacts. For this repo
@@ -170,7 +170,7 @@ Handbook*, *Accelerate*, *Spec-Driven Development* (ch. 20, Quality Gate).
 what was built.
 
 **Roles:** `quality-assurance`, `business-analyst`, `product-owner` (skills
-`estrategia-de-testes`, `mapear-requisitos`, `refinar-backlog`).
+`test-strategy`, `map-requirements`, `refine-backlog`).
 
 **Quality gate:** every acceptance criterion of the spec verified against the
 result; divergences become defects or spec adjustments — they do not slip
@@ -187,8 +187,8 @@ Example*.
 the blast radius of any defect that escapes.
 
 **Roles:** `devops-engineer`, `platform-engineer`, `site-reliability-engineer`
-(skills `montar-pipeline-cicd`, `construir-capacidade-plataforma`,
-`confiabilidade-de-servico`).
+(skills `build-cicd-pipeline`, `build-platform-capability`,
+`service-reliability`).
 
 **Quality gate:** a progressive rollout strategy defined (flag/canary/blue-green)
 with a trigger and **automatic rollback**; blast radius limited and measurable.
@@ -206,7 +206,7 @@ contain production problems within minutes. Metrics, logs, and *traces* answer
 unknown questions.
 
 **Roles:** `site-reliability-engineer`, `devops-engineer` (skills
-`confiabilidade-de-servico`, `montar-pipeline-cicd`).
+`service-reliability`, `build-cicd-pipeline`).
 
 **Quality gate:** SLIs/SLOs defined and instrumented; actionable alerts based on
 user-facing symptoms; observable *failure modes*. Do not operate blind.
@@ -222,7 +222,7 @@ user-facing symptoms; observable *failure modes*. Do not operate blind.
 incident becomes a new spec/test**, closing the loop back to Gate 2.
 
 **Roles:** `site-reliability-engineer`, `engineering-manager`, `agile-coach`
-(skills `confiabilidade-de-servico`, `diagnostico-de-time`, `diagnostico-agil`).
+(skills `service-reliability`, `team-diagnosis`, `agile-diagnosis`).
 
 **Quality gate:** blameless postmortem with root cause and actions with
 owner/deadline; each learning fed back as a new spec/test. The loop restarts —
