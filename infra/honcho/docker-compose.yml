@@ -6,7 +6,7 @@
 # `up` clones + builds it; subsequent runs are cached.
 #
 # Usage:
-#   cp .env.example .env        # then set LLM_OPENAI_API_KEY (DeepSeek)
+#   python -m cdt.honcho_setup  # choose the reasoning provider (writes .env)
 #   docker compose up -d
 #   curl http://localhost:8000/health
 #

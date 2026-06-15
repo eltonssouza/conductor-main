@@ -52,10 +52,14 @@ The diary works without Honcho (local mirror only). For meaning-based recall,
 run the self-hosted server and install the SDK:
 
 ```bash
-cd infra/honcho && cp .env.example .env   # set the DeepSeek key
-docker compose up -d
+python -m cdt.honcho_setup                # choose the reasoning provider (writes .env)
+cd infra/honcho && docker compose up -d
 pip install -e .[honcho]
 ```
+
+The reasoning provider is **your choice at install time** — `cdt.honcho_setup`
+has presets for OpenAI, DeepSeek, OpenRouter, local Ollama, and Anthropic (any
+OpenAI-compatible endpoint works). Re-run it to switch.
 
 Peer model: two peers per workspace — `conductor` (all AI roles) and `owner`
 (the human). Workspace id = the project slug, so history is **isolated per

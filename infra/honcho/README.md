@@ -9,7 +9,12 @@ Honcho is **optional** — it adds intelligent recall on top.
 ## Bring it up
 
 ```bash
-cp .env.example .env          # set LLM_OPENAI_API_KEY to your DeepSeek key
+# 1. Choose the reasoning provider (writes .env for it)
+python -m cdt.honcho_setup            # interactive: openai | deepseek | openrouter | ollama | anthropic
+#   or non-interactive, e.g.:  python -m cdt.honcho_setup --provider ollama
+#   or manual:                 cp .env.example .env  (uncomment one preset)
+
+# 2. Start it
 docker compose up -d          # first run clones + builds Honcho (a few minutes)
 docker compose ps             # api / deriver / database / redis healthy
 curl http://localhost:8000/health
@@ -23,12 +28,13 @@ pip install -e .[honcho]      # from the repo root
 python -m cdt.journal recall "why did we choose this architecture?"
 ```
 
-## Reasoning engine — DeepSeek
+## Reasoning engine — your choice
 
-The `deriver`, `dialectic`, and `summary` features run on **DeepSeek** through
-its OpenAI-compatible API (`https://api.deepseek.com/v1`, model `deepseek-chat`),
-wired via the `*_MODEL_CONFIG__*` vars in `.env`. Swap the `MODEL` / `BASE_URL`
-to use any OpenAI-compatible provider (OpenAI, OpenRouter, Ollama, vLLM…).
+The `deriver`, `dialectic`, and `summary` features run on **whichever provider
+you pick at install time** — nothing is pre-selected. `python -m cdt.honcho_setup`
+ships presets for **OpenAI, DeepSeek, OpenRouter, local Ollama, and Anthropic**,
+and any OpenAI-compatible endpoint (Together, Fireworks, vLLM…) works too. It all
+maps to the `*_MODEL_CONFIG__*` vars in `.env`; re-run the setup to switch.
 
 ## Services
 

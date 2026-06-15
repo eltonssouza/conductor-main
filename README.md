@@ -45,7 +45,7 @@ are tracked in `~/.claude/conductor/projects.json`.
 - `commands/` — `/cdt` (flow + `init`), `/library` (RAG), `/journal` (diary).
 - `rag/` — semantic search over the library (optional extra `[rag]`).
 - `cdt/` — per-project enrollment + development diary (optional extra `[honcho]`).
-- `infra/honcho/` — self-hosted Honcho (docker-compose, DeepSeek reasoning).
+- `infra/honcho/` — self-hosted Honcho (docker-compose; reasoning provider is your choice).
 - `tools/validate.py` — the golden-rule invariant validator (CI quality gate).
 
 ## Invariants
