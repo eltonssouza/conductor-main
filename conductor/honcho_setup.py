@@ -65,6 +65,16 @@ def render_env(provider: str, model: str, base_url: str, api_key: str,
             lines.append(f"{feat}_MODEL_CONFIG__OVERRIDES__BASE_URL={base_url}")
         lines.append("")
 
+    # The dialectic does NOT use DIALECTIC_MODEL_CONFIG; it uses per-reasoning-level
+    # configs (each defaulting to the vendor's own model). Override every level so
+    # the dialectic tool-loop actually uses the chosen provider/model.
+    for lvl in ("minimal", "low", "medium", "high", "max"):
+        lines.append(f"DIALECTIC_LEVELS__{lvl}__MODEL_CONFIG__TRANSPORT={transport}")
+        lines.append(f"DIALECTIC_LEVELS__{lvl}__MODEL_CONFIG__MODEL={model}")
+        if base_url:
+            lines.append(f"DIALECTIC_LEVELS__{lvl}__MODEL_CONFIG__OVERRIDES__BASE_URL={base_url}")
+    lines.append("")
+
     # Honcho also EMBEDS messages for vector recall. DeepSeek/Anthropic/OpenRouter
     # have no (compatible) embeddings, so default embeddings to the local Ollama
     # bge-m3 unless the provider is OpenAI itself.

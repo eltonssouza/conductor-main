@@ -1,59 +1,76 @@
 # infra/honcho — self-hosted Honcho (development diary backend)
 
 [Honcho](https://honcho.dev) is the long-term memory behind Conductor's
-`/journal` diary. It stores the diary messages and reasons over them in the
-background (peer modeling + dialectic), so `recall` answers by meaning. This
-compose runs it locally; the diary's local JSONL mirror works without it, so
-Honcho is **optional** — it adds intelligent recall on top.
+`journal` diary. It stores the diary messages and reasons over them in the
+background (peer modeling + dialectic), so `conductor journal recall` answers by
+meaning. The diary's local JSONL mirror works without it, so Honcho is
+**optional** — it adds intelligent recall on top.
 
 ## Bring it up
 
 ```bash
-# 1. Choose the reasoning provider (writes .env for it)
-conductor honcho-setup                # interactive: openai | deepseek | openrouter | ollama | anthropic
-#   or non-interactive, e.g.:  conductor honcho-setup --provider ollama
-#   or manual:                 cp .env.example .env  (uncomment one preset)
+# 1. SDK + reasoning provider
+pip install -e .[honcho]                 # from the repo root
+conductor honcho-setup --provider deepseek --api-key sk-...   # or: ollama (local)
 
-# 2. Start it
-docker compose up -d          # first run clones + builds Honcho (a few minutes)
-docker compose ps             # api / deriver / database / redis healthy
-curl http://localhost:8000/health
+# 2. Clone Honcho locally (the git-URL build context fails on Docker Desktop /
+#    Windows, so we build from a local clone)
+git clone https://github.com/plastic-labs/honcho.git C:/path/to/honcho-src
+
+# 3. Start it (point HONCHO_SRC at the clone)
+cd conductor/infra/honcho
+HONCHO_SRC=C:/path/to/honcho-src docker compose up -d
 ```
 
-Then install the SDK and point the diary at it:
+If the **api** container crashes on startup with a *dimension mismatch* (the
+schema is created at 1536 but local embeddings are 1024-d), run Honcho's
+reconfigure script once against the running DB, then bring the stack up again:
 
 ```bash
-pip install -e .[honcho]      # from the repo root
-# default base_url is http://localhost:8000 (override: CONDUCTOR_HONCHO_URL)
-conductor journal recall "why did we choose this architecture?"
+HONCHO_SRC=... docker compose run --rm --no-deps \
+  --entrypoint /app/.venv/bin/python deriver scripts/configure_embeddings.py --yes
+HONCHO_SRC=... docker compose up -d
+curl http://localhost:8000/health        # {"status":"ok"}
 ```
 
-## Reasoning engine — your choice
+Then the diary syncs + recalls by meaning:
 
-The `deriver`, `dialectic`, and `summary` features run on **whichever provider
-you pick at install time** — nothing is pre-selected. `conductor honcho-setup`
-ships presets for **OpenAI, DeepSeek, OpenRouter, local Ollama, and Anthropic**,
-and any OpenAI-compatible endpoint (Together, Fireworks, vLLM…) works too. It all
-maps to the `*_MODEL_CONFIG__*` vars in `.env`; re-run the setup to switch.
+```bash
+conductor journal add --gate 4 --kind decision "chose hexagonal arch; ADR-1"
+conductor journal recall "why this architecture?"
+```
 
-## Services
+## Reasoning engine — your choice (recommended: DeepSeek)
 
-| Service | Image | Port (localhost only) |
-|---------|-------|-----------------------|
-| api | built from upstream Honcho | 8000 |
+`conductor honcho-setup` writes the full config Honcho needs:
+
+- **Reasoning** (deriver + dialectic + summary): the chosen provider's model.
+  The dialectic uses per-level configs (`DIALECTIC_LEVELS__<level>__MODEL_CONFIG`),
+  which the setup overrides — otherwise Honcho's own default model is sent to your
+  provider and rejected.
+- **Global base URL** (`LLM_OPENAI_BASE_URL`) so calls without a per-feature
+  override hit your provider, not OpenAI.
+- **Embeddings**: DeepSeek/Anthropic/OpenRouter have no compatible embeddings, so
+  embeddings default to the **local Ollama bge-m3** (1024-d) — a free, local
+  hybrid alongside cloud reasoning. (OpenAI uses its own 1536-d embeddings.)
+
+Presets: `openai | deepseek | openrouter | ollama | anthropic`. Re-run to switch.
+
+## Services (all bound to 127.0.0.1)
+
+| Service | Image | Host port |
+|---------|-------|-----------|
+| api | built from the local Honcho clone | 8000 |
 | deriver | same image, background worker | — |
-| database | `pgvector/pgvector:pg15` | 5432 |
-| redis | `redis:8.2` | 6379 |
+| database | `pgvector/pgvector:pg15` | — (internal) |
+| redis | `redis:8.2` | — (internal) |
 
-All ports bind to `127.0.0.1` — nothing is exposed off the host.
+database/redis are internal-only (no host bind) to avoid clashing with a host
+Postgres/Redis on 5432/6379.
 
-## Version pinning (caveat)
+## Notes
 
-The api/deriver image builds from the upstream repo at `main`. For a
-reproducible build, pin a tag/SHA:
-
-```bash
-HONCHO_REF=v2.4.0 docker compose build      # then `up -d`
-```
-
-If an upstream change breaks the build, pin a known-good `HONCHO_REF`.
+- Windows clones may give the Honcho shell scripts CRLF endings, which break the
+  container entrypoint (`set: Illegal option`). Strip them:
+  `find <clone> -name '*.sh' -exec sed -i 's/\r$//' {} +`.
+- `conductor honcho-setup` writes the `.env` here (gitignored). Never commit it.
