@@ -86,11 +86,15 @@ class HonchoBackend:
             return HonchoResult(False, self._error or "Honcho unavailable")
         try:
             peer = client.peer(CONDUCTOR_PEER)
-            # Prefer a session-scoped dialectic query; fall back to global chat.
-            try:
-                answer = peer.chat(question, session_id=session_id)
-            except TypeError:
-                answer = peer.chat(question)
+            # Prefer a session-scoped dialectic query; the kwarg name varies by
+            # SDK version, so fall back to a plain global chat on any rejection.
+            answer = None
+            for kwargs in ({"session_id": session_id}, {"session": session_id}, {}):
+                try:
+                    answer = peer.chat(question, **kwargs)
+                    break
+                except Exception:  # noqa: BLE001 — try the next call shape
+                    continue
             return HonchoResult(True, text=str(answer) if answer else None)
         except Exception as e:  # noqa: BLE001
             return HonchoResult(False, f"Honcho recall failed ({e})")

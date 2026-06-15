@@ -12,8 +12,13 @@
 #
 # Pin HONCHO_REF to a tag/SHA for reproducibility (defaults to main).
 
+# Build context for the Honcho image. A git-URL context fails on some Docker
+# versions (notably Docker Desktop on Windows), so prefer a LOCAL clone:
+#   git clone https://github.com/plastic-labs/honcho.git
+#   HONCHO_SRC=/path/to/honcho docker compose up -d
+# Falls back to the git URL where that build mode is supported.
 x-honcho-build: &honcho-build
-  context: "https://github.com/plastic-labs/honcho.git#${HONCHO_REF:-main}"
+  context: "${HONCHO_SRC:-https://github.com/plastic-labs/honcho.git#${HONCHO_REF:-main}}"
 
 x-honcho-env: &honcho-env
   DB_CONNECTION_URI: postgresql+psycopg://postgres:postgres@database:5432/postgres
@@ -70,8 +75,8 @@ services:
     volumes:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
       - pgdata:/var/lib/postgresql/data/
-    ports:
-      - "127.0.0.1:5432:5432"
+    # No host port: only api/deriver reach the DB over the internal network.
+    # (Avoids clashing with any host postgres on 5432.)
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -83,8 +88,7 @@ services:
     image: redis:8.2
     volumes:
       - redis-data:/data
-    ports:
-      - "127.0.0.1:6379:6379"
+    # No host port: internal-network only.
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
