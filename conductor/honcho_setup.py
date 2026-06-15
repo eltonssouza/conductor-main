@@ -20,8 +20,7 @@ from typing import Dict, List, Optional
 
 from .project import force_utf8
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_OUT = REPO_ROOT / "infra" / "honcho" / ".env"
+from .project import PACKAGE_INFRA
 
 FEATURES = ("DERIVER", "DIALECTIC", "SUMMARY")
 
@@ -90,10 +89,13 @@ def main(argv: List[str]) -> int:
     ap.add_argument("--model", help="override the model id")
     ap.add_argument("--base-url", help="override the OpenAI-compatible base URL")
     ap.add_argument("--api-key", help="API key (or set it later in the .env)")
-    ap.add_argument("--out", type=Path, default=DEFAULT_OUT, help="output .env path")
+    ap.add_argument("--out", type=Path, default=None,
+                    help="output .env path (default: the staged Honcho infra dir)")
     ap.add_argument("--force", action="store_true", help="overwrite an existing .env")
     args = ap.parse_args(argv)
     force_utf8()
+
+    out = args.out or (PACKAGE_INFRA / "honcho" / ".env")
 
     provider = args.provider or _prompt_choice()
     preset = PRESETS[provider]
@@ -111,16 +113,17 @@ def main(argv: List[str]) -> int:
         else:
             api_key = "ollama"  # local: any value
 
-    if args.out.exists() and not args.force:
-        print(f"{args.out} exists (use --force to overwrite).", file=sys.stderr)
+    if out.exists() and not args.force:
+        print(f"{out} exists (use --force to overwrite).", file=sys.stderr)
         return 1
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(render_env(provider, model, base_url, api_key, key_env, transport),
-                        encoding="utf-8")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(render_env(provider, model, base_url, api_key, key_env, transport),
+                   encoding="utf-8")
 
-    print(f"Wrote {args.out} (provider: {provider}, model: {model}).")
+    print(f"Wrote {out} (provider: {provider}, model: {model}).")
+    print(f"  Honcho infra staged at: {out.parent}  (run `docker compose up -d` there)")
     if api_key.startswith("set-your-"):
-        print(f"  -> edit {args.out} and set {key_env} before `docker compose up`.")
+        print(f"  -> edit {out} and set {key_env} before `docker compose up`.")
     return 0
 
 

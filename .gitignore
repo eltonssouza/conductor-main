@@ -5,8 +5,8 @@ __pycache__/
 conductor/rag/chroma/
 conductor/rag/*.log
 
-# Honcho self-host secrets (copy infra/honcho/.env.example -> .env)
-infra/honcho/.env
+# Honcho self-host secrets (the live .env is staged to ~/.claude/conductor/infra)
+conductor/infra/honcho/.env
 
 # Python build/editable-install artifacts
 *.egg-info/

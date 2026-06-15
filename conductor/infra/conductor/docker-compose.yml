@@ -1,9 +1,8 @@
 # Conductor RAG stack — Ollama + bge-m3 + ChromaDB + book ingest, all in Docker.
 #
-# Usage:
-#   1. Put the books archive here as  infra/conductor/to-brain.7z
-#   2. docker compose up                # attach to watch the progress
-#      (or `up -d` then `docker compose logs -f conductor`)
+# Usage (preferred): `conductor up` / `conductor up -d` from a project that has a
+# to-brain.7z in its cwd (or set CONDUCTOR_ARCHIVE). The launcher auto-detects the
+# GPU and the archive. Watch progress with `docker compose logs -f conductor`.
 #
 # The `conductor` service runs once: it extracts the books, pulls bge-m3, waits
 # for ChromaDB, and ingests — printing the progress of each step. It exits when
@@ -25,8 +24,8 @@ services:
       retries: 30
       start_period: 10s
     restart: unless-stopped
-    # GPU is auto-enabled by `python -m rag.stack up` (detects NVIDIA GPU +
-    # Docker runtime and adds docker-compose.gpu.yml). CPU ingest is slow.
+    # GPU is auto-enabled by `conductor up` (detects NVIDIA GPU + Docker runtime
+    # and adds docker-compose.gpu.yml). CPU ingest is slow.
 
   chroma:
     image: chromadb/chroma:latest
@@ -44,8 +43,9 @@ services:
 
   conductor:
     build:
-      context: ../..
-      dockerfile: infra/conductor/Dockerfile
+      # Repo root, three levels up from conductor/infra/conductor/.
+      context: ../../..
+      dockerfile: conductor/infra/conductor/Dockerfile
     depends_on:
       ollama:
         condition: service_healthy
@@ -58,9 +58,8 @@ services:
       CONDUCTOR_LIBRARY_ARCHIVE: /seed/to-brain.7z
       CONDUCTOR_EMBED_MODEL: bge-m3
     volumes:
-      # Host path to the books archive. Default: infra/conductor/to-brain.7z.
-      # Override for a different location, e.g. the repo root:
-      #   CONDUCTOR_ARCHIVE=../../to-brain.7z docker compose up
+      # Books archive: `conductor up` sets CONDUCTOR_ARCHIVE to an absolute path
+      # (found in the cwd or via the env var). Falls back to ./to-brain.7z.
       - ${CONDUCTOR_ARCHIVE:-./to-brain.7z}:/seed/to-brain.7z:ro
       - library:/data/library
     restart: "no"

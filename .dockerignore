@@ -1,8 +1,10 @@
 .git
 __pycache__/
 *.py[cod]
-rag/chroma/
-rag/*.log
-infra/honcho/.env
-infra/conductor/to-brain.7z
+*.egg-info/
+build/
+dist/
+conductor/rag/chroma/
+conductor/rag/*.log
+conductor/infra/honcho/.env
 *.7z

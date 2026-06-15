@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
-"""`python -m rag.stack up` — launch the RAG stack, auto-detecting the GPU.
+"""`conductor up|down` — launch the RAG stack, auto-detecting the GPU.
 
-The plugin identifies an NVIDIA GPU and Docker's NVIDIA runtime; when both are
+Conductor identifies an NVIDIA GPU and Docker's NVIDIA runtime; when both are
 present it adds the GPU compose override so Ollama runs bge-m3 on the GPU
-(~0.5 s/embed). Otherwise it tells you it is falling back to CPU (the full-corpus
-ingest then takes hours). It also auto-locates the books archive.
+(~0.5 s/embed). Otherwise it falls back to CPU (full-corpus ingest takes hours).
+It also auto-locates the books archive (cwd or CONDUCTOR_ARCHIVE).
 
-  python -m rag.stack up            # attached (watch progress)
-  python -m rag.stack up -d         # detached
-  python -m rag.stack down          # stop the stack
-  python -m rag.stack <any docker compose args...>
+The Docker infra ships inside the package; the `conductor` image is built from
+the local source, so the Docker stack needs a repo clone (the CLI itself does not).
+
+  conductor up            # attached (watch progress)
+  conductor up -d         # detached
+  conductor down          # stop the stack
 """
 from __future__ import annotations
 
@@ -19,10 +21,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]  # conductor/rag/stack.py -> repo root
-INFRA = REPO_ROOT / "infra" / "conductor"
-BASE = INFRA / "docker-compose.yml"
-GPU = INFRA / "docker-compose.gpu.yml"
+from ..project import PACKAGE_INFRA
 
 
 def has_nvidia_gpu() -> bool:
@@ -45,26 +44,28 @@ def docker_has_nvidia_runtime() -> bool:
 
 
 def resolve_archive(env: dict) -> None:
-    """Auto-point CONDUCTOR_ARCHIVE at the repo-root to-brain.7z if not set."""
-    if env.get("CONDUCTOR_ARCHIVE"):
+    """Sets CONDUCTOR_ARCHIVE to an ABSOLUTE path (compose runs from the staged
+    infra dir, so a relative path would resolve wrong)."""
+    val = env.get("CONDUCTOR_ARCHIVE")
+    if val:
+        p = Path(val)
+        env["CONDUCTOR_ARCHIVE"] = str(p if p.is_absolute() else (Path.cwd() / p).resolve())
+        print(f"Books archive: {env['CONDUCTOR_ARCHIVE']}")
         return
-    local = INFRA / "to-brain.7z"
-    root = REPO_ROOT / "to-brain.7z"
-    if not local.exists() and root.exists():
-        env["CONDUCTOR_ARCHIVE"] = "../../to-brain.7z"
-        print(f"Books archive: {root} (CONDUCTOR_ARCHIVE=../../to-brain.7z)")
-    elif local.exists():
-        print(f"Books archive: {local}")
+    cand = Path.cwd() / "to-brain.7z"
+    if cand.is_file():
+        env["CONDUCTOR_ARCHIVE"] = str(cand.resolve())
+        print(f"Books archive: {cand.resolve()}")
     else:
-        print("WARNING: no to-brain.7z found (in infra/conductor/ or repo root). "
-              "Set CONDUCTOR_ARCHIVE or the build will skip extraction.")
+        print("WARNING: no to-brain.7z in the cwd. Set CONDUCTOR_ARCHIVE to your "
+              "archive, or the build will skip extraction (empty index).")
 
 
-def select_compose_files() -> list:
-    files = ["-f", str(BASE)]
+def select_compose_files(infra: Path) -> list:
+    files = ["-f", str(infra / "docker-compose.yml")]
     if has_nvidia_gpu():
         if docker_has_nvidia_runtime():
-            files += ["-f", str(GPU)]
+            files += ["-f", str(infra / "docker-compose.gpu.yml")]
             print("GPU: NVIDIA GPU + Docker runtime detected — enabling GPU for "
                   "Ollama (~0.5s/embed).")
         else:
@@ -80,14 +81,19 @@ def main(argv: list) -> int:
     if not shutil.which("docker"):
         print("ERROR: docker not found on PATH.", file=sys.stderr)
         return 2
+    infra = PACKAGE_INFRA / "conductor"
+    if not (infra / "docker-compose.yml").is_file():
+        print(f"ERROR: docker infra not found at {infra}. The Docker stack needs "
+              "a repo clone (build from source).", file=sys.stderr)
+        return 2
     cmd = argv or ["up"]
     env = dict(os.environ)
     resolve_archive(env)
-    files = select_compose_files()
+    files = select_compose_files(infra)
     full = ["docker", "compose", *files, *cmd]
     print("+ " + " ".join(full))
     sys.stdout.flush()  # flush our notices before docker inherits stdout
-    return subprocess.call(full, cwd=str(INFRA), env=env)
+    return subprocess.call(full, cwd=str(infra), env=env)
 
 
 if __name__ == "__main__":
