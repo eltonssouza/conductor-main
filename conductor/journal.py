@@ -81,6 +81,14 @@ def cmd_add(root: Path, config: dict, args) -> int:
         print(f"  synced to Honcho (workspace '{backend.workspace}', session '{session_id}')")
     else:
         print(f"  Honcho unavailable, mirrored locally only: {res.detail}")
+
+    # Keep CLAUDE.md's project memory live (best-effort, silent on failure).
+    try:
+        from .scaffold import refresh_claude_md
+        if refresh_claude_md(root):
+            print("  CLAUDE.md project memory refreshed")
+    except Exception:  # noqa: BLE001
+        pass
     return 0
 
 

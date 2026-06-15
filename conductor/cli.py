@@ -20,7 +20,9 @@ USAGE = """conductor <command> [args]
 Commands:
   cdt init [path]            Enroll a project: generate .claude/ (agents+skills),
                              .cdt/ (stack, diary), and a project CLAUDE.md.
-  init [path]                Alias for `cdt init`.
+  cdt sync [path]            Refresh CLAUDE.md (live): re-detect stack, roles, and
+                             pull the latest diary memory into the managed region.
+  init | sync [path]         Aliases for `cdt init` / `cdt sync`.
   library "<question>"       Semantic search over the reference books (RAG).
   journal add|recall|log     Per-project development diary.
   up | down                  Start / stop the Docker RAG stack (auto-detects GPU).
@@ -39,16 +41,16 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     cmd, rest = argv[0], argv[1:]
 
-    # `cdt init ...` (and bare `init ...`)
+    # `cdt init|sync ...` (and bare `init`/`sync`)
     if cmd == "cdt":
-        if rest and rest[0] == "init":
+        if rest and rest[0] in ("init", "sync"):
             from .scaffold import main as scaffold_main
-            return scaffold_main(rest[1:])
-        print("usage: conductor cdt init [path]", file=sys.stderr)
+            return scaffold_main(rest)
+        print("usage: conductor cdt init|sync [path]", file=sys.stderr)
         return 2
-    if cmd == "init":
+    if cmd in ("init", "sync"):
         from .scaffold import main as scaffold_main
-        return scaffold_main(rest)
+        return scaffold_main([cmd, *rest])
 
     if cmd == "library":
         from .library import main as library_main
