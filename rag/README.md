@@ -34,7 +34,7 @@ python -m rag.query -k 8 --json "circuit breaker vs bulkhead"
 python -m rag.query --category 09_seguranca_e_privacidade "STRIDE"
 ```
 
-Or via the plugin: command `/acervo <question>` (and `/conductor` uses the
+Or via the plugin: command `/library <question>` (and `/cdt` uses the
 acervo to anchor each gate).
 
 ## Configuration (environment variables)

@@ -1,0 +1,19 @@
+name: validate
+
+# Gate 7 (quality gate): every push/PR must pass the plugin invariants.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      # tools/validate.py is pure stdlib — no dependencies to install.
+      - name: Run plugin invariant validator
+        run: python tools/validate.py
