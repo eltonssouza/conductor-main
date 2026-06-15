@@ -30,6 +30,7 @@ violations = run()            # list of Violation; empty == all OK
 | **R5-agent-anchor** | Each agent has a substantial system prompt + a `**Reference books:**` line. |
 | **R6-skill-structure** | Each `SKILL.md` has a `When to use` section + numbered steps. |
 | **R7-flow-integrity** | The `/cdt` command has all 11 flow gates and only references agents/skills/commands that exist. |
+| **R8-agent-model** | Each agent declares a `model:` tier — one of `opus`, `sonnet`, `haiku` — so `/cdt` delegation never falls back silently on a typo'd alias. |
 
 To add a rule: write a function decorated with `@rule("ID", "description")`
 that takes a `Context` and returns a list of `Violation`.

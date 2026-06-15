@@ -337,6 +337,29 @@ def check_flow_integrity(ctx: Context) -> List[Violation]:
     return v
 
 
+# --- R8: agent model tier (valid, version-resilient alias) -------------------
+
+VALID_MODELS = {"opus", "sonnet", "haiku"}
+
+
+@rule("R8-agent-model", "agent declares model: one of opus|sonnet|haiku")
+def check_agent_model(ctx: Context) -> List[Violation]:
+    v: List[Violation] = []
+    for path in ctx.agent_files:
+        rel = ctx.rel(path)
+        fm, _body = split_frontmatter(path.read_text(encoding="utf-8"))
+        model = frontmatter_field(fm, "model")
+        if model is None:
+            v.append(Violation("R8-agent-model", rel, "frontmatter missing 'model' field"))
+            continue
+        model = _strip_quotes(model)
+        if model not in VALID_MODELS:
+            v.append(Violation("R8-agent-model", rel,
+                               f"model '{model}' not in {sorted(VALID_MODELS)} "
+                               "(Claude Code silently ignores an invalid alias)"))
+    return v
+
+
 # --- runner ------------------------------------------------------------------
 
 def run() -> List[Violation]:
