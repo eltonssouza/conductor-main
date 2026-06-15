@@ -1,0 +1,15 @@
+{
+  "name": "conductor",
+  "description": "Conductor marketplace — the role-driven software-development guidance plugin.",
+  "owner": {
+    "name": "Elton Souza",
+    "email": "eltons.souz@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "conductor",
+      "source": "./",
+      "description": "Technology-agnostic software-development guidance plugin: 36 industry roles (Agents + Skills), an 11-gate /cdt flow, library RAG, and a per-project Honcho diary."
+    }
+  ]
+}
