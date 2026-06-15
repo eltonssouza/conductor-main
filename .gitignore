@@ -4,3 +4,6 @@ __pycache__/
 # RAG vector index — built locally via `python -m rag.ingest`
 rag/chroma/
 rag/*.log
+
+# Honcho self-host secrets (copy infra/honcho/.env.example -> .env)
+infra/honcho/.env

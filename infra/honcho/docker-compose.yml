@@ -1,0 +1,97 @@
+# Self-hosted Honcho for the Conductor development diary.
+#
+# Brings up four services: api (8000), deriver (background worker),
+# database (postgres + pgvector), redis. The api/deriver image is built from
+# the upstream Honcho repo (no published image on Docker Hub), so the first
+# `up` clones + builds it; subsequent runs are cached.
+#
+# Usage:
+#   cp .env.example .env        # then set LLM_OPENAI_API_KEY (DeepSeek)
+#   docker compose up -d
+#   curl http://localhost:8000/health
+#
+# Pin HONCHO_REF to a tag/SHA for reproducibility (defaults to main).
+
+x-honcho-build: &honcho-build
+  context: "https://github.com/plastic-labs/honcho.git#${HONCHO_REF:-main}"
+
+x-honcho-env: &honcho-env
+  DB_CONNECTION_URI: postgresql+psycopg://postgres:postgres@database:5432/postgres
+  CACHE_URL: redis://redis:6379/0?suppress=true
+  CACHE_ENABLED: "true"
+
+services:
+  api:
+    build: *honcho-build
+    image: conductor/honcho:local
+    entrypoint: sh docker/entrypoint.sh
+    env_file: .env
+    environment:
+      <<: *honcho-env
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  deriver:
+    image: conductor/honcho:local
+    entrypoint: /app/.venv/bin/python -m src.deriver
+    env_file: .env
+    environment:
+      <<: *honcho-env
+    depends_on:
+      api:
+        condition: service_healthy
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  database:
+    image: pgvector/pgvector:pg15
+    command: postgres -c max_connections=200
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_HOST_AUTH_METHOD: trust
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - pgdata:/var/lib/postgresql/data/
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:8.2
+    volumes:
+      - redis-data:/data
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redis-data:

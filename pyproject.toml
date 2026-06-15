@@ -4,7 +4,11 @@ version = "0.1.2"
 description = "Software-development guidance plugin with 36 roles (Agents + Skills) anchored in reference books."
 requires-python = ">=3.9"
 
-# RAG is optional: the plugin (agents/skills/commands) works without deps.
-# For semantic search over the library: pip install -e .[rag] + Ollama with bge-m3.
+# Optional extras: the plugin (agents/skills/commands) works without any deps.
+# - rag: semantic search over the library — pip install -e .[rag] + Ollama/bge-m3.
+# - honcho: the per-project development diary — pip install -e .[honcho] + the
+#   self-hosted Honcho server (see infra/honcho/). The diary's local JSONL mirror
+#   works without this extra; Honcho only adds intelligent, meaning-based recall.
 [project.optional-dependencies]
 rag = ["chromadb>=1.5"]
+honcho = ["honcho-ai>=1.0"]
