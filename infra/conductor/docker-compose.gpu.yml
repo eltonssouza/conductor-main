@@ -1,0 +1,12 @@
+# GPU override for the RAG stack. Applied automatically by `python -m rag.stack up`
+# when an NVIDIA GPU + the NVIDIA Container Toolkit are detected. Manual use:
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up
+services:
+  ollama:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

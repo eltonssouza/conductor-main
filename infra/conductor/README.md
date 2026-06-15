@@ -12,16 +12,25 @@ Three services:
 ## Use it
 
 ```bash
-# 1. Point at the books archive — either drop it here as to-brain.7z:
-cp /path/to/to-brain.7z infra/conductor/to-brain.7z
-#    ...or keep it elsewhere and set CONDUCTOR_ARCHIVE (path relative to
-#    infra/conductor/), e.g. the repo root:  CONDUCTOR_ARCHIVE=../../to-brain.7z
+# Recommended: the launcher auto-detects the GPU and the books archive.
+python -m rag.stack up           # attached (watch progress)
+python -m rag.stack up -d        # detached  (then: docker compose logs -f conductor)
+python -m rag.stack down         # stop
+```
 
-# 2. Bring the stack up (attached, to watch progress)
+The launcher (`rag/stack.py`):
+- **detects an NVIDIA GPU** (`nvidia-smi`) **and Docker's NVIDIA runtime** — if
+  both are present it adds `docker-compose.gpu.yml` so Ollama uses the GPU; if
+  not, it says so and runs on CPU (slow). It prints which mode it chose.
+- **auto-locates the books archive**: a `to-brain.7z` in `infra/conductor/` or at
+  the repo root is used automatically; otherwise set `CONDUCTOR_ARCHIVE`.
+
+Plain Docker still works (no auto-detect):
+
+```bash
 cd infra/conductor
-docker compose up                       # uses ./to-brain.7z
-#   repo-root archive:  CONDUCTOR_ARCHIVE=../../to-brain.7z docker compose up
-#   detached:           docker compose up -d && docker compose logs -f conductor
+docker compose up                                            # CPU
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml up   # GPU
 ```
 
 The `conductor` service prints:
@@ -50,12 +59,14 @@ set OLLAMA_HOST=http://localhost:11434
 python -m rag.query "bounded context"
 ```
 
-## GPU (recommended)
+## GPU (auto-detected)
 
-CPU embedding of the full corpus takes **hours**. With an NVIDIA GPU + the
-NVIDIA Container Toolkit, uncomment the `deploy:` block under `ollama` in
-`docker-compose.yml` to run bge-m3 on the GPU (~0.5 s/embed, like the local dev
-setup). Verify with `docker compose exec ollama ollama ps` (should read GPU).
+CPU embedding of the full corpus takes **hours**. `python -m rag.stack up`
+detects an NVIDIA GPU + the NVIDIA Container Toolkit and enables the GPU
+automatically (~0.5 s/embed, like local dev). The `conductor` service then
+**confirms the real mode** after the pull — it warms bge-m3 and reports
+`bge-m3 on GPU (… VRAM)` or `bge-m3 on CPU`. If you have a GPU but it reports
+CPU, install the NVIDIA Container Toolkit and re-run.
 
 ## Notes
 

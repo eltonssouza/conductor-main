@@ -7,6 +7,3 @@ rag/*.log
 
 # Honcho self-host secrets (copy infra/honcho/.env.example -> .env)
 infra/honcho/.env
-
-# Books corpus archive — never commit (large; it is the corpus, not source)
-*.7z

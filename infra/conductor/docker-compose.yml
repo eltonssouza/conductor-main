@@ -25,15 +25,8 @@ services:
       retries: 30
       start_period: 10s
     restart: unless-stopped
-    # NVIDIA GPU (optional but strongly recommended — CPU ingest of the full
-    # corpus takes hours). Needs Docker + the NVIDIA Container Toolkit. Uncomment:
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [gpu]
+    # GPU is auto-enabled by `python -m rag.stack up` (detects NVIDIA GPU +
+    # Docker runtime and adds docker-compose.gpu.yml). CPU ingest is slow.
 
   chroma:
     image: chromadb/chroma:latest

@@ -1,6 +1,6 @@
 {
   "name": "conductor",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Technology-agnostic software-development guidance plugin. Brings together 36 industry roles, each as an Agent (a system prompt anchored in reference books) with its actionable Skill.",
   "author": {
     "name": "Elton Souza"

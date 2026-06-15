@@ -108,6 +108,29 @@ def step_pull() -> None:
                 last = status
     print()
     log("2/4", f"{MODEL} ready")
+    _gpu_report()
+
+
+def _gpu_report() -> None:
+    """Warms the model and reports whether it actually runs on GPU or CPU."""
+    try:
+        warm = json.dumps({"model": MODEL, "input": "warmup"}).encode("utf-8")
+        urllib.request.urlopen(urllib.request.Request(
+            f"{OLLAMA}/api/embed", data=warm,
+            headers={"Content-Type": "application/json"}), timeout=180)
+        with urllib.request.urlopen(f"{OLLAMA}/api/ps", timeout=10) as r:
+            models = json.loads(r.read().decode("utf-8")).get("models", [])
+        for m in models:
+            if MODEL in m.get("name", ""):
+                vram = m.get("size_vram", 0) or 0
+                if vram > 0:
+                    log("2/4", f"bge-m3 on GPU ({vram / 1e9:.1f} GB VRAM) — fast embeds")
+                else:
+                    log("2/4", "bge-m3 on CPU — ingest will be slow (hours). "
+                               "For GPU, launch via `python -m rag.stack up`.")
+                return
+    except Exception:
+        pass  # reporting only; never block the build
 
 
 # --- [3/4] chroma ------------------------------------------------------------
