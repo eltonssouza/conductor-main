@@ -1,6 +1,6 @@
 [project]
 name = "conductor"
-version = "0.1.7"
+version = "0.1.8"
 description = "Software-development guidance plugin with 36 roles (Agents + Skills) anchored in reference books."
 requires-python = ">=3.9"
 

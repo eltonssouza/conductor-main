@@ -12,13 +12,16 @@ Three services:
 ## Use it
 
 ```bash
-# 1. Put the books archive here
+# 1. Point at the books archive — either drop it here as to-brain.7z:
 cp /path/to/to-brain.7z infra/conductor/to-brain.7z
+#    ...or keep it elsewhere and set CONDUCTOR_ARCHIVE (path relative to
+#    infra/conductor/), e.g. the repo root:  CONDUCTOR_ARCHIVE=../../to-brain.7z
 
 # 2. Bring the stack up (attached, to watch progress)
 cd infra/conductor
-docker compose up
-#   or detached:  docker compose up -d && docker compose logs -f conductor
+docker compose up                       # uses ./to-brain.7z
+#   repo-root archive:  CONDUCTOR_ARCHIVE=../../to-brain.7z docker compose up
+#   detached:           docker compose up -d && docker compose logs -f conductor
 ```
 
 The `conductor` service prints:

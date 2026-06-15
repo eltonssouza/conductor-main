@@ -68,7 +68,10 @@ services:
       CONDUCTOR_LIBRARY_ARCHIVE: /seed/to-brain.7z
       CONDUCTOR_EMBED_MODEL: bge-m3
     volumes:
-      - ./to-brain.7z:/seed/to-brain.7z:ro
+      # Host path to the books archive. Default: infra/conductor/to-brain.7z.
+      # Override for a different location, e.g. the repo root:
+      #   CONDUCTOR_ARCHIVE=../../to-brain.7z docker compose up
+      - ${CONDUCTOR_ARCHIVE:-./to-brain.7z}:/seed/to-brain.7z:ro
       - library:/data/library
     restart: "no"
 
