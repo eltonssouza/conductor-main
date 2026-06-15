@@ -1,6 +1,6 @@
 ---
 description: "Conducts a demand through the 11 gates of the Conductor flow (discovery → spec → security → architecture → test → code → quality gate → validation → delivery → observability → learning), engaging the right roles at each step."
-argument-hint: "[description of the demand / feature / problem]"
+argument-hint: "[init | description of the demand / feature / problem]"
 ---
 
 # Conductor (cdt) — role-driven development flow
@@ -12,18 +12,50 @@ regressions, the quality gate stops errors from advancing, progressive delivery
 contains what escapes, and observability + postmortems feed back into the spec —
 **each loop lowers the defect rate**.
 
-## Grounding in the library (RAG)
+## Mode dispatch
 
-At any gate, **ground decisions in the library** before asserting: use the
-`/library` command (or `python -m rag.query --json -k 6 "<question>"`) to retrieve
-passages from the reference books and cite the source. Do not invent sources; if
-the library does not cover it, say so and proceed with explicit own reasoning.
+If **$ARGUMENTS** begins with `init`, run **Enrollment** below and stop.
+Otherwise, run the **11-gate flow** (the rest of this document).
+
+## Enrollment — `/cdt init`
+
+Opt this project into Conductor (per-project, not global):
+
+1. Run `python -m cdt.init` (pass the target path if not the cwd). It scaffolds
+   `.cdt/` (config.json, `stack/<TYPE>.md`, journal/), best-effort detects the
+   project type, and registers the project.
+2. **Finalize the stack**: read the real manifests (package.json, pyproject,
+   go.mod, pom.xml, pubspec.yaml, etc.) and complete `.cdt/stack/<TYPE>.md` with
+   the actual languages, frameworks, datastores, build tools, and test tools. If
+   the detected type is wrong, re-run with `--type <type> --force`.
+3. Confirm enrollment and tell the user the diary is now available via
+   `/journal` (start the Honcho backend with `infra/honcho/` for smart recall).
+
+## Two memories (ground every gate)
+
+- **Library (RAG)** — *what good practice says*. Use the `/library` command (or
+  `python -m rag.query --json -k 6 "<question>"`) to retrieve passages from the
+  reference books and cite the source. If enrolled, read `.cdt/stack/<TYPE>.md`
+  first and make queries **project-aware** (e.g. add the project's framework to
+  the query). Do not invent sources; if the library does not cover it, say so.
+- **Diary (Honcho)** — *what this project already decided and learned*. At each
+  gate, `recall` relevant prior context to avoid repeating mistakes, and record
+  the key reasoning/decision/error/solution:
+
+  ```bash
+  python -m cdt.journal recall "<what was decided/attempted before?>"
+  python -m cdt.journal add --gate <N> --kind decision "<concise decision>"
+  ```
+
+  (Diary entries are on-demand and only for enrolled projects.)
 
 ## How to conduct
 
 User demand: **$ARGUMENTS**
 
-Conduct the demand through the gates **in order**. Each gate has an **objective**,
+If the project is enrolled (`.cdt/config.json` exists), load its type and stack
+to steer the flow; if not, suggest `/cdt init` but proceed anyway. Conduct the
+demand through the gates **in order**. Each gate has an **objective**,
 the responsible **roles** (delegate to the matching Agent / invoke the matching
 Skill), and a **quality gate** — an explicit exit criterion. **Do not advance to
 the next gate until the exit criterion is met**; if information is missing, state
