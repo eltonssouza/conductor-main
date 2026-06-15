@@ -7,6 +7,50 @@ demand through an 11-gate flow so no critical step (discovery, spec, security,
 architecture, test, code, quality gate, validation, delivery, observability,
 learning) gets skipped.
 
+## Install
+
+### Locally (before publishing)
+
+Fastest dev loop — load straight from the directory, no marketplace:
+
+```bash
+claude --plugin-dir /path/to/conductor
+```
+
+Or install through the bundled local marketplace (exercises the real flow). In
+Claude Code:
+
+```
+/plugin marketplace add /path/to/conductor
+/plugin install conductor@conductor
+/reload-plugins
+```
+
+`conductor@conductor` is `<plugin-name>@<marketplace-name>` (both `conductor`).
+Verify with `/plugin details conductor@conductor`, `/help` (see `/cdt`,
+`/library`, `/journal`), and `/agents` (the 36 roles).
+
+### From GitHub (after publishing)
+
+```
+/plugin marketplace add <user>/conductor
+/plugin install conductor@conductor
+```
+
+### Optional Python extras
+
+The `/library` (RAG) and `/journal` (diary) commands shell out to
+`python -m rag.…` / `python -m cdt.…`. Install the package so those modules
+resolve from any directory:
+
+```bash
+pip install -e .[rag]        # semantic search over the library (+ Ollama/bge-m3)
+pip install -e .[honcho]     # the development diary (+ infra/honcho/ server)
+```
+
+The plugin's agents/skills/commands work without any of this; the extras only
+power the two memories.
+
 ## The flow — `/cdt`
 
 ```
