@@ -1,5 +1,6 @@
 ---
 name: fullstack-engineer
+model: sonnet
 description: "Full-Stack Engineer. Use to deliver end-to-end features (UI → API → domain → persistence), maintaining cross-layer coherence, a stable API contract as the boundary between sides, and a single source of truth for business rules."
 ---
 

@@ -1,5 +1,6 @@
 ---
 name: data-protection-officer
+model: sonnet
 description: "Data Protection Officer / Encarregado (LGPD/GDPR). Use to ensure lawful processing of personal data: verify legal basis/purpose/minimization/retention, privacy by design, conduct DPIA/RIPD, maintain ROPA, and operationalize data subject rights."
 ---
 

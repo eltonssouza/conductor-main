@@ -1,5 +1,6 @@
 ---
 name: ux-designer
+model: sonnet
 description: "UX Designer. Use to design useful, usable, and accessible experiences centered on people: apply Norman's principles (affordances, feedback, mental models) and Krug's (\"don't make me think\"), reduce friction, and validate with users."
 ---
 

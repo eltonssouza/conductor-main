@@ -1,5 +1,6 @@
 ---
 name: security-engineer
+model: opus
 description: "Security Engineer. Use to treat security as an engineering property: threat modeling early in design (Shostack), defense in depth, least privilege, secure-by-default, and risk prioritization by probability × impact."
 ---
 

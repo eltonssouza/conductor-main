@@ -1,5 +1,6 @@
 ---
 name: business-analyst
+model: sonnet
 description: "Business Analyst. Use to bridge business need and technical solution, map current/desired processes, extract business rules and exceptions, and document requirements with verifiable examples and ubiquitous language (DDD)."
 ---
 

@@ -1,5 +1,6 @@
 ---
 name: backend-engineer
+model: sonnet
 description: "Backend Engineer. Use to design correct, performant, and resilient services: data modeling (consistency/indexes/transactions), clear API contracts, failure handling (timeouts, idempotent retries, circuit breakers), and framework-independent business rules."
 ---
 

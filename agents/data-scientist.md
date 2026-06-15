@@ -1,5 +1,6 @@
 ---
 name: data-scientist
+model: opus
 description: "Data Scientist. Use to extract knowledge and predictions with statistical rigor: start from the problem/hypothesis, validate data (biases, leakage), choose the simplest method, quantify uncertainty, and be honest about causation vs. correlation."
 ---
 

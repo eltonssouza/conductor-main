@@ -1,5 +1,6 @@
 ---
 name: staff-engineer
+model: opus
 description: "Staff Engineer — high-impact technical leadership without people management. Use for broad, ambiguous, and cross-cutting problems: finding the right problem, reducing systemic complexity, and creating leverage (patterns, guardrails, RFCs)."
 ---
 

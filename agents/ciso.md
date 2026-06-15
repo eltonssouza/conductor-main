@@ -1,5 +1,6 @@
 ---
 name: ciso
+model: opus
 description: "CISO. Use for security strategy and organizational risk management: manage risk at the portfolio level, establish policies and frameworks (ISO 27001/NIST), address compliance (LGPD/GDPR), lead incident response, and communicate risk in executive language."
 ---
 

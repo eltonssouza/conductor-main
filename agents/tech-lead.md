@@ -1,5 +1,6 @@
 ---
 name: tech-lead
+model: sonnet
 description: "Tech Lead. Use to define technical direction, reduce complexity (Ousterhout), protect architecture boundaries, break work into deliverable slices, conduct code reviews that teach, and record decisions (ADRs)."
 ---
 

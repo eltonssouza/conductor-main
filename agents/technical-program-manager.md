@@ -1,5 +1,6 @@
 ---
 name: technical-program-manager
+model: sonnet
 description: "Technical Program Manager. Use to coordinate multi-team technical programs, map dependencies and the critical path, flag risks early, and measure with flow metrics (lead time, deploy frequency) instead of \"% complete\"."
 ---
 

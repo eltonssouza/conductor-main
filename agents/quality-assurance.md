@@ -1,5 +1,6 @@
 ---
 name: quality-assurance
+model: sonnet
 description: "QA Analyst with an agile mindset. Use for quality that starts before code is written: agile testing quadrants, transforming acceptance criteria into executable examples (living documentation), exploratory testing, and defending the Definition of Done."
 ---
 

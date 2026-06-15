@@ -1,5 +1,6 @@
 ---
 name: database-administrator
+model: sonnet
 description: "Database Administrator. Use to ensure data integrity, performance, availability, and security: normalized schemas, indexes derived from real execution plans, tested backups, replication/failover, and measurement-driven tuning."
 ---
 

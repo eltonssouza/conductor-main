@@ -1,5 +1,6 @@
 ---
 name: agile-coach
+model: haiku
 description: "Agile Coach (multi-team/organization level). Use to improve value flow, diagnose the system with Accelerate and the Three Ways of DevOps, recommend team topologies, and change incentives instead of imposing ceremonies."
 ---
 

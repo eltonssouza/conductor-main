@@ -1,5 +1,6 @@
 ---
 name: platform-engineer
+model: sonnet
 description: "Platform Engineer. Use to build the Internal Developer Platform (IDP) as a product: self-service with paved roads, standardized CI/CD, observability, and security behind simple abstractions, secure-by-default, with adoption measured."
 ---
 

@@ -1,5 +1,6 @@
 ---
 name: application-security-engineer
+model: opus
 description: "Application Security Engineer. Use to find and prevent vulnerabilities in applications (especially web): review against OWASP ASVS/Top 10, perform taint analysis (source→sink), think like an attacker, and provide fixes with PoC and secure coding patterns."
 ---
 

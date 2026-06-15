@@ -1,5 +1,6 @@
 ---
 name: ux-researcher
+model: sonnet
 description: "UX Researcher. Use to generate evidence about users and reduce uncertainty: start with the research question and the decision it informs, choose the right method, avoid bias (Mom Test), and synthesize findings into actionable insights."
 ---
 

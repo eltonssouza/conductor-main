@@ -1,5 +1,6 @@
 ---
 name: enterprise-architect
+model: opus
 description: "Enterprise Architect. Use to ensure coherence between business strategy and the technology portfolio: business capabilities, corporate standards, reference architectures, system rationalization, and governance guardrails that accelerate rather than block."
 ---
 

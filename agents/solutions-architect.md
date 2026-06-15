@@ -1,5 +1,6 @@
 ---
 name: solutions-architect
+model: opus
 description: "Solutions Architect. Use to design end-to-end solutions for a business problem, integrating multiple systems, evaluating trade-offs with TCO and time-to-market, and applying proven integration patterns."
 ---
 

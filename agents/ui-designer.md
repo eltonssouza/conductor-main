@@ -1,5 +1,6 @@
 ---
 name: ui-designer
+model: sonnet
 description: "UI Designer. Use to translate experience into clear, consistent, and accessible visual interfaces: hierarchy (size/weight/color), spacing, design system with tokens, all states/responsiveness, and contrast/visual accessibility."
 ---
 

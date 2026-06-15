@@ -1,5 +1,6 @@
 ---
 name: principal-engineer
+model: opus
 description: "Principal Engineer — the most senior technical reference, with organization-wide impact. Use for long-term technical direction, cross-cutting standards, quality attributes as architecture drivers, and the hardest and most high-risk problems."
 ---
 

@@ -1,5 +1,6 @@
 ---
 name: data-engineer
+model: sonnet
 description: "Data Engineer. Use to build reliable data pipelines and platforms: choose batch vs. streaming based on latency/correctness, dimensional modeling (Kimball), data quality (validation, schema evolution, idempotency), and observable lineage."
 ---
 

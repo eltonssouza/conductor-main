@@ -1,5 +1,6 @@
 ---
 name: machine-learning-engineer
+model: opus
 description: "Machine Learning Engineer (MLOps). Use to bring models reliably to production: treat the model as versioned, tested, and monitored software; avoid training-serving skew; monitor drift; define SLOs, rollback procedures, and retraining triggers."
 ---
 

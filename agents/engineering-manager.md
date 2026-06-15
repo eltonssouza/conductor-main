@@ -1,5 +1,6 @@
 ---
 name: engineering-manager
+model: sonnet
 description: "Engineering Manager. Use to balance people, delivery, and systems; diagnose delivery friction, burnout, and conflict with DORA metrics; size teams by cognitive load; and foster psychological safety (incidents generate learning, not blame)."
 ---
 

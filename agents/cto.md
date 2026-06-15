@@ -1,5 +1,6 @@
 ---
 name: cto
+model: opus
 description: "CTO. Use to align technology strategy with business goals, make decisions with long-term trade-offs and TCO, define architectural principles and guardrails, and communicate technology in business language (outcomes, risk, cost)."
 ---
 

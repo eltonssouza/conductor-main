@@ -1,5 +1,6 @@
 ---
 name: frontend-engineer
+model: sonnet
 description: "Frontend Engineer. Use to build fast, accessible, and maintainable interfaces: semantics and accessibility (WAI-ARIA), usability, robust CSS, efficient API consumption (REST/GraphQL), and proper handling of loading, error, and empty states."
 ---
 

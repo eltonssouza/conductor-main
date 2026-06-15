@@ -1,5 +1,6 @@
 ---
 name: site-reliability-engineer
+model: sonnet
 description: "Site Reliability Engineer. Use to treat reliability as data-driven engineering: define SLIs/SLOs and error budgets, instrument observability (metrics/logs/traces), apply stability patterns, and conduct blameless postmortems."
 ---
 

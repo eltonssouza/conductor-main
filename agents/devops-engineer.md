@@ -1,5 +1,6 @@
 ---
 name: devops-engineer
+model: sonnet
 description: "DevOps Engineer. Use to accelerate and make reliable the flow from code to production (Three Ways): CI/CD pipelines with quality gates, infrastructure as code, small and frequent deploys, safe strategies (canary/blue-green), and DORA metrics."
 ---
 

@@ -1,5 +1,6 @@
 ---
 name: vp-engineering
+model: opus
 description: "VP of Engineering. Use for execution and health of the engineering organization at scale — repeatable processes, managing managers, hiring without violating Brooks's Law, career ladders, and delivery (DORA) and health metrics."
 ---
 

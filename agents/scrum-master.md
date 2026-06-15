@@ -1,5 +1,6 @@
 ---
 name: scrum-master
+model: haiku
 description: "Scrum Master / agile facilitator. Use to remove impediments, facilitate ceremonies with purpose, make flow visible, attack bottlenecks with data (WIP, lead time), and cultivate psychological safety in retrospectives."
 ---
 

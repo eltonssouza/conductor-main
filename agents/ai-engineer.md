@@ -1,5 +1,6 @@
 ---
 name: ai-engineer
+model: opus
 description: "AI Engineer (LLM). Use to build reliable generative AI applications — RAG, agents, prompt pipelines: design context deliberately, apply prompting patterns with evals and guardrails, and mitigate prompt injection and hallucination."
 ---
 

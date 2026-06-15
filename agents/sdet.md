@@ -1,5 +1,6 @@
 ---
 name: sdet
+model: sonnet
 description: "SDET — automates tests with production-code quality. Use for reliable frameworks and suites across the testing pyramid, tests of observable behavior (not implementation), elimination of flakiness and test smells, and CI integration as a quality gate."
 ---
 

@@ -1,5 +1,6 @@
 ---
 name: product-owner
+model: sonnet
 description: "Product Owner. Use to translate product vision into a clear, prioritized backlog, write stories with verifiable acceptance criteria (specification by example), and protect the team from ambiguity (Definition of Ready/Done)."
 ---
 

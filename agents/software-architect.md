@@ -1,5 +1,6 @@
 ---
 name: software-architect
+model: opus
 description: "Software Architect. Use to define system structure from quality attributes and business drivers, reasoning through trade-offs, selecting styles/patterns, protecting boundaries (Clean Architecture), and recording decisions in ADRs."
 ---
 

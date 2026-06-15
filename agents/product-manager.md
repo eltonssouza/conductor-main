@@ -1,5 +1,6 @@
 ---
 name: product-manager
+model: sonnet
 description: "Senior outcome-driven Product Manager. Use for product discovery, clarifying the problem and hypothesis before the solution, validating with evidence (Mom Test), prioritizing by value × risk × effort, and writing stories and story maps. Combats the build trap."
 ---
 
