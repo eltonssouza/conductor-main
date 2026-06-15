@@ -1,100 +1,81 @@
 # Conductor
 
-A technology-agnostic software-development **guidance plugin** for Claude Code.
-It brings together 36 industry roles — each an **Agent** (a system prompt
-anchored in reference books) with an actionable **Skill** — and conducts a
-demand through an 11-gate flow so no critical step (discovery, spec, security,
-architecture, test, code, quality gate, validation, delivery, observability,
-learning) gets skipped.
+A global CLI that turns any project into a **Claude-Code-conducted** project.
+`conductor cdt init` analyzes your project and scaffolds Claude-Code-native
+config into it — a relevant subset of 36 industry **role Agents + Skills** under
+`.claude/`, the detected **stack**, and a generated **CLAUDE.md** describing the
+roles and an 11-gate development flow (discovery → spec → security → architecture
+→ test → code → quality gate → validation → delivery → observability → learning).
+
+Conductor is **not a Claude Code plugin**. It is the tool that *prepares* a
+project; the reasoning then happens in your Claude, driven by the project-local
+`.claude/` and `CLAUDE.md`. Two memories ground every gate:
+
+| Memory | Knows | Backed by |
+|--------|-------|-----------|
+| **Library (RAG)** | what good practice says — static books | `conductor library` → bge-m3 + ChromaDB |
+| **Diary (Honcho)** | what *this* project decided & learned | `conductor journal` → Honcho + local mirror |
 
 ## Install
 
-### Locally (before publishing)
+```bash
+pipx install conductor          # or: pip install conductor
+# from source:  pipx install --editable .
+```
 
-Fastest dev loop — load straight from the directory, no marketplace:
+Gives you the `conductor` command (and the `cdt` alias).
+
+## Use
 
 ```bash
-claude --plugin-dir /path/to/conductor
+# In a project directory:
+conductor cdt init              # detect type/stack, generate .claude/ + CLAUDE.md
+conductor cdt init --all        # scaffold all 36 roles (default: a relevant subset)
+conductor cdt init --roles backend-engineer,security-engineer,...   # explicit set
+
+# Grounding + memory (from the project root):
+conductor library "bounded context boundaries"
+conductor journal add --gate 4 --kind decision "chose hexagonal arch; ADR-1"
+conductor journal recall "why this architecture?"
+
+# Backends (Docker): RAG (Ollama + ChromaDB), GPU auto-detected
+conductor up                    # start    | conductor down  | conductor ingest
 ```
 
-Or install through the bundled local marketplace (exercises the real flow). In
-Claude Code:
+Then open the project in Claude Code — the project-scoped `.claude/agents` and
+`.claude/skills` load automatically (no plugin), and `CLAUDE.md` is picked up as
+project context. Each role runs on a model sized to its cognitive load (`model:`
+per agent — opus for architecture/security/strategy, sonnet for implementation,
+haiku for light facilitation).
+
+## What `conductor cdt init` generates
 
 ```
-/plugin marketplace add /path/to/conductor
-/plugin install conductor@conductor
-/reload-plugins
+<project>/
+  CLAUDE.md                     # roles + the 11-gate flow + the conductor CLI
+  .claude/
+    agents/<role>.md            # subset by type (Claude Code auto-loads these)
+    skills/<skill>/SKILL.md     # the matching skills
+  .cdt/
+    config.json                 # enrollment (slug, type, Honcho workspace)
+    stack/<TYPE>.md             # detected technologies (steers RAG queries)
+    journal/                    # local diary mirror
 ```
-
-`conductor@conductor` is `<plugin-name>@<marketplace-name>` (both `conductor`).
-Verify with `/plugin details conductor@conductor`, `/help` (see `/cdt`,
-`/library`, `/journal`), and `/agents` (the 36 roles).
-
-### From GitHub (after publishing)
-
-```
-/plugin marketplace add <user>/conductor
-/plugin install conductor@conductor
-```
-
-### Optional Python extras
-
-The `/library` (RAG) and `/journal` (diary) commands shell out to
-`python -m rag.…` / `python -m cdt.…`. Install the package so those modules
-resolve from any directory:
-
-```bash
-pip install -e .[rag]        # semantic search over the library (+ Ollama/bge-m3)
-pip install -e .[honcho]     # the development diary (+ infra/honcho/ server)
-```
-
-The plugin's agents/skills/commands work without any of this; the extras only
-power the two memories.
-
-## The flow — `/cdt`
-
-```
-/cdt "add a WhatsApp button to the Angular app"
-```
-
-Runs the demand through the **11 gates in order**, delegating to the right roles
-at each step and refusing to advance until each gate's exit criterion is met.
-Each role runs on a model sized to its cognitive load (`model:` per agent —
-opus for architecture/security/strategy, sonnet for implementation, haiku for
-light facilitation).
-
-## Two memories that ground every gate
-
-| Memory | What it knows | How |
-|--------|---------------|-----|
-| **Library (RAG)** | what good practice says — static books | `/library "<question>"` → bge-m3 + ChromaDB. See [rag/](rag/README.md). |
-| **Diary (Honcho)** | what *this* project decided & learned — dynamic | `/journal add/recall` → Honcho + local mirror. See [cdt/](cdt/README.md). |
-
-## Per-project usage — `/cdt init`
-
-Conductor is opt-in per project. Enroll one with:
-
-```
-/cdt init
-```
-
-This scaffolds `.cdt/` (project type, tech stack, diary), so the RAG becomes
-**project-aware** and the diary records the project's history. Enrolled projects
-are tracked in `~/.claude/conductor/projects.json`.
 
 ## Layout
 
-- `agents/` — 36 role Agents (system prompt + reference books + model tier).
-- `skills/` — 36 matching Skills (`When to use` + numbered steps).
-- `commands/` — `/cdt` (flow + `init`), `/library` (RAG), `/journal` (diary).
-- `rag/` — semantic search over the library (optional extra `[rag]`).
-- `cdt/` — per-project enrollment + development diary (optional extra `[honcho]`).
-- `infra/honcho/` — self-hosted Honcho (docker-compose; reasoning provider is your choice).
-- `tools/validate.py` — the golden-rule invariant validator (CI quality gate).
+- `conductor/` — the Python package (CLI). `cli.py` (dispatch), `detect.py`
+  (type/stack), `roles.py` (36-role registry), `scaffold.py` (generator),
+  `library.py`/`journal.py`/`honcho_client.py`, and `rag/` (embed/ingest/stack).
+- `conductor/templates/` — the 36 role Agents + Skills + `CLAUDE.md.tmpl` +
+  `flow.md` (the 11-gate flow), copied into projects.
+- `infra/conductor/` — the Docker RAG stack (Ollama + bge-m3 + ChromaDB).
+- `infra/honcho/` — the self-hosted Honcho diary backend.
+- `tools/validate.py` — the golden-rule validator over the templates (CI gate).
 
 ## Invariants
 
-`python tools/validate.py` enforces 8 golden rules (R1–R8) that keep the plugin
-consistent with `plano.md` — role parity, frontmatter/YAML safety, version sync,
-agent/skill structure, flow integrity, and valid model tiers. It runs in CI as
-the plugin's own Gate 7. See [tools/](tools/README.md).
+`python tools/validate.py` enforces 8 golden rules (R1–R8) over the templates:
+role parity (36+36), frontmatter/YAML safety, semver, agent anchoring, skill
+structure, the roles↔templates registry + 11-gate flow, and valid model tiers.
+Runs in CI. See [tools/](tools/README.md).

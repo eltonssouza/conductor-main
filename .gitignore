@@ -1,9 +1,14 @@
 __pycache__/
 *.py[cod]
 
-# RAG vector index — built locally via `python -m rag.ingest`
-rag/chroma/
-rag/*.log
+# RAG vector index — built locally
+conductor/rag/chroma/
+conductor/rag/*.log
 
 # Honcho self-host secrets (copy infra/honcho/.env.example -> .env)
 infra/honcho/.env
+
+# Python build/editable-install artifacts
+*.egg-info/
+build/
+dist/

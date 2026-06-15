@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Semantic search over the library. Embeds the question and returns the top-k passages.
 
-  python -m rag.query "how to define bounded context boundaries?"
-  python -m rag.query -k 8 --json "circuit breaker vs bulkhead"
-  python -m rag.query --category 09_seguranca_e_privacidade "STRIDE"
+  conductor library "how to define bounded context boundaries?"
+  conductor library -k 8 --json "circuit breaker vs bulkhead"
+  conductor library --category 09_seguranca_e_privacidade "STRIDE"
 """
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ import json
 import sys
 from typing import List
 
-from .core import embed, force_utf8, get_collection
+from .rag.core import embed, force_utf8, get_collection
 
 
 def search(question: str, k: int = 5, category: str = "") -> List[dict]:

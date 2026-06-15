@@ -25,17 +25,17 @@ pip install -e .[rag]
 
 ```bash
 # Build/update the index (idempotent; can be resumed)
-python -m rag.ingest                 # full library
-python -m rag.ingest --limit 200     # quick sample
+conductor ingest                            # full library (in the Docker stack)
+python -m conductor.rag.ingest --limit 200  # quick local sample
 
 # Query
-python -m rag.query "bounded context boundaries"
-python -m rag.query -k 8 --json "circuit breaker vs bulkhead"
-python -m rag.query --category 09_seguranca_e_privacidade "STRIDE"
+conductor library "bounded context boundaries"
+conductor library -k 8 --json "circuit breaker vs bulkhead"
+conductor library --category 09_seguranca_e_privacidade "STRIDE"
 ```
 
-Or via the plugin: command `/library <question>` (and `/cdt` uses the
-library to anchor each gate).
+The generated project's `CLAUDE.md` tells the project's Claude to use
+`conductor library` to anchor each gate.
 
 ## Configuration (environment variables)
 

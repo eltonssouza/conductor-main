@@ -435,10 +435,4 @@ A lógica geral: a spec elimina ambiguidade (causa-raiz de muito defeito), os te
 
 > **Fim.** 36 cargos, cada um com Agent (prompt de sistema) + Skill, ancorados nos livros do acervo. Para usar como skills instaláveis (com frontmatter SKILL.md), peça a conversão.
 
-## Restrições 
 
-1. Não implemente nada fora do escopo dos cargos definidos, nem adicione informações nos prompts de sistema que não estejam diretamente relacionadas ao cargo.
-
-2. Não implemente nada além dos agentes e suas respectivas skills, conforme solicitado.
-
-3. Não faça nada além do que foi pedido, siga estritamente as instruções.

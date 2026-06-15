@@ -1,14 +1,29 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "conductor"
-version = "0.1.9"
-description = "Software-development guidance plugin with 36 roles (Agents + Skills) anchored in reference books."
+version = "0.2.0"
+description = "Global CLI that scaffolds Claude-Code-native config (role Agents + Skills + CLAUDE.md) into any project, with a library RAG and a per-project development diary."
 requires-python = ">=3.9"
 
-# Optional extras: the plugin (agents/skills/commands) works without any deps.
+# Optional extras: the core CLI (scaffolding) works without any deps.
 # - rag: semantic search over the library — pip install -e .[rag] + Ollama/bge-m3.
-# - honcho: the per-project development diary — pip install -e .[honcho] + the
-#   self-hosted Honcho server (see infra/honcho/). The diary's local JSONL mirror
-#   works without this extra; Honcho only adds intelligent, meaning-based recall.
+# - honcho: the per-project development diary backend — pip install -e .[honcho]
+#   + the self-hosted Honcho server (see infra/honcho/). The diary's local JSONL
+#   mirror works without this extra; Honcho only adds meaning-based recall.
 [project.optional-dependencies]
 rag = ["chromadb>=1.5"]
 honcho = ["honcho-ai>=1.0"]
+
+# Global commands: `conductor` (and the `cdt` alias).
+[project.scripts]
+conductor = "conductor.cli:main"
+cdt = "conductor.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["conductor*"]
+
+[tool.setuptools.package-data]
+conductor = ["templates/**/*"]

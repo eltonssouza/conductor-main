@@ -19,10 +19,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-INFRA = Path(__file__).resolve().parent.parent / "infra" / "conductor"
+REPO_ROOT = Path(__file__).resolve().parents[2]  # conductor/rag/stack.py -> repo root
+INFRA = REPO_ROOT / "infra" / "conductor"
 BASE = INFRA / "docker-compose.yml"
 GPU = INFRA / "docker-compose.gpu.yml"
-REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 def has_nvidia_gpu() -> bool:

@@ -1,0 +1,35 @@
+# {project} — conducted by Conductor
+
+This project is enrolled in **Conductor**: development is conducted through an
+11-gate, role-driven flow grounded in a library of reference books. The roles
+below live as project-scoped Agents/Skills under `.claude/` and are loaded
+automatically by Claude Code — no plugin required.
+
+- **Type:** {type}
+- **Stack:** see [`.cdt/stack/{type}.md`](.cdt/stack/{type}.md)
+- **Roles:** the Agents in `.claude/agents/` with their Skills in
+  `.claude/skills/` — a subset selected for this project type.
+
+## Roles in this project
+
+{roles_table}
+
+## Tooling (run from the project root)
+
+- **Ground answers in the library (RAG):** `conductor library "<question>"`
+  retrieves passages from the reference books — cite the source, and make queries
+  project-aware using the stack above.
+- **Development diary:** record and recall what this project decided/learned:
+
+  ```bash
+  conductor journal add --gate <N> --kind decision "<concise decision>"
+  conductor journal recall "<what was decided/attempted before?>"
+  ```
+
+  Kinds: `reasoning | decision | plan | error | solution`.
+- **Backends (Docker):** `conductor up` starts Ollama + ChromaDB (and the Honcho
+  diary if configured); `conductor down` stops them. GPU is auto-detected.
+
+---
+
+{flow}

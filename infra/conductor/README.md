@@ -13,12 +13,12 @@ Three services:
 
 ```bash
 # Recommended: the launcher auto-detects the GPU and the books archive.
-python -m rag.stack up           # attached (watch progress)
-python -m rag.stack up -d        # detached  (then: docker compose logs -f conductor)
-python -m rag.stack down         # stop
+conductor up                     # attached (watch progress)
+conductor up -d                  # detached  (then: docker compose logs -f conductor)
+conductor down                   # stop
 ```
 
-The launcher (`rag/stack.py`):
+The launcher (`conductor/rag/stack.py`, invoked by `conductor up`):
 - **detects an NVIDIA GPU** (`nvidia-smi`) **and Docker's NVIDIA runtime** — if
   both are present it adds `docker-compose.gpu.yml` so Ollama uses the GPU; if
   not, it says so and runs on CPU (slow). It prints which mode it chose.
@@ -56,12 +56,12 @@ From the host, point the RAG query at the containerized Chroma + Ollama:
 ```bash
 set CONDUCTOR_CHROMA_HTTP=localhost:8001
 set OLLAMA_HOST=http://localhost:11434
-python -m rag.query "bounded context"
+conductor library "bounded context"
 ```
 
 ## GPU (auto-detected)
 
-CPU embedding of the full corpus takes **hours**. `python -m rag.stack up`
+CPU embedding of the full corpus takes **hours**. `conductor up`
 detects an NVIDIA GPU + the NVIDIA Container Toolkit and enables the GPU
 automatically (~0.5 s/embed, like local dev). The `conductor` service then
 **confirms the real mode** after the pull — it warms bge-m3 and reports

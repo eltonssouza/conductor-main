@@ -10,8 +10,8 @@ Honcho is **optional** — it adds intelligent recall on top.
 
 ```bash
 # 1. Choose the reasoning provider (writes .env for it)
-python -m cdt.honcho_setup            # interactive: openai | deepseek | openrouter | ollama | anthropic
-#   or non-interactive, e.g.:  python -m cdt.honcho_setup --provider ollama
+conductor honcho-setup                # interactive: openai | deepseek | openrouter | ollama | anthropic
+#   or non-interactive, e.g.:  conductor honcho-setup --provider ollama
 #   or manual:                 cp .env.example .env  (uncomment one preset)
 
 # 2. Start it
@@ -25,13 +25,13 @@ Then install the SDK and point the diary at it:
 ```bash
 pip install -e .[honcho]      # from the repo root
 # default base_url is http://localhost:8000 (override: CONDUCTOR_HONCHO_URL)
-python -m cdt.journal recall "why did we choose this architecture?"
+conductor journal recall "why did we choose this architecture?"
 ```
 
 ## Reasoning engine — your choice
 
 The `deriver`, `dialectic`, and `summary` features run on **whichever provider
-you pick at install time** — nothing is pre-selected. `python -m cdt.honcho_setup`
+you pick at install time** — nothing is pre-selected. `conductor honcho-setup`
 ships presets for **OpenAI, DeepSeek, OpenRouter, local Ollama, and Anthropic**,
 and any OpenAI-compatible endpoint (Together, Fireworks, vLLM…) works too. It all
 maps to the `*_MODEL_CONFIG__*` vars in `.env`; re-run the setup to switch.
