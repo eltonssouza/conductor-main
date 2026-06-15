@@ -34,10 +34,11 @@ def force_utf8() -> None:
 REPO_ROOT = Path(__file__).resolve().parent.parent
 LIBRARY_DIR = Path(os.environ.get("CONDUCTOR_LIBRARY", r"C:\development\to-brain"))
 CHROMA_DIR = Path(os.environ.get("CONDUCTOR_CHROMA", str(REPO_ROOT / "rag" / "chroma")))
-# Optional resident Chroma server ("host:port"). When set, queries hit a
-# long-running server that keeps the HNSW index in RAM — no per-process index
-# reload, so repeated agent queries stay sub-second. Empty = local persistent.
-CHROMA_HTTP = os.environ.get("CONDUCTOR_CHROMA_HTTP", "").strip()
+# Resident Chroma server ("host:port"). Defaults to the dockerized stack
+# (`conductor up` exposes ChromaDB on localhost:8001), so `conductor library`
+# works with no env setup. The in-container bootstrap overrides this with
+# `chroma:8000`. Set to empty to use a local persistent index instead.
+CHROMA_HTTP = os.environ.get("CONDUCTOR_CHROMA_HTTP", "localhost:8001").strip()
 COLLECTION = "library"
 
 OLLAMA_URL = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")

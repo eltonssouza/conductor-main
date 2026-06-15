@@ -12,3 +12,6 @@ conductor/infra/honcho/.env
 *.egg-info/
 build/
 dist/
+
+# Books corpus archive — large; kept local, not committed (specific file, not *.7z)
+to-brain.7z
