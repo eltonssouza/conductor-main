@@ -45,3 +45,26 @@ library to anchor each gate).
 | `CONDUCTOR_CHROMA` | `rag/chroma` | where to persist the index |
 | `CONDUCTOR_EMBED_MODEL` | `bge-m3` | embeddings model in Ollama |
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama endpoint |
+| `CONDUCTOR_KEEP_ALIVE` | `30m` | how long Ollama keeps bge-m3 resident |
+| `CONDUCTOR_HNSW_M` / `_CONSTRUCTION_EF` / `_SEARCH_EF` | `32` / `200` / `128` | HNSW index tuning |
+| `CONDUCTOR_CHROMA_HTTP` | _(unset)_ | `host:port` of a resident Chroma server |
+
+## Performance
+
+Agent queries cost ≈ one bge-m3 embed + one HNSW search. Two levers keep that
+low:
+
+1. **bge-m3 resident on GPU** — `CONDUCTOR_KEEP_ALIVE` keeps the model loaded, so
+   a query embeds in ~0.5s on GPU instead of ~2.4s cold. Verify with `ollama ps`
+   (should read `100% GPU`).
+2. **Resident Chroma server (optional)** — a fresh CLI process otherwise reloads
+   the HNSW index from disk every query. Run a server once and point queries at
+   it so the index stays in RAM:
+
+   ```bash
+   chroma run --path rag/chroma --port 8000          # leave running
+   set CONDUCTOR_CHROMA_HTTP=localhost:8000           # then ingest/query hit it
+   ```
+
+HNSW recall/latency is tunable via the `CONDUCTOR_HNSW_*` vars (rebuild the index
+after changing `M`/`construction_ef`; `search_ef` applies per query).

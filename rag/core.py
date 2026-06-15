@@ -34,6 +34,10 @@ def force_utf8() -> None:
 REPO_ROOT = Path(__file__).resolve().parent.parent
 LIBRARY_DIR = Path(os.environ.get("CONDUCTOR_LIBRARY", r"C:\development\to-brain"))
 CHROMA_DIR = Path(os.environ.get("CONDUCTOR_CHROMA", str(REPO_ROOT / "rag" / "chroma")))
+# Optional resident Chroma server ("host:port"). When set, queries hit a
+# long-running server that keeps the HNSW index in RAM — no per-process index
+# reload, so repeated agent queries stay sub-second. Empty = local persistent.
+CHROMA_HTTP = os.environ.get("CONDUCTOR_CHROMA_HTTP", "").strip()
 COLLECTION = "library"
 
 OLLAMA_URL = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
@@ -179,16 +183,25 @@ def embed(texts: List[str]) -> List[List[float]]:
 
 # --- ChromaDB ----------------------------------------------------------------
 
+def _client():
+    """Chroma client: resident HTTP server if CONDUCTOR_CHROMA_HTTP is set,
+    otherwise the local persistent client."""
+    import chromadb  # late import: heavy dependency
+
+    if CHROMA_HTTP:
+        host, _, port = CHROMA_HTTP.partition(":")
+        return chromadb.HttpClient(host=host or "localhost", port=int(port or "8000"))
+    CHROMA_DIR.mkdir(parents=True, exist_ok=True)
+    return chromadb.PersistentClient(path=str(CHROMA_DIR))
+
+
 def get_collection(create: bool = True):
-    """Opens (or creates) the persistent library collection.
+    """Opens (or creates) the library collection.
 
     On create, applies the tuned HNSW_CONFIG; falls back to cosine-only if the
     installed chromadb rejects the extra keys.
     """
-    import chromadb  # late import: heavy dependency
-
-    CHROMA_DIR.mkdir(parents=True, exist_ok=True)
-    client = chromadb.PersistentClient(path=str(CHROMA_DIR))
+    client = _client()
     if not create:
         return client.get_collection(COLLECTION)
     try:
