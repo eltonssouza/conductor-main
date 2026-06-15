@@ -1,0 +1,78 @@
+# Conductor RAG stack — Ollama + bge-m3 + ChromaDB + book ingest, all in Docker.
+#
+# Usage:
+#   1. Put the books archive here as  infra/conductor/to-brain.7z
+#   2. docker compose up                # attach to watch the progress
+#      (or `up -d` then `docker compose logs -f conductor`)
+#
+# The `conductor` service runs once: it extracts the books, pulls bge-m3, waits
+# for ChromaDB, and ingests — printing the progress of each step. It exits when
+# the ingest finishes; ollama + chroma keep running to serve queries.
+#
+# Ports (localhost only): Ollama 11434, ChromaDB 8001 (8000 is left for Honcho).
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama:/root/.ollama
+    ports:
+      - "127.0.0.1:11434:11434"
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped
+    # NVIDIA GPU (optional but strongly recommended — CPU ingest of the full
+    # corpus takes hours). Needs Docker + the NVIDIA Container Toolkit. Uncomment:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  chroma:
+    image: chromadb/chroma:latest
+    volumes:
+      - chroma:/data
+    environment:
+      IS_PERSISTENT: "TRUE"
+      ANONYMIZED_TELEMETRY: "FALSE"
+    ports:
+      - "127.0.0.1:8001:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v2/heartbeat')"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped
+
+  conductor:
+    build:
+      context: ../..
+      dockerfile: infra/conductor/Dockerfile
+    depends_on:
+      ollama:
+        condition: service_healthy
+      chroma:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      CONDUCTOR_CHROMA_HTTP: chroma:8000
+      CONDUCTOR_LIBRARY: /data/library
+      CONDUCTOR_LIBRARY_ARCHIVE: /seed/to-brain.7z
+      CONDUCTOR_EMBED_MODEL: bge-m3
+    volumes:
+      - ./to-brain.7z:/seed/to-brain.7z:ro
+      - library:/data/library
+    restart: "no"
+
+volumes:
+  ollama:
+  chroma:
+  library:

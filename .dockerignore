@@ -1,0 +1,8 @@
+.git
+__pycache__/
+*.py[cod]
+rag/chroma/
+rag/*.log
+infra/honcho/.env
+infra/conductor/to-brain.7z
+*.7z
