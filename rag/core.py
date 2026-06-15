@@ -39,14 +39,27 @@ COLLECTION = "library"
 OLLAMA_URL = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
 EMBED_MODEL = os.environ.get("CONDUCTOR_EMBED_MODEL", "bge-m3")
 EMBED_DIM = 1024
+# Keep bge-m3 resident in Ollama between calls so agent queries skip the model
+# cold-start. "-1" = never unload; e.g. "30m" for a TTL. Configurable.
+EMBED_KEEP_ALIVE = os.environ.get("CONDUCTOR_KEEP_ALIVE", "30m")
 
 # Chunking: target in characters (~512 tokens) with 1-paragraph overlap.
 CHUNK_TARGET_CHARS = 1500
 CHUNK_MAX_CHARS = 2400
-EMBED_BATCH = 48
+EMBED_BATCH = 64
 # Safety cap per text sent to Ollama (bge-m3 ~8192 tokens). Above this,
 # /api/embed returns HTTP 400; we truncate to never overflow.
 EMBED_CHAR_CAP = 6000
+
+# HNSW index tuning for the vector store. Higher M / construction_ef = better
+# recall and denser graph (slower build, more RAM); search_ef trades query
+# latency for recall. Sized for a ~60k-chunk corpus queried by agents.
+HNSW_CONFIG = {
+    "hnsw:space": "cosine",
+    "hnsw:M": int(os.environ.get("CONDUCTOR_HNSW_M", "32")),
+    "hnsw:construction_ef": int(os.environ.get("CONDUCTOR_HNSW_CONSTRUCTION_EF", "200")),
+    "hnsw:search_ef": int(os.environ.get("CONDUCTOR_HNSW_SEARCH_EF", "128")),
+}
 
 
 # --- chunking ----------------------------------------------------------------
@@ -150,7 +163,8 @@ def embed(texts: List[str]) -> List[List[float]]:
     so Ollama never returns HTTP 400.
     """
     safe = [(sanitize(t)[:EMBED_CHAR_CAP] or " ") for t in texts]
-    payload = json.dumps({"model": EMBED_MODEL, "input": safe}).encode("utf-8")
+    payload = json.dumps({"model": EMBED_MODEL, "input": safe,
+                          "keep_alive": EMBED_KEEP_ALIVE}).encode("utf-8")
     req = urllib.request.Request(
         f"{OLLAMA_URL}/api/embed", data=payload,
         headers={"Content-Type": "application/json"},
@@ -166,11 +180,18 @@ def embed(texts: List[str]) -> List[List[float]]:
 # --- ChromaDB ----------------------------------------------------------------
 
 def get_collection(create: bool = True):
-    """Opens (or creates) the persistent library collection."""
+    """Opens (or creates) the persistent library collection.
+
+    On create, applies the tuned HNSW_CONFIG; falls back to cosine-only if the
+    installed chromadb rejects the extra keys.
+    """
     import chromadb  # late import: heavy dependency
 
     CHROMA_DIR.mkdir(parents=True, exist_ok=True)
     client = chromadb.PersistentClient(path=str(CHROMA_DIR))
-    if create:
+    if not create:
+        return client.get_collection(COLLECTION)
+    try:
+        return client.get_or_create_collection(COLLECTION, metadata=dict(HNSW_CONFIG))
+    except Exception:  # noqa: BLE001 — older/newer chromadb metadata schema
         return client.get_or_create_collection(COLLECTION, metadata={"hnsw:space": "cosine"})
-    return client.get_collection(COLLECTION)
