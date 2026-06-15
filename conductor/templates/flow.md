@@ -7,31 +7,44 @@ test-first locks regressions, the quality gate stops errors from advancing,
 progressive delivery contains what escapes, and observability + postmortems feed
 back into the spec — **each loop lowers the defect rate**.
 
-## Two memories (ground every gate)
+## Two memories
 
-- **Library (RAG)** — *what good practice says*. Run
-  `conductor library "<question>"` to retrieve passages from the reference books
-  and cite the source. Make queries **project-aware** using the stack in
-  `.cdt/stack/` (e.g. add the project's framework to the query). Do not invent
-  sources; if the library does not cover it, say so.
-- **Diary (Honcho)** — *what this project already decided and learned*. At each
-  gate, recall prior context to avoid repeating mistakes, and record the key
-  reasoning/decision/error/solution:
+- **Library (RAG)** — *what good practice says*. `conductor library "<question>"`
+  retrieves passages from the reference books. Make queries **project-aware**
+  using the stack in `.cdt/stack/` (e.g. add the project's framework). Do not
+  invent sources; if the library does not cover it, say so.
+- **Diary (Honcho)** — *what this project already decided and learned*.
+  `conductor journal recall "<question>"` retrieves prior context;
+  `conductor journal add --gate <N> --kind <kind> "<text>"` records it
+  (kinds: reasoning | decision | plan | error | solution).
 
-  ```bash
-  conductor journal recall "<what was decided/attempted before?>"
-  conductor journal add --gate <N> --kind decision "<concise decision>"
-  ```
+## Gate protocol — MANDATORY at every gate
+
+Grounding and recording are **not optional**. For each gate, in order, you MUST:
+
+1. **Recall** — `conductor journal recall "<the gate's question>"` to load what
+   this project already decided/attempted. Don't repeat past mistakes.
+2. **Ground** — `conductor library "<project-aware question>"` and **cite the
+   book(s)** for each non-trivial claim or decision. An assertion with no library
+   citation (or an explicit "the library does not cover this") is not allowed.
+3. **Decide** — reason as the gate's roles, using the retrieved evidence.
+4. **Record** — `conductor journal add --gate <N> --kind decision "<decision>"`
+   for every key decision (and `--kind error|solution` for problems hit/fixed)
+   **before advancing**.
+
+The gate's **exit criterion is met only when steps 1–4 are done** and the
+gate-specific criterion below holds. State the library citations and the journal
+entries you wrote as part of closing the gate.
 
 ## How to conduct
 
-Conduct the demand through the gates **in order**. Each gate has an
-**objective**, the responsible **roles** (delegate to the matching Agent /
-invoke the matching Skill under `.claude/`), and a **quality gate** — an explicit
-exit criterion. **Do not advance to the next gate until the exit criterion is
-met**; if information is missing, state what must be discovered before
-proceeding. Adapt depth to the size of the demand, but never skip a gate without
-justification.
+Conduct the demand through the gates **in order**, applying the Gate protocol
+above to each. Each gate has an **objective**, the responsible **roles**
+(delegate to the matching Agent / invoke the matching Skill under `.claude/`),
+and a **quality gate** — an explicit exit criterion. **Do not advance until the
+exit criterion is met**; if information is missing, state what must be discovered
+first. Adapt depth to the size of the demand, but never skip a gate or its
+protocol without justification.
 
 ---
 
