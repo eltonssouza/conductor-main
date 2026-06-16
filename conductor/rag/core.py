@@ -105,7 +105,7 @@ def chunk_markdown(text: str, *, source: str, category: str, path: str) -> List[
         nonlocal buf, buf_len, idx
         if not buf:
             return
-        body = "\n\n".join(buf).strip()
+        body = sanitize("\n\n".join(buf).strip())
         if body:
             chunks.append(Chunk(
                 chunk_id=f"{path}::{idx}",
@@ -153,7 +153,9 @@ def iter_corpus(library: Path = LIBRARY_DIR) -> Iterable[Chunk]:
         rel = md.relative_to(library)
         parts = rel.parts
         category = parts[0] if len(parts) > 1 else "(root)"
-        text = sanitize(md.read_text(encoding="utf-8", errors="replace"))
+        # sanitize() is applied once per chunk body in chunk_markdown(), so we
+        # no longer scrub the whole file here (avoids a second O(file) regex pass).
+        text = md.read_text(encoding="utf-8", errors="replace")
         yield from chunk_markdown(
             text, source=md.stem, category=category, path=str(rel).replace("\\", "/"),
         )
@@ -165,9 +167,10 @@ def embed(texts: List[str]) -> List[List[float]]:
     """Embeds a list of texts via Ollama /api/embed (batch). 1024-d.
 
     Each text is truncated to EMBED_CHAR_CAP and empty strings become a space,
-    so Ollama never returns HTTP 400.
+    so Ollama never returns HTTP 400. Inputs are already sanitized at chunk
+    creation (chunk_markdown), so we only truncate here.
     """
-    safe = [(sanitize(t)[:EMBED_CHAR_CAP] or " ") for t in texts]
+    safe = [(t[:EMBED_CHAR_CAP] or " ") for t in texts]
     payload = json.dumps({"model": EMBED_MODEL, "input": safe,
                           "keep_alive": EMBED_KEEP_ALIVE}).encode("utf-8")
     req = urllib.request.Request(

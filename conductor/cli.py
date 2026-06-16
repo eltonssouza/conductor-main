@@ -27,6 +27,7 @@ Commands:
   journal add|recall|log     Per-project development diary.
   up | down                  Start / stop the Docker RAG stack (auto-detects GPU).
   ingest                     (Re)build the index in the running stack.
+  viewer                     3D map of the library embeddings (filter by profile).
   honcho setup               Choose the Honcho diary reasoning provider.
   honcho up | down           Start / stop the Honcho diary backend (Docker).
   update [--reinstall]       Pull the latest source (editable/source install).
@@ -69,6 +70,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "ingest":
         from .rag.bootstrap import main as bootstrap_main
         return bootstrap_main()
+
+    if cmd == "viewer":
+        from .viewer import main as viewer_main
+        return viewer_main(rest)
 
     if cmd == "honcho-setup":
         from .honcho_setup import main as honcho_setup_main
