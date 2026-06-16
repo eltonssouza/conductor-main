@@ -2,15 +2,31 @@
 
 Used by `conductor cdt init` to pick the role subset and seed the stack file;
 the user's Claude finalizes the stack from the real manifests afterwards.
+
+Monorepo-aware: scans the project root plus subdirectories up to two levels
+deep (skipping vendored/build noise), so a fullstack repo with `backend/` and
+`frontend/` manifests is detected even when the root holds only a thin shell
+package.json.
 """
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 VALID_TYPES = ("backend", "frontend", "mobile", "fullstack", "library",
                "data", "unknown")
+
+# Directories never worth scanning for manifests (vendored deps, build output,
+# virtualenvs). Hidden dirs (.git, .cdt, .vercel, ...) are skipped separately.
+SKIP_DIRS = frozenset({
+    "node_modules", "dist", "build", "out", "target", "bin", "obj",
+    "vendor", "coverage", "tmp", "temp", "__pycache__",
+    "venv", ".venv", "env", "site-packages",
+})
+# How deep below the root to look for manifests (root=0).
+MAX_DEPTH = 2
 
 
 def _read_json(path: Path) -> dict:
@@ -20,25 +36,80 @@ def _read_json(path: Path) -> dict:
         return {}
 
 
+def _rel(path: Path, root: Path) -> str:
+    try:
+        return path.relative_to(root).as_posix()
+    except ValueError:
+        return path.name
+
+
+def _search_roots(root: Path) -> List[Path]:
+    """Root plus its subdirectories up to MAX_DEPTH, skipping noise/hidden dirs."""
+    roots = [root]
+
+    def walk(d: Path, depth: int) -> None:
+        if depth > MAX_DEPTH:
+            return
+        try:
+            children = sorted(d.iterdir())
+        except OSError:
+            return
+        for child in children:
+            if not child.is_dir():
+                continue
+            if child.name.startswith(".") or child.name in SKIP_DIRS:
+                continue
+            roots.append(child)
+            walk(child, depth + 1)
+
+    walk(root, 1)
+    return roots
+
+
 def detect(root: Path) -> Tuple[str, List[str], List[str]]:
-    """Returns (type, technologies, evidence) from root manifests.
+    """Returns (type, technologies, evidence) from root + subdir manifests.
 
     Conservative: mixed front+back signals -> fullstack; nothing recognized ->
-    unknown, so the command/owner can classify.
+    unknown, so the command/owner can classify. Evidence entries are paths
+    relative to the project root, so monorepo locations are visible.
     """
+    search = _search_roots(root)
     techs: List[str] = []
     evidence: List[str] = []
     front = back = mobile = False
 
-    def has(name: str) -> bool:
-        return (root / name).exists()
+    def find(name: str) -> str | None:
+        """First search root containing `name`; returns its relative path."""
+        for r in search:
+            p = r / name
+            if p.exists():
+                return _rel(p, root)
+        return None
 
-    # JS/TS ecosystem
-    pkg = _read_json(root / "package.json") if has("package.json") else {}
-    deps = {**pkg.get("dependencies", {}), **pkg.get("devDependencies", {})}
-    if pkg:
-        evidence.append("package.json")
-    if has("angular.json") or "@angular/core" in deps:
+    def glob_first(pattern: str) -> str | None:
+        for r in search:
+            for m in r.glob(pattern):
+                return _rel(m, root)
+        return None
+
+    # JS/TS ecosystem — merge deps from every package.json across the tree.
+    deps: dict = {}
+    pkg_paths: List[str] = []
+    for r in search:
+        p = r / "package.json"
+        if p.exists():
+            pkg = _read_json(p)
+            if pkg:
+                deps.update(pkg.get("dependencies", {}))
+                deps.update(pkg.get("devDependencies", {}))
+                pkg_paths.append(_rel(p, root))
+    if pkg_paths:
+        evidence.extend(pkg_paths)
+
+    def has_dir(name: str) -> bool:
+        return find(name) is not None
+
+    if has_dir("angular.json") or "@angular/core" in deps:
         front = True; techs.append("Angular")
     if "react" in deps:
         if "react-native" in deps:
@@ -51,29 +122,51 @@ def detect(root: Path) -> Tuple[str, List[str], List[str]]:
         front = True; techs.append("Svelte")
     if "next" in deps:
         front = True; techs.append("Next.js")
-    if any((root / f).exists() for f in ("vite.config.js", "vite.config.ts")):
+    if glob_first("vite.config.js") or glob_first("vite.config.ts"):
         front = True; techs.append("Vite")
-    if "express" in deps or "fastify" in deps or "@nestjs/core" in deps:
+    # Node backend. NestJS/Fastify are unambiguous. Express, however, also ships
+    # as the SSR server of an Angular Universal app (@angular/ssr); in that case
+    # it is not a separate backend, so only count it when no Angular SSR is present.
+    if "@nestjs/core" in deps or "fastify" in deps:
+        back = True; techs.append("Node.js")
+    elif "express" in deps and not ("@angular/ssr" in deps or "@angular/core" in deps):
         back = True; techs.append("Node.js")
 
     # backend manifests
     for f, tech in (("pom.xml", "Java/Maven"), ("build.gradle", "Java/Gradle"),
                     ("go.mod", "Go"), ("Gemfile", "Ruby"),
                     ("composer.json", "PHP"), ("Cargo.toml", "Rust")):
-        if has(f):
-            back = True; techs.append(tech); evidence.append(f)
-    if has("requirements.txt") or has("pyproject.toml"):
-        back = True; techs.append("Python"); evidence.append("requirements/pyproject")
-    if any(root.glob("*.csproj")):
-        back = True; techs.append(".NET"); evidence.append("*.csproj")
+        hit = find(f)
+        if hit:
+            back = True; techs.append(tech); evidence.append(hit)
+    py = find("requirements.txt") or find("pyproject.toml") or find("manage.py")
+    if py:
+        back = True; techs.append("Python"); evidence.append(py)
+    csproj = glob_first("*.csproj")
+    if csproj:
+        back = True; techs.append(".NET"); evidence.append(csproj)
+    php = glob_first("*.php")  # composer.json is already handled above
+    if php:
+        back = True; techs.append("PHP"); evidence.append(php)
 
     # mobile manifests
-    if has("pubspec.yaml"):
-        mobile = True; techs.append("Flutter"); evidence.append("pubspec.yaml")
-    if has("android") and has("ios"):
+    flutter = find("pubspec.yaml")
+    if flutter:
+        mobile = True; techs.append("Flutter"); evidence.append(flutter)
+    if has_dir("android") and has_dir("ios"):
         mobile = True; evidence.append("android/+ios/")
-    if any(root.glob("*.xcodeproj")):
-        mobile = True; techs.append("iOS/Xcode"); evidence.append("*.xcodeproj")
+    xcode = glob_first("*.xcodeproj")
+    if xcode:
+        mobile = True; techs.append("iOS/Xcode"); evidence.append(xcode)
+
+    # Hand-written static site: HTML present but no package.json anywhere (so it
+    # is not an unbuilt JS app). `index.html` is the strong signal; fall back to
+    # any *.html at a search root. Guarded by `not deps` so real frontend
+    # frameworks are never tagged "Static HTML".
+    if not front and not deps:
+        html = find("index.html") or glob_first("*.html")
+        if html:
+            front = True; techs.append("Static HTML"); evidence.append(html)
 
     if mobile:
         ptype = "mobile"
@@ -86,4 +179,184 @@ def detect(root: Path) -> Tuple[str, List[str], List[str]]:
     else:
         ptype = "unknown"
 
-    return ptype, list(dict.fromkeys(techs)), evidence
+    return ptype, list(dict.fromkeys(techs)), list(dict.fromkeys(evidence))
+
+
+# --- rich profile ------------------------------------------------------------
+# detect() answers "what type"; profile() answers "what exactly" — the frameworks,
+# versions, datastore, build/test tooling and notable libraries written into the
+# .cdt/stack/<type>.md so the file is actually filled in, not a blank skeleton.
+
+PROFILE_FIELDS = ("languages", "frameworks", "datastores", "build", "testing",
+                  "libraries")
+
+# docker-compose / pom image or driver substring -> datastore label.
+_DATASTORES = (
+    ("pgvector", "PostgreSQL (pgvector)"), ("postgres", "PostgreSQL"),
+    ("mariadb", "MariaDB"), ("mysql", "MySQL"), ("mongo", "MongoDB"),
+    ("redis", "Redis"), ("minio", "MinIO / S3"), ("keycloak", "Keycloak (auth)"),
+    ("elasticsearch", "Elasticsearch"), ("opensearch", "OpenSearch"),
+    ("rabbitmq", "RabbitMQ"), ("kafka", "Kafka"), ("cassandra", "Cassandra"),
+    ("clickhouse", "ClickHouse"),
+)
+
+
+def _read_text(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+
+
+def _clean_ver(v: str) -> str:
+    """`^21.2.14` / `~5.9.2` -> `21.2.14`."""
+    return re.sub(r"^[\^~>=<\s]+", "", (v or "").strip())
+
+
+def _major(v: str) -> str:
+    m = re.match(r"(\d+)", _clean_ver(v))
+    return m.group(1) if m else _clean_ver(v)
+
+
+def _parse_pom(text: str, prof: Dict[str, List[str]]) -> None:
+    pm = re.search(
+        r"spring-boot-starter-parent</artifactId>\s*<version>([^<]+)</version>", text)
+    if pm:
+        prof["frameworks"].append(f"Spring Boot {pm.group(1)}")
+    jm = (re.search(r"<java\.version>([^<]+)</java\.version>", text)
+          or re.search(r"<maven\.compiler\.(?:source|release)>([^<]+)<", text))
+    if jm:
+        prof["languages"].append(f"Java {jm.group(1)}")
+    arts = set(re.findall(r"<artifactId>([^<]+)</artifactId>", text))
+
+    def art(*subs: str) -> bool:
+        return any(any(s in a for s in subs) for a in arts)
+
+    if art("spring-boot-starter-data-jpa") or art("hibernate"):
+        prof["libraries"].append("Spring Data JPA / Hibernate")
+    if art("spring-boot-starter-security"):
+        prof["libraries"].append("Spring Security")
+    if art("flyway"):
+        prof["libraries"].append("Flyway (migrations)")
+    if art("liquibase"):
+        prof["libraries"].append("Liquibase (migrations)")
+    if art("postgresql"):
+        prof["datastores"].append("PostgreSQL")
+    if art("mysql-connector", "mariadb"):
+        prof["datastores"].append("MySQL/MariaDB")
+    if art("spring-boot-starter-data-mongodb"):
+        prof["datastores"].append("MongoDB")
+    if art("spring-boot-starter-data-redis"):
+        prof["datastores"].append("Redis")
+    if art("jjwt", "java-jwt"):
+        prof["libraries"].append("JWT (jjwt)")
+    if art("bucket4j"):
+        prof["libraries"].append("Bucket4j (rate limiting)")
+    if art("lombok"):
+        prof["libraries"].append("Lombok")
+    if art("awssdk", "aws-java-sdk") or "s3" in arts:
+        prof["libraries"].append("AWS SDK (S3)")
+    if art("mapstruct"):
+        prof["libraries"].append("MapStruct")
+    if art("spring-boot-starter-test"):
+        prof["testing"].append("Spring Boot Test (JUnit)")
+    if "testcontainers" in text:  # groupId org.testcontainers, not an artifactId
+        prof["testing"].append("Testcontainers")
+    prof["build"].append("Maven")
+
+
+def _parse_pkg(pkg: dict, prof: Dict[str, List[str]]) -> None:
+    deps = {**pkg.get("dependencies", {}), **pkg.get("devDependencies", {})}
+    if "@angular/core" in deps:
+        ssr = " (SSR + Express)" if "@angular/ssr" in deps else ""
+        prof["frameworks"].append(f"Angular {_major(deps['@angular/core'])}{ssr}")
+    if "react" in deps and "react-native" not in deps:
+        prof["frameworks"].append(f"React {_major(deps['react'])}")
+    if "react-native" in deps:
+        prof["frameworks"].append(f"React Native {_major(deps['react-native'])}")
+    if "vue" in deps:
+        prof["frameworks"].append(f"Vue {_major(deps['vue'])}")
+    if "next" in deps:
+        prof["frameworks"].append(f"Next.js {_major(deps['next'])}")
+    if "svelte" in deps:
+        prof["frameworks"].append(f"Svelte {_major(deps['svelte'])}")
+    if "@nestjs/core" in deps:
+        prof["frameworks"].append(f"NestJS {_major(deps['@nestjs/core'])}")
+    elif "express" in deps and not ("@angular/ssr" in deps or "@angular/core" in deps):
+        prof["frameworks"].append(f"Express {_major(deps['express'])}")
+    elif "fastify" in deps:
+        prof["frameworks"].append(f"Fastify {_major(deps['fastify'])}")
+    if "vite" in deps:
+        prof["build"].append(f"Vite {_major(deps['vite'])}")
+    if "typescript" in deps:
+        prof["languages"].append(f"TypeScript {_clean_ver(deps['typescript'])}")
+    for name, label in (("bootstrap", "Bootstrap"),
+                        ("@ng-bootstrap/ng-bootstrap", "ng-bootstrap"),
+                        ("@angular/material", "Angular Material"),
+                        ("tailwindcss", "Tailwind CSS"), ("rxjs", "RxJS"),
+                        ("@ngrx/store", "NgRx"), ("redux", "Redux"),
+                        ("axios", "Axios")):
+        if name in deps:
+            prof["libraries"].append(label)
+    for name, label in (("vitest", "Vitest"), ("jest", "Jest"), ("karma", "Karma"),
+                        ("jasmine", "Jasmine"), ("cypress", "Cypress"),
+                        ("@playwright/test", "Playwright"), ("playwright", "Playwright")):
+        if name in deps:
+            prof["testing"].append(label)
+    pm = pkg.get("packageManager")
+    if pm:
+        prof["build"].append(pm.replace("@", " "))
+    elif "@angular/cli" in deps:
+        prof["build"].append("npm (Angular CLI)")
+
+
+def _parse_compose(text: str, prof: Dict[str, List[str]]) -> None:
+    for img in re.findall(r"image:\s*['\"]?([^\s'\"]+)", text):
+        low = img.lower()
+        for key, label in _DATASTORES:
+            if key in low:
+                prof["datastores"].append(label)
+                break
+
+
+def _parse_python(blob: str, prof: Dict[str, List[str]]) -> None:
+    rp = re.search(r"requires-python\s*=\s*[\"']([^\"']+)", blob)
+    if rp:
+        prof["languages"].append(f"Python {rp.group(1)}")
+    low = blob.lower()
+    for key, label in (("django", "Django"), ("fastapi", "FastAPI"),
+                       ("flask", "Flask")):
+        if key in low:
+            prof["frameworks"].append(label)
+    if "pytest" in low:
+        prof["testing"].append("pytest")
+
+
+def profile(root: Path) -> Dict[str, List[str]]:
+    """Extracts a filled stack profile from the manifests across the tree.
+
+    Returns a dict with the PROFILE_FIELDS keys, each a deduped list (possibly
+    empty). Best-effort and never raises — unknown corners simply stay empty.
+    """
+    prof: Dict[str, List[str]] = {k: [] for k in PROFILE_FIELDS}
+    py_blob = ""
+    for r in _search_roots(root):
+        if (r / "pom.xml").exists():
+            _parse_pom(_read_text(r / "pom.xml"), prof)
+        if (r / "build.gradle").exists() or (r / "build.gradle.kts").exists():
+            prof["build"].append("Gradle")
+        if (r / "package.json").exists():
+            pkg = _read_json(r / "package.json")
+            if pkg:
+                _parse_pkg(pkg, prof)
+        for cf in ("docker-compose.yml", "docker-compose.yaml", "compose.yml"):
+            if (r / cf).exists():
+                _parse_compose(_read_text(r / cf), prof)
+        for pf in ("pyproject.toml", "requirements.txt"):
+            if (r / pf).exists():
+                py_blob += _read_text(r / pf) + "\n"
+        if (r / "go.mod").exists():
+            prof["languages"].append("Go")
+    if py_blob.strip():
+        _parse_python(py_blob, prof)
+    return {k: list(dict.fromkeys(v)) for k, v in prof.items()}
