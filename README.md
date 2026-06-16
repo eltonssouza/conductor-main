@@ -34,13 +34,14 @@ memories ground every decision:
    - [`conductor cdt sync` — the living CLAUDE.md](#conductor-cdt-sync--the-living-claudemd)
 6. [The 11-gate flow](#the-11-gate-flow)
 7. [The library (Chroma) — grounding answers](#the-library-chroma--grounding-answers)
-8. [The diary (Honcho) — project memory](#the-diary-honcho--project-memory)
-9. [CLI reference](#cli-reference)
-10. [Configuration (environment variables)](#configuration-environment-variables)
-11. [Repository layout](#repository-layout)
-12. [Invariants / quality gate](#invariants--quality-gate)
-13. [Troubleshooting](#troubleshooting)
-14. [Security notes](#security-notes)
+8. [The 3D viewer & screen ingest](#the-3d-viewer--screen-ingest)
+9. [The diary (Honcho) — project memory](#the-diary-honcho--project-memory)
+10. [CLI reference](#cli-reference)
+11. [Configuration (environment variables)](#configuration-environment-variables)
+12. [Repository layout](#repository-layout)
+13. [Invariants / quality gate](#invariants--quality-gate)
+14. [Troubleshooting](#troubleshooting)
+15. [Security notes](#security-notes)
 
 ---
 
@@ -110,7 +111,7 @@ clone is needed to run them):
 git clone https://github.com/eltonssouza/conductor-main.git
 cd conductor-main
 pipx install --editable .       # or: pip install -e .
-pip install -e .[rag]           # ChromaDB client, for `conductor library` on the host
+pip install -e .[rag]           # ChromaDB client + scikit-learn/numpy, for `conductor library` and `conductor viewer`
 pip install -e .[honcho]        # Honcho SDK, for `conductor journal` recall
 ```
 
@@ -346,6 +347,46 @@ autonomously in the background; Claude runs `conductor library` as instructed by
 
 To (re)build the index, run `conductor up` (or `conductor ingest`); it indexes the
 markdown books from `to-brain.7z` — roughly 60k chunks for the default corpus.
+Ingest is **incremental**: each chunk stores a content hash, so a re-run skips
+everything that is unchanged and only re-embeds new or edited chunks (embedding is
+the slow step). Use `conductor ingest --force` to re-embed the whole corpus and
+`--quiet` to silence the per-batch telemetry. Embedding (Ollama) and the ChromaDB
+upsert run pipelined on separate threads, so the database write of one batch
+overlaps the embedding of the next.
+
+---
+
+## The 3D viewer & screen ingest
+
+`conductor viewer` opens a small local web app (standard-library HTTP server, no
+web framework) that **visualizes the library embeddings in 3D** and lets you
+**ingest a markdown file from the browser**.
+
+```bash
+conductor viewer                 # http://localhost:8765, opens the browser
+conductor viewer --port 9000 --no-browser
+```
+
+It needs the `rag` extra (`pip install -e .[rag]`, which also pulls `scikit-learn`
+and `numpy`) and a running ChromaDB (`conductor up`). It is read-only against the
+index except through the ingest screen.
+
+**3D map.** The viewer fetches the 1024-dimensional `bge-m3` embeddings for a
+filtered slice, reduces them to three dimensions with **PCA**, and renders an
+interactive Plotly scatter colored by category. Two dropdowns filter by
+**profile** — the `category` (the `NN_…` corpus folder) and the `source` (the book)
+stored in each chunk's metadata — and a point-limit control keeps the browser smooth
+on the ~60k-chunk index. Hovering a point shows its source, section, and a text
+preview; the explained variance of the 3D projection is reported in the status bar.
+
+**Screen ingest.** The "+ Ingest" screen accepts a `.md` file (pick a file or paste
+markdown) plus an optional title, author, and category (profile). Conductor
+**formats it to the library convention** (see `to-brain/CONVENCOES_DE_ARQUIVOS.md`):
+it strips control characters, normalizes blank lines, ensures blank lines around
+headings so chunking splits cleanly, and rebuilds a clean header (`# Title` +
+optional `**Author**`). The result is saved as `category/Title - Author.md` under
+the library, then chunked, embedded, and upserted into ChromaDB — the new source
+appears in the 3D map's filters immediately.
 
 ---
 
@@ -384,7 +425,8 @@ recording an entry also refreshes the "Project memory" block in `CLAUDE.md`.
 | `conductor library "<q>"` | Semantic search over the reference books. Flags: `-k N`, `--json`, `--category C`. |
 | `conductor journal add\|recall\|log` | The per-project development diary. |
 | `conductor up` / `down` | Start / stop the Docker RAG stack (GPU auto-detected). |
-| `conductor ingest` | (Re)build the library index in the running stack. |
+| `conductor ingest` | (Re)build the library index in the running stack. **Incremental** (content-hash skip). Flags: `--force` (re-embed all), `--quiet` (no telemetry), `--batch N`, `--limit N`. |
+| `conductor viewer` | 3D map of the library embeddings (PCA), filtered by profile; includes a screen to ingest a `.md` file formatted to the library convention. Flags: `--port`, `--no-browser`. |
 | `conductor honcho setup` | Choose the Honcho reasoning provider and write its `.env`. |
 | `conductor honcho up` / `down` | Start / stop the Honcho diary backend (clone + build + health automated). |
 
@@ -416,7 +458,8 @@ recording an entry also refreshes the "Project memory" block in `CLAUDE.md`.
     `roles.py` (the 36-role registry: role → skill / area / project types),
     `scaffold.py` (the `.claude/` + `CLAUDE.md` generator), `project.py`,
     `library.py`, `journal.py`, `honcho_client.py`, `honcho_setup.py`,
-    `honcho_stack.py`, and `rag/` (`core`, `ingest`, `bootstrap`, `stack`).
+    `honcho_stack.py`, `viewer.py` (the 3D map + screen-ingest web app), and
+    `rag/` (`core`, `ingest`, `bootstrap`, `stack`).
   - `conductor/templates/` — the 36 role **Agents** + 36 **Skills**,
     `CLAUDE.md.tmpl`, and `flow.md` (the 11-gate flow). These are copied into
     target projects.
