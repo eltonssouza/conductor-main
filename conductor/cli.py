@@ -29,6 +29,7 @@ Commands:
   ingest                     (Re)build the index in the running stack.
   honcho setup               Choose the Honcho diary reasoning provider.
   honcho up | down           Start / stop the Honcho diary backend (Docker).
+  update [--reinstall]       Pull the latest source (editable/source install).
 
 Run `conductor <command> --help` for command options.
 """
@@ -82,6 +83,10 @@ def main(argv: Optional[List[str]] = None) -> int:
             return honcho_stack_main(rest)
         print("usage: conductor honcho setup|up|down", file=sys.stderr)
         return 2
+
+    if cmd == "update":
+        from .update import main as update_main
+        return update_main(rest)
 
     print(f"unknown command: {cmd}\n\n{USAGE}", file=sys.stderr)
     return 2
