@@ -379,6 +379,13 @@ stored in each chunk's metadata — and a point-limit control keeps the browser 
 on the ~60k-chunk index. Hovering a point shows its source, section, and a text
 preview; the explained variance of the 3D projection is reported in the status bar.
 
+**3D graph (`/graph`).** A force-directed network rendered with **three.js**
+(`3d-force-graph`): each source (book) is a node grouped under its category hub,
+and sources are linked to their nearest neighbors by embedding similarity (cosine
+between per-source centroids). The kNN web clusters related books and bridges
+categories, with the big hub nodes labeled — pick a category (profile) or show them
+all. Rotatable/zoomable in 3D.
+
 **Screen ingest.** The "+ Ingest" screen accepts a `.md` file (pick a file or paste
 markdown) plus an optional title, author, and category (profile). Conductor
 **formats it to the library convention** (see `to-brain/CONVENCOES_DE_ARQUIVOS.md`):
