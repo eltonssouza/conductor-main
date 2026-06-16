@@ -14,15 +14,34 @@ works (OpenAI, DeepSeek, OpenRouter, local Ollama/vLLM…), plus native Anthropi
 from __future__ import annotations
 
 import argparse
+import os
+import re
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from .project import force_utf8
-
-from .project import PACKAGE_INFRA
+from .project import PACKAGE_INFRA, force_utf8
 
 FEATURES = ("DERIVER", "DIALECTIC", "SUMMARY")
+
+# DeepSeek key is read from this file (var name API-KEY-DEEP_SEEK) when no
+# --api-key is given. Override the path with CONDUCTOR_DEEPSEEK_KEY_FILE.
+DEEPSEEK_KEY_FILE = Path(os.environ.get(
+    "CONDUCTOR_DEEPSEEK_KEY_FILE", r"C:\honcho\deep-seek-key.txt"))
+DEEPSEEK_KEY_VAR = "API-KEY-DEEP_SEEK"
+
+
+def _read_key_from_file(path: Path, var: str) -> Optional[str]:
+    """Reads `var`'s value (an sk-... token) from a simple KEY: \"value\" file."""
+    try:
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if var in line:
+                m = re.search(r"(sk-[A-Za-z0-9_\-]+)", line)
+                if m:
+                    return m.group(1)
+    except OSError:
+        return None
+    return None
 
 # Each preset is OpenAI-compatible unless transport says otherwise. base_url
 # empty = use the provider's native default.
@@ -139,6 +158,10 @@ def main(argv: List[str]) -> int:
     key_env = preset["key_env"]
 
     api_key = args.api_key
+    if api_key is None and provider == "deepseek":
+        api_key = _read_key_from_file(DEEPSEEK_KEY_FILE, DEEPSEEK_KEY_VAR)
+        if api_key:
+            print(f"DeepSeek key loaded from {DEEPSEEK_KEY_FILE}")
     if api_key is None:
         if preset["needs_key"]:
             if sys.stdin.isatty():

@@ -9,10 +9,14 @@ meaning. The diary's local JSONL mirror works without it, so Honcho is
 ## Bring it up — one command
 
 ```bash
-pip install -e .[honcho]                                       # SDK
-conductor honcho setup --provider deepseek --api-key sk-...    # or: ollama (local)
-conductor honcho up                                            # clone + build + start
+pip install -e .[honcho]                       # SDK
+conductor honcho setup --provider deepseek     # key auto-read (see below); or --api-key sk-...
+conductor honcho up                            # clone + build + start
 ```
+
+For DeepSeek, the key is read from `C:\honcho\deep-seek-key.txt` (line
+`API-KEY-DEEP_SEEK: "sk-..."`) when `--api-key` is omitted; override the path
+with `CONDUCTOR_DEEPSEEK_KEY_FILE`.
 
 `conductor honcho up` does everything the stack needs automatically: clones
 Honcho if missing, strips the Windows CRLF endings that break the entrypoint,
