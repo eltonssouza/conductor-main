@@ -213,6 +213,9 @@ def _make_handler():
             try:
                 if url.path in ("/", "/index.html"):
                     self._send(200, INDEX_HTML, "text/html; charset=utf-8")
+                elif url.path == "/favicon.ico":
+                    self.send_response(204)  # no favicon; silence the browser probe
+                    self.end_headers()
                 elif url.path == "/ingest":
                     self._send(200, INGEST_HTML, "text/html; charset=utf-8")
                 elif url.path == "/api/profiles":
