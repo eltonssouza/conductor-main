@@ -17,10 +17,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 DEFAULT_PORT = 8765
@@ -119,6 +121,74 @@ def _points(coll, category: str, source: str, limit: int) -> dict:
     return {"points": points, "variance": round(variance, 4), "count": n}
 
 
+# --- ingest via screen -------------------------------------------------------
+# Formats arbitrary pasted/uploaded markdown into the library convention
+# (CONVENCOES_DE_ARQUIVOS.md): a clean H1 title, an optional bold author line,
+# blank-line-separated paragraphs and headings (so core.chunk_markdown splits
+# correctly), UTF-8 with control chars stripped. Filename: "Title - Author.md"
+# under the chosen NN_category folder.
+
+_ILLEGAL = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+
+
+def _safe_filename(stem: str) -> str:
+    stem = _ILLEGAL.sub("", stem).strip().strip(".")
+    return (stem or "untitled")[:180]
+
+
+def format_markdown(content: str, title: str, author: str) -> tuple:
+    """Returns (formatted_text, final_title). Normalizes to the convention."""
+    from .rag.core import sanitize
+
+    text = sanitize(content).replace("\r\n", "\n").replace("\r", "\n")
+    text = "\n".join(ln.rstrip() for ln in text.split("\n"))
+    text = re.sub(r"\n{3,}", "\n\n", text).strip()
+    # blank line before/after ATX headings so paragraphs and sections split
+    text = re.sub(r"(?<!\n)\n(#{1,6} )", r"\n\n\1", text)
+    text = re.sub(r"(\n#{1,6} [^\n]+)\n(?!\n)", r"\1\n\n", text)
+
+    detected = None
+    m = re.match(r"^#\s+(.+?)\n", text + "\n")
+    if m:
+        detected = m.group(1).strip()
+        text = text[m.end() - 1:].lstrip("\n")  # drop the original H1 line
+    final_title = (title or "").strip() or detected or "Untitled"
+
+    head = f"# {final_title}\n"
+    if author.strip():
+        head += f"**{author.strip()}**\n"
+    doc = head + "\n" + text + "\n"
+    doc = re.sub(r"\n{3,}", "\n\n", doc).strip() + "\n"
+    return doc, final_title
+
+
+def _ingest_markdown(category: str, title: str, author: str, content: str) -> dict:
+    """Formats, writes under the library, then chunks + embeds + upserts the
+    single file. Returns {file, chunks, category, source}."""
+    from .rag.core import LIBRARY_DIR, chunk_markdown
+    from .rag.ingest import _embed_batch, _upsert_pairs
+
+    if not content.strip():
+        raise ValueError("empty content")
+    category = _safe_filename(category.strip()) or "99_custom"
+    doc, final_title = format_markdown(content, title, author)
+
+    stem = _safe_filename(f"{final_title} - {author.strip()}" if author.strip()
+                          else final_title)
+    rel = f"{category}/{stem}.md"
+    dest = LIBRARY_DIR / category / f"{stem}.md"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(doc, encoding="utf-8")
+
+    chunks = chunk_markdown(doc, source=stem, category=category, path=rel)
+    n = 0
+    if chunks:
+        n = _upsert_pairs(_collection(), _embed_batch(chunks))
+    global _profiles_cache
+    _profiles_cache = None  # new category/source -> refresh the filter lists
+    return {"file": str(dest), "chunks": n, "category": category, "source": stem}
+
+
 # --- HTTP --------------------------------------------------------------------
 
 def _make_handler():
@@ -143,6 +213,8 @@ def _make_handler():
             try:
                 if url.path in ("/", "/index.html"):
                     self._send(200, INDEX_HTML, "text/html; charset=utf-8")
+                elif url.path == "/ingest":
+                    self._send(200, INGEST_HTML, "text/html; charset=utf-8")
                 elif url.path == "/api/profiles":
                     self._json(_profiles(_collection()))
                 elif url.path == "/api/points":
@@ -150,6 +222,20 @@ def _make_handler():
                     limit = int(q.get("limit", [DEFAULT_LIMIT])[0])
                     self._json(_points(coll, q.get("category", [""])[0],
                                        q.get("source", [""])[0], limit))
+                else:
+                    self._json({"error": "not found"}, 404)
+            except Exception as e:  # noqa: BLE001 — surface errors to the UI
+                self._json({"error": str(e)}, 500)
+
+        def do_POST(self):
+            url = urlparse(self.path)
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                payload = json.loads(self.rfile.read(length) or b"{}")
+                if url.path == "/api/ingest":
+                    self._json(_ingest_markdown(
+                        payload.get("category", ""), payload.get("title", ""),
+                        payload.get("author", ""), payload.get("content", "")))
                 else:
                     self._json({"error": "not found"}, 404)
             except Exception as e:  # noqa: BLE001 — surface errors to the UI
@@ -217,6 +303,7 @@ INDEX_HTML = """<!doctype html>
       <option>8000</option><option>15000</option>
     </select></span>
   <button id="load">Carregar</button>
+  <a href="/ingest" style="color:#58a6ff;text-decoration:none;margin-left:8px">+ Ingest</a>
   <span id="status">carregando perfis…</span>
 </header>
 <div id="plot"></div>
@@ -273,6 +360,87 @@ async function loadPoints() {
 
 $('#load').addEventListener('click', loadPoints);
 loadProfiles();
+</script>
+</body></html>"""
+
+
+INGEST_HTML = """<!doctype html>
+<html lang="pt-br"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conductor — Ingest</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; font:14px system-ui,sans-serif; background:#0d1117; color:#c9d1d9; }
+  header { padding:12px 16px; border-bottom:1px solid #21262d; display:flex; align-items:center; }
+  h1 { font-size:15px; margin:0; font-weight:600; }
+  header a { color:#58a6ff; text-decoration:none; margin-left:auto; }
+  main { max-width:880px; margin:0 auto; padding:20px 16px; }
+  .row { display:flex; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+  .field { flex:1; min-width:200px; }
+  label { display:block; font-size:12px; color:#8b949e; margin-bottom:4px; }
+  input, select, textarea, button { background:#161b22; color:#c9d1d9;
+    border:1px solid #30363d; border-radius:6px; padding:8px 10px; font:inherit; width:100%;
+    box-sizing:border-box; }
+  textarea { min-height:340px; font-family:ui-monospace,monospace; resize:vertical; white-space:pre; }
+  button { cursor:pointer; width:auto; padding:8px 18px; }
+  button:hover { border-color:#58a6ff; }
+  #result { margin-top:14px; padding:12px; border-radius:6px; font-size:13px; white-space:pre-wrap; }
+  .ok { background:#0f2417; border:1px solid #238636; }
+  .err { background:#2d1518; border:1px solid #da3633; }
+  .hint { font-size:12px; color:#8b949e; }
+</style></head>
+<body>
+<header><h1>Ingest de arquivo .md</h1><a href="/">← Voltar ao mapa 3D</a></header>
+<main>
+  <p class="hint">O arquivo é formatado no padrão da biblioteca (H1 título, autor,
+  parágrafos/heading separados, UTF-8 limpo), salvo em <code>categoria/Título - Autor.md</code>,
+  e então chunked + embeddado + indexado no ChromaDB.</p>
+  <div class="row">
+    <div class="field"><label>Categoria (perfil)</label>
+      <input id="category" list="cats" placeholder="ex: 10_ia_e_llm"></div>
+    <datalist id="cats"></datalist>
+    <div class="field"><label>Título</label>
+      <input id="title" placeholder="(opcional — usa o H1 do conteúdo)"></div>
+    <div class="field"><label>Autor(es)</label>
+      <input id="author" placeholder="ex: Martin"></div>
+  </div>
+  <div class="row">
+    <div class="field">
+      <label>Arquivo .md (ou cole abaixo)</label>
+      <input type="file" id="file" accept=".md,.markdown,text/markdown">
+    </div>
+  </div>
+  <div class="field"><label>Conteúdo markdown</label>
+    <textarea id="content" placeholder="# Título&#10;&#10;Conteúdo..."></textarea></div>
+  <div style="margin-top:12px"><button id="send">Formatar e indexar</button></div>
+  <div id="result"></div>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+fetch('/api/profiles').then(r=>r.json()).then(p=>{
+  if (p.categories) $('#cats').innerHTML =
+    p.categories.map(([c])=>`<option value="${c}">`).join('');
+});
+$('#file').addEventListener('change', e=>{
+  const f = e.target.files[0]; if(!f) return;
+  if(!/\\.(md|markdown)$/i.test(f.name)){ alert('Selecione um arquivo .md'); e.target.value=''; return; }
+  const r = new FileReader();
+  r.onload = () => { $('#content').value = r.result;
+    if(!$('#title').value) $('#title').value = f.name.replace(/\\.(md|markdown)$/i,''); };
+  r.readAsText(f);
+});
+$('#send').addEventListener('click', async ()=>{
+  const body = { category:$('#category').value, title:$('#title').value,
+                 author:$('#author').value, content:$('#content').value };
+  if(!body.content.trim()){ show('Conteúdo vazio.', false); return; }
+  show('Formatando e indexando… (o embed pode levar alguns segundos)', true);
+  const r = await fetch('/api/ingest',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(body)});
+  const d = await r.json();
+  if(d.error) show('Erro: '+d.error, false);
+  else show(`OK — ${d.chunks} chunk(s) indexados.\\nArquivo: ${d.file}\\nSource: ${d.source} · categoria: ${d.category}`, true);
+});
+function show(msg, ok){ const el=$('#result'); el.textContent=msg; el.className=ok?'ok':'err'; }
 </script>
 </body></html>"""
 
