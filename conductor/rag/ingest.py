@@ -6,54 +6,119 @@ interrupted and resumed. Usage:
 
   python -m rag.ingest               # full library
   python -m rag.ingest --limit 200   # only the first N chunks (quick test)
+
+Pipeline (golden rule 2): embedding (Ollama, the dominant cost) and the Chroma
+upsert run on different threads — while batch N is upserted, batch N+1 is
+already embedding. A single embed worker is enough: Ollama serializes a model
+instance anyway, so the win is overlapping the (cheap) DB write with the
+(expensive) next embed, not parallel embeds.
 """
 from __future__ import annotations
 
 import argparse
+import hashlib
 import sys
 import time
-from typing import List
+from concurrent.futures import ThreadPoolExecutor
+from typing import Iterator, List, Tuple
 
 from .core import (LIBRARY_DIR, CHROMA_DIR, EMBED_BATCH, Chunk, embed,
                    force_utf8, get_collection, iter_corpus)
 
+# Per-batch embed telemetry: rate (chunks/s) reveals whether Ollama is the
+# bottleneck and whether GPU/CPU is being saturated. Toggle with --quiet.
+_VERBOSE = True
 
-def _upsert(coll, batch: List[Chunk], embs) -> None:
-    coll.upsert(
-        ids=[c.chunk_id for c in batch],
-        embeddings=embs,
-        documents=[c.text for c in batch],
-        metadatas=[{"source": c.source, "category": c.category,
-                    "section": c.section, "path": c.path} for c in batch],
-    )
+Pair = Tuple[Chunk, List[float]]
 
 
-def _flush(coll, batch: List[Chunk]) -> int:
-    """Indexes a batch; if it fails, retries item-by-item and skips bad ones.
+def _chash(text: str) -> str:
+    """Short content hash of a chunk's text — stored as `chash` metadata so a
+    re-run can skip chunks whose text is unchanged (golden rule 3)."""
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
 
-    Returns the number of chunks actually indexed.
-    """
+
+def _filter_unchanged(coll, batch: List[Chunk]) -> List[Chunk]:
+    """Drops chunks already in Chroma with a matching content hash. One get()
+    round-trip per batch saves embedding ~all chunks on a re-run (embedding is
+    orders of magnitude costlier than the lookup). On any error, embeds all."""
+    ids = [c.chunk_id for c in batch]
     try:
-        _upsert(coll, batch, embed([c.text for c in batch]))
-        return len(batch)
+        existing = coll.get(ids=ids, include=["metadatas"])
+    except Exception:  # noqa: BLE001 — never let the lookup block ingest
+        return batch
+    have = {i: (m or {}).get("chash")
+            for i, m in zip(existing.get("ids", []), existing.get("metadatas", []))}
+    return [c for c in batch if have.get(c.chunk_id) != _chash(c.text)]
+
+
+def _embed_batch(batch: List[Chunk]) -> List[Pair]:
+    """Embeds a batch -> [(chunk, embedding)]. No DB access, so it is safe to
+    run in a worker thread. On a batch failure, retries item by item and drops
+    chunks that still fail (e.g. a single oversized/corrupt one)."""
+    try:
+        t0 = time.monotonic()
+        embs = embed([c.text for c in batch])
+        if _VERBOSE:
+            dt = time.monotonic() - t0
+            print(f"  embed {len(batch)} in {dt:.2f}s "
+                  f"({len(batch)/max(dt,1e-6):.1f}/s)", file=sys.stderr)
+        return list(zip(batch, embs))
     except Exception as e:  # noqa: BLE001 — any network/model failure
-        print(f"  ! batch of {len(batch)} failed ({e}); retrying item by item", file=sys.stderr)
-        ok = 0
+        print(f"  ! batch of {len(batch)} failed ({e}); retrying item by item",
+              file=sys.stderr)
+        pairs: List[Pair] = []
         for c in batch:
             try:
-                _upsert(coll, [c], embed([c.text]))
-                ok += 1
+                pairs.append((c, embed([c.text])[0]))
             except Exception as e2:  # noqa: BLE001
                 print(f"  ! skipping chunk {c.chunk_id} ({e2})", file=sys.stderr)
-        return ok
+        return pairs
+
+
+def _upsert_pairs(coll, pairs: List[Pair]) -> int:
+    """Upserts embedded chunks into Chroma. Runs on the main thread."""
+    if not pairs:
+        return 0
+    chunks = [c for c, _ in pairs]
+    coll.upsert(
+        ids=[c.chunk_id for c in chunks],
+        embeddings=[e for _, e in pairs],
+        documents=[c.text for c in chunks],
+        metadatas=[{"source": c.source, "category": c.category,
+                    "section": c.section, "path": c.path,
+                    "chash": _chash(c.text)} for c in chunks],
+    )
+    return len(chunks)
+
+
+def _iter_batches(size: int, limit: int) -> Iterator[List[Chunk]]:
+    """Groups the streamed corpus into batches of `size`, honoring `limit`."""
+    batch: List[Chunk] = []
+    seen = 0
+    for chunk in iter_corpus():
+        batch.append(chunk)
+        seen += 1
+        if len(batch) >= size:
+            yield batch
+            batch = []
+        if limit and seen >= limit:
+            break
+    if batch:
+        yield batch
 
 
 def main(argv: List[str]) -> int:
     ap = argparse.ArgumentParser(description="Index the library into ChromaDB.")
     ap.add_argument("--limit", type=int, default=0, help="max chunks (0 = all)")
     ap.add_argument("--batch", type=int, default=EMBED_BATCH, help="embed batch size")
+    ap.add_argument("--quiet", action="store_true", help="suppress per-batch telemetry")
+    ap.add_argument("--force", action="store_true",
+                    help="re-embed every chunk (skip the content-hash dedup)")
     args = ap.parse_args(argv)
     force_utf8()
+    global _VERBOSE
+    _VERBOSE = not args.quiet
 
     if not LIBRARY_DIR.is_dir():
         print(f"ERROR: library not found at {LIBRARY_DIR}", file=sys.stderr)
@@ -62,28 +127,36 @@ def main(argv: List[str]) -> int:
     coll = get_collection(create=True)
     print(f"Library: {LIBRARY_DIR}\nChroma: {CHROMA_DIR}\nCollection: {coll.name}")
 
-    batch: List[Chunk] = []
-    total = 0   # successfully indexed
-    seen = 0    # processed (includes skipped)
+    total = 0     # successfully indexed (embedded + upserted)
+    seen = 0      # processed (includes skipped)
+    skipped = 0   # unchanged, skipped by the content-hash dedup
     t0 = time.monotonic()
-    for chunk in iter_corpus():
-        batch.append(chunk)
-        seen += 1
-        if len(batch) >= args.batch:
-            total += _flush(coll, batch)
-            batch = []
+    if not args.force:
+        print("Incremental: skipping chunks unchanged since last ingest "
+              "(use --force to re-embed all).")
+
+    # One embed worker; the main thread upserts the *previous* batch while the
+    # next one embeds in the background.
+    with ThreadPoolExecutor(max_workers=1) as ex:
+        pending = None  # Future for the batch currently embedding
+        for batch in _iter_batches(args.batch, args.limit):
+            seen += len(batch)
+            fresh = batch if args.force else _filter_unchanged(coll, batch)
+            skipped += len(batch) - len(fresh)
+            fut = ex.submit(_embed_batch, fresh) if fresh else None
+            if pending is not None:
+                total += _upsert_pairs(coll, pending.result())
+            pending = fut
             if seen % (args.batch * 10) == 0:
                 rate = seen / max(time.monotonic() - t0, 1e-6)
-                print(f"  {seen} chunks processed, {total} indexed ({rate:.0f}/s)")
-        if args.limit and seen >= args.limit:
-            break
-
-    if batch and (not args.limit or seen < args.limit):
-        total += _flush(coll, batch)
+                print(f"  {seen} processed, {total} indexed, {skipped} skipped "
+                      f"({rate:.1f}/s)")
+        if pending is not None:
+            total += _upsert_pairs(coll, pending.result())
 
     dt = time.monotonic() - t0
-    print(f"Done: {seen} processed, {total} indexed in {dt:.0f}s. "
-          f"Total in collection: {coll.count()}")
+    print(f"Done: {seen} processed, {total} indexed, {skipped} skipped in "
+          f"{dt:.0f}s. Total in collection: {coll.count()}")
     return 0
 
 
