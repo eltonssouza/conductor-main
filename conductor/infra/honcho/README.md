@@ -6,32 +6,27 @@ background (peer modeling + dialectic), so `conductor journal recall` answers by
 meaning. The diary's local JSONL mirror works without it, so Honcho is
 **optional** — it adds intelligent recall on top.
 
-## Bring it up
+## Bring it up — one command
 
 ```bash
-# 1. SDK + reasoning provider
-pip install -e .[honcho]                 # from the repo root
-conductor honcho-setup --provider deepseek --api-key sk-...   # or: ollama (local)
-
-# 2. Clone Honcho locally (the git-URL build context fails on Docker Desktop /
-#    Windows, so we build from a local clone)
-git clone https://github.com/plastic-labs/honcho.git C:/path/to/honcho-src
-
-# 3. Start it (point HONCHO_SRC at the clone)
-cd conductor/infra/honcho
-HONCHO_SRC=C:/path/to/honcho-src docker compose up -d
+pip install -e .[honcho]                                       # SDK
+conductor honcho setup --provider deepseek --api-key sk-...    # or: ollama (local)
+conductor honcho up                                            # clone + build + start
 ```
 
-If the **api** container crashes on startup with a *dimension mismatch* (the
-schema is created at 1536 but local embeddings are 1024-d), run Honcho's
-reconfigure script once against the running DB, then bring the stack up again:
+`conductor honcho up` does everything the stack needs automatically: clones
+Honcho if missing, strips the Windows CRLF endings that break the entrypoint,
+builds from the local clone (the git-URL build context fails on Docker Desktop),
+brings the stack up, and — on the first run — reconfigures the DB vector
+dimension to 1024 (for the local bge-m3 embeddings) when it detects the
+mismatch. `conductor honcho down` stops it.
 
-```bash
-HONCHO_SRC=... docker compose run --rm --no-deps \
-  --entrypoint /app/.venv/bin/python deriver scripts/configure_embeddings.py --yes
-HONCHO_SRC=... docker compose up -d
-curl http://localhost:8000/health        # {"status":"ok"}
-```
+> Run `conductor up` too: Honcho embeds messages via the local bge-m3, which the
+> RAG stack's Ollama serves.
+
+Manual equivalent (if you prefer): `git clone` Honcho, `HONCHO_SRC=... docker
+compose up -d` in this dir, and run `scripts/configure_embeddings.py --yes` once
+if the api reports a dimension mismatch.
 
 Then the diary syncs + recalls by meaning:
 

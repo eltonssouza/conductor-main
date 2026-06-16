@@ -27,7 +27,8 @@ Commands:
   journal add|recall|log     Per-project development diary.
   up | down                  Start / stop the Docker RAG stack (auto-detects GPU).
   ingest                     (Re)build the index in the running stack.
-  honcho-setup               Choose the Honcho diary reasoning provider.
+  honcho setup               Choose the Honcho diary reasoning provider.
+  honcho up | down           Start / stop the Honcho diary backend (Docker).
 
 Run `conductor <command> --help` for command options.
 """
@@ -71,6 +72,16 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "honcho-setup":
         from .honcho_setup import main as honcho_setup_main
         return honcho_setup_main(rest)
+
+    if cmd == "honcho":
+        if rest and rest[0] == "setup":
+            from .honcho_setup import main as honcho_setup_main
+            return honcho_setup_main(rest[1:])
+        if rest and rest[0] in ("up", "down"):
+            from .honcho_stack import main as honcho_stack_main
+            return honcho_stack_main(rest)
+        print("usage: conductor honcho setup|up|down", file=sys.stderr)
+        return 2
 
     print(f"unknown command: {cmd}\n\n{USAGE}", file=sys.stderr)
     return 2
