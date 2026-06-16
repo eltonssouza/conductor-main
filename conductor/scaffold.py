@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from . import roles as roles_mod
-from .detect import VALID_TYPES, detect
+from .detect import VALID_TYPES, detect, profile
 from .project import (cdt_dir, config_path, find_project_root, force_utf8,
                       journal_dir, read_config, register_project, slugify,
                       stack_dir, write_config)
@@ -40,25 +40,39 @@ MEMORY_LIMIT = 15
 
 # --- rendering ---------------------------------------------------------------
 
-def _stack_md(ptype: str, techs: List[str], evidence: List[str]) -> str:
-    tech_lines = "\n".join(f"- {t}" for t in techs) or "- _(to be completed)_"
+def _stack_md(ptype: str, techs: List[str], evidence: List[str],
+              prof: Optional[dict] = None) -> str:
+    prof = prof or {}
     ev = ", ".join(evidence) if evidence else "none"
+    tags = ", ".join(techs) if techs else "none"
+
+    def line(label: str, key: str) -> str:
+        items = prof.get(key) or []
+        body = ", ".join(items) if items else "_(not detected — complete manually)_"
+        return f"- **{label}:** {body}"
+
+    detected = "\n".join((
+        line("Languages & versions", "languages"),
+        line("Frameworks", "frameworks"),
+        line("Datastore(s)", "datastores"),
+        line("Build / package manager", "build"),
+        line("Testing", "testing"),
+        line("Notable libraries", "libraries"),
+    ))
     return f"""# Stack — {ptype}
 
 Technologies this project uses. Agents read this so their `conductor library`
-(RAG) queries are **project-aware**.
+(RAG) queries are **project-aware**. Auto-filled from the manifests by
+`conductor cdt init/sync`; refine anything marked _not detected_.
 
 ## Detected
-{tech_lines}
+{detected}
 
 ## To complete (owner / Conductor)
-- Language(s) & versions:
-- Framework(s):
-- Datastore(s):
-- Build / package manager:
-- Testing tools:
-- Notable libraries / constraints:
+- Architecture notes / constraints:
+- External integrations / APIs:
 
+<!-- detected tags: {tags} -->
 <!-- detection evidence: {ev} -->
 """
 
@@ -189,6 +203,7 @@ def cmd_init(args) -> int:
         return 0
 
     det_type, techs, evidence = detect(project)
+    prof = profile(project)
     ptype = args.type or det_type
     slug = slugify(args.name or project.name)
     override = [s.strip() for s in args.roles.split(",")] if args.roles else None
@@ -206,7 +221,7 @@ def cmd_init(args) -> int:
     stack_dir(project).mkdir(parents=True, exist_ok=True)
     journal_dir(project).mkdir(parents=True, exist_ok=True)
     (stack_dir(project) / f"{ptype}.md").write_text(
-        _stack_md(ptype, techs, evidence), encoding="utf-8")
+        _stack_md(ptype, techs, evidence, prof), encoding="utf-8")
     (cdt_dir(project) / ".gitignore").write_text("journal/\n", encoding="utf-8")
     write_config(project, {
         "project": slug, "type": ptype, "roles": selected, "roles_mode": mode,
@@ -233,6 +248,7 @@ def cmd_sync(args) -> int:
     slug = config.get("project", slugify(root.name))
     mode = config.get("roles_mode", "subset")
     det_type, techs, evidence = detect(root)
+    prof = profile(root)
     ptype = args.type or (det_type if det_type != "unknown" else config.get("type", "unknown"))
 
     if mode == "all":
@@ -244,7 +260,7 @@ def cmd_sync(args) -> int:
 
     n = _copy_roles(root, selected)
     (stack_dir(root) / f"{ptype}.md").write_text(
-        _stack_md(ptype, techs, evidence), encoding="utf-8")
+        _stack_md(ptype, techs, evidence, prof), encoding="utf-8")
     config.update({"type": ptype, "roles": selected, "roles_mode": mode})
     write_config(root, config)
     register_project(root, slug, ptype)
