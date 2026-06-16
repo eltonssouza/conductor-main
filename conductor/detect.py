@@ -11,8 +11,9 @@ package.json.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 VALID_TYPES = ("backend", "frontend", "mobile", "fullstack", "library",
                "data", "unknown")
@@ -179,3 +180,183 @@ def detect(root: Path) -> Tuple[str, List[str], List[str]]:
         ptype = "unknown"
 
     return ptype, list(dict.fromkeys(techs)), list(dict.fromkeys(evidence))
+
+
+# --- rich profile ------------------------------------------------------------
+# detect() answers "what type"; profile() answers "what exactly" — the frameworks,
+# versions, datastore, build/test tooling and notable libraries written into the
+# .cdt/stack/<type>.md so the file is actually filled in, not a blank skeleton.
+
+PROFILE_FIELDS = ("languages", "frameworks", "datastores", "build", "testing",
+                  "libraries")
+
+# docker-compose / pom image or driver substring -> datastore label.
+_DATASTORES = (
+    ("pgvector", "PostgreSQL (pgvector)"), ("postgres", "PostgreSQL"),
+    ("mariadb", "MariaDB"), ("mysql", "MySQL"), ("mongo", "MongoDB"),
+    ("redis", "Redis"), ("minio", "MinIO / S3"), ("keycloak", "Keycloak (auth)"),
+    ("elasticsearch", "Elasticsearch"), ("opensearch", "OpenSearch"),
+    ("rabbitmq", "RabbitMQ"), ("kafka", "Kafka"), ("cassandra", "Cassandra"),
+    ("clickhouse", "ClickHouse"),
+)
+
+
+def _read_text(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+
+
+def _clean_ver(v: str) -> str:
+    """`^21.2.14` / `~5.9.2` -> `21.2.14`."""
+    return re.sub(r"^[\^~>=<\s]+", "", (v or "").strip())
+
+
+def _major(v: str) -> str:
+    m = re.match(r"(\d+)", _clean_ver(v))
+    return m.group(1) if m else _clean_ver(v)
+
+
+def _parse_pom(text: str, prof: Dict[str, List[str]]) -> None:
+    pm = re.search(
+        r"spring-boot-starter-parent</artifactId>\s*<version>([^<]+)</version>", text)
+    if pm:
+        prof["frameworks"].append(f"Spring Boot {pm.group(1)}")
+    jm = (re.search(r"<java\.version>([^<]+)</java\.version>", text)
+          or re.search(r"<maven\.compiler\.(?:source|release)>([^<]+)<", text))
+    if jm:
+        prof["languages"].append(f"Java {jm.group(1)}")
+    arts = set(re.findall(r"<artifactId>([^<]+)</artifactId>", text))
+
+    def art(*subs: str) -> bool:
+        return any(any(s in a for s in subs) for a in arts)
+
+    if art("spring-boot-starter-data-jpa") or art("hibernate"):
+        prof["libraries"].append("Spring Data JPA / Hibernate")
+    if art("spring-boot-starter-security"):
+        prof["libraries"].append("Spring Security")
+    if art("flyway"):
+        prof["libraries"].append("Flyway (migrations)")
+    if art("liquibase"):
+        prof["libraries"].append("Liquibase (migrations)")
+    if art("postgresql"):
+        prof["datastores"].append("PostgreSQL")
+    if art("mysql-connector", "mariadb"):
+        prof["datastores"].append("MySQL/MariaDB")
+    if art("spring-boot-starter-data-mongodb"):
+        prof["datastores"].append("MongoDB")
+    if art("spring-boot-starter-data-redis"):
+        prof["datastores"].append("Redis")
+    if art("jjwt", "java-jwt"):
+        prof["libraries"].append("JWT (jjwt)")
+    if art("bucket4j"):
+        prof["libraries"].append("Bucket4j (rate limiting)")
+    if art("lombok"):
+        prof["libraries"].append("Lombok")
+    if art("awssdk", "aws-java-sdk") or "s3" in arts:
+        prof["libraries"].append("AWS SDK (S3)")
+    if art("mapstruct"):
+        prof["libraries"].append("MapStruct")
+    if art("spring-boot-starter-test"):
+        prof["testing"].append("Spring Boot Test (JUnit)")
+    if "testcontainers" in text:  # groupId org.testcontainers, not an artifactId
+        prof["testing"].append("Testcontainers")
+    prof["build"].append("Maven")
+
+
+def _parse_pkg(pkg: dict, prof: Dict[str, List[str]]) -> None:
+    deps = {**pkg.get("dependencies", {}), **pkg.get("devDependencies", {})}
+    if "@angular/core" in deps:
+        ssr = " (SSR + Express)" if "@angular/ssr" in deps else ""
+        prof["frameworks"].append(f"Angular {_major(deps['@angular/core'])}{ssr}")
+    if "react" in deps and "react-native" not in deps:
+        prof["frameworks"].append(f"React {_major(deps['react'])}")
+    if "react-native" in deps:
+        prof["frameworks"].append(f"React Native {_major(deps['react-native'])}")
+    if "vue" in deps:
+        prof["frameworks"].append(f"Vue {_major(deps['vue'])}")
+    if "next" in deps:
+        prof["frameworks"].append(f"Next.js {_major(deps['next'])}")
+    if "svelte" in deps:
+        prof["frameworks"].append(f"Svelte {_major(deps['svelte'])}")
+    if "@nestjs/core" in deps:
+        prof["frameworks"].append(f"NestJS {_major(deps['@nestjs/core'])}")
+    elif "express" in deps and not ("@angular/ssr" in deps or "@angular/core" in deps):
+        prof["frameworks"].append(f"Express {_major(deps['express'])}")
+    elif "fastify" in deps:
+        prof["frameworks"].append(f"Fastify {_major(deps['fastify'])}")
+    if "vite" in deps:
+        prof["build"].append(f"Vite {_major(deps['vite'])}")
+    if "typescript" in deps:
+        prof["languages"].append(f"TypeScript {_clean_ver(deps['typescript'])}")
+    for name, label in (("bootstrap", "Bootstrap"),
+                        ("@ng-bootstrap/ng-bootstrap", "ng-bootstrap"),
+                        ("@angular/material", "Angular Material"),
+                        ("tailwindcss", "Tailwind CSS"), ("rxjs", "RxJS"),
+                        ("@ngrx/store", "NgRx"), ("redux", "Redux"),
+                        ("axios", "Axios")):
+        if name in deps:
+            prof["libraries"].append(label)
+    for name, label in (("vitest", "Vitest"), ("jest", "Jest"), ("karma", "Karma"),
+                        ("jasmine", "Jasmine"), ("cypress", "Cypress"),
+                        ("@playwright/test", "Playwright"), ("playwright", "Playwright")):
+        if name in deps:
+            prof["testing"].append(label)
+    pm = pkg.get("packageManager")
+    if pm:
+        prof["build"].append(pm.replace("@", " "))
+    elif "@angular/cli" in deps:
+        prof["build"].append("npm (Angular CLI)")
+
+
+def _parse_compose(text: str, prof: Dict[str, List[str]]) -> None:
+    for img in re.findall(r"image:\s*['\"]?([^\s'\"]+)", text):
+        low = img.lower()
+        for key, label in _DATASTORES:
+            if key in low:
+                prof["datastores"].append(label)
+                break
+
+
+def _parse_python(blob: str, prof: Dict[str, List[str]]) -> None:
+    rp = re.search(r"requires-python\s*=\s*[\"']([^\"']+)", blob)
+    if rp:
+        prof["languages"].append(f"Python {rp.group(1)}")
+    low = blob.lower()
+    for key, label in (("django", "Django"), ("fastapi", "FastAPI"),
+                       ("flask", "Flask")):
+        if key in low:
+            prof["frameworks"].append(label)
+    if "pytest" in low:
+        prof["testing"].append("pytest")
+
+
+def profile(root: Path) -> Dict[str, List[str]]:
+    """Extracts a filled stack profile from the manifests across the tree.
+
+    Returns a dict with the PROFILE_FIELDS keys, each a deduped list (possibly
+    empty). Best-effort and never raises — unknown corners simply stay empty.
+    """
+    prof: Dict[str, List[str]] = {k: [] for k in PROFILE_FIELDS}
+    py_blob = ""
+    for r in _search_roots(root):
+        if (r / "pom.xml").exists():
+            _parse_pom(_read_text(r / "pom.xml"), prof)
+        if (r / "build.gradle").exists() or (r / "build.gradle.kts").exists():
+            prof["build"].append("Gradle")
+        if (r / "package.json").exists():
+            pkg = _read_json(r / "package.json")
+            if pkg:
+                _parse_pkg(pkg, prof)
+        for cf in ("docker-compose.yml", "docker-compose.yaml", "compose.yml"):
+            if (r / cf).exists():
+                _parse_compose(_read_text(r / cf), prof)
+        for pf in ("pyproject.toml", "requirements.txt"):
+            if (r / pf).exists():
+                py_blob += _read_text(r / pf) + "\n"
+        if (r / "go.mod").exists():
+            prof["languages"].append("Go")
+    if py_blob.strip():
+        _parse_python(py_blob, prof)
+    return {k: list(dict.fromkeys(v)) for k, v in prof.items()}
