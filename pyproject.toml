@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "conductor"
-version = "0.2.13"
+version = "0.2.14"
 description = "Global CLI that scaffolds Claude-Code-native config (role Agents + Skills + CLAUDE.md) into any project, with a library RAG and a per-project development diary."
 requires-python = ">=3.9"
 
@@ -14,7 +14,7 @@ requires-python = ">=3.9"
 #   + the self-hosted Honcho server (see infra/honcho/). The diary's local JSONL
 #   mirror works without this extra; Honcho only adds meaning-based recall.
 [project.optional-dependencies]
-rag = ["chromadb>=1.5"]
+rag = ["chromadb>=1.5", "scikit-learn>=1.3", "numpy>=1.23"]
 honcho = ["honcho-ai>=1.0"]
 
 # Global commands: `conductor` (and the `cdt` alias).
