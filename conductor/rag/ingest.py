@@ -6,56 +6,84 @@ interrupted and resumed. Usage:
 
   python -m rag.ingest               # full library
   python -m rag.ingest --limit 200   # only the first N chunks (quick test)
+
+Pipeline (golden rule 2): embedding (Ollama, the dominant cost) and the Chroma
+upsert run on different threads — while batch N is upserted, batch N+1 is
+already embedding. A single embed worker is enough: Ollama serializes a model
+instance anyway, so the win is overlapping the (cheap) DB write with the
+(expensive) next embed, not parallel embeds.
 """
 from __future__ import annotations
 
 import argparse
 import sys
 import time
-from typing import List
+from concurrent.futures import ThreadPoolExecutor
+from typing import Iterator, List, Tuple
+
+from .core import (LIBRARY_DIR, CHROMA_DIR, EMBED_BATCH, Chunk, embed,
+                   force_utf8, get_collection, iter_corpus)
 
 # Per-batch embed telemetry: rate (chunks/s) reveals whether Ollama is the
 # bottleneck and whether GPU/CPU is being saturated. Toggle with --quiet.
 _VERBOSE = True
 
-from .core import (LIBRARY_DIR, CHROMA_DIR, EMBED_BATCH, Chunk, embed,
-                   force_utf8, get_collection, iter_corpus)
+Pair = Tuple[Chunk, List[float]]
 
 
-def _upsert(coll, batch: List[Chunk], embs) -> None:
-    coll.upsert(
-        ids=[c.chunk_id for c in batch],
-        embeddings=embs,
-        documents=[c.text for c in batch],
-        metadatas=[{"source": c.source, "category": c.category,
-                    "section": c.section, "path": c.path} for c in batch],
-    )
-
-
-def _flush(coll, batch: List[Chunk]) -> int:
-    """Indexes a batch; if it fails, retries item-by-item and skips bad ones.
-
-    Returns the number of chunks actually indexed.
-    """
+def _embed_batch(batch: List[Chunk]) -> List[Pair]:
+    """Embeds a batch -> [(chunk, embedding)]. No DB access, so it is safe to
+    run in a worker thread. On a batch failure, retries item by item and drops
+    chunks that still fail (e.g. a single oversized/corrupt one)."""
     try:
         t0 = time.monotonic()
         embs = embed([c.text for c in batch])
-        dt = time.monotonic() - t0
-        _upsert(coll, batch, embs)
         if _VERBOSE:
-            rate = len(batch) / max(dt, 1e-6)
-            print(f"  embed {len(batch)} in {dt:.2f}s ({rate:.1f}/s)", file=sys.stderr)
-        return len(batch)
+            dt = time.monotonic() - t0
+            print(f"  embed {len(batch)} in {dt:.2f}s "
+                  f"({len(batch)/max(dt,1e-6):.1f}/s)", file=sys.stderr)
+        return list(zip(batch, embs))
     except Exception as e:  # noqa: BLE001 — any network/model failure
-        print(f"  ! batch of {len(batch)} failed ({e}); retrying item by item", file=sys.stderr)
-        ok = 0
+        print(f"  ! batch of {len(batch)} failed ({e}); retrying item by item",
+              file=sys.stderr)
+        pairs: List[Pair] = []
         for c in batch:
             try:
-                _upsert(coll, [c], embed([c.text]))
-                ok += 1
+                pairs.append((c, embed([c.text])[0]))
             except Exception as e2:  # noqa: BLE001
                 print(f"  ! skipping chunk {c.chunk_id} ({e2})", file=sys.stderr)
-        return ok
+        return pairs
+
+
+def _upsert_pairs(coll, pairs: List[Pair]) -> int:
+    """Upserts embedded chunks into Chroma. Runs on the main thread."""
+    if not pairs:
+        return 0
+    chunks = [c for c, _ in pairs]
+    coll.upsert(
+        ids=[c.chunk_id for c in chunks],
+        embeddings=[e for _, e in pairs],
+        documents=[c.text for c in chunks],
+        metadatas=[{"source": c.source, "category": c.category,
+                    "section": c.section, "path": c.path} for c in chunks],
+    )
+    return len(chunks)
+
+
+def _iter_batches(size: int, limit: int) -> Iterator[List[Chunk]]:
+    """Groups the streamed corpus into batches of `size`, honoring `limit`."""
+    batch: List[Chunk] = []
+    seen = 0
+    for chunk in iter_corpus():
+        batch.append(chunk)
+        seen += 1
+        if len(batch) >= size:
+            yield batch
+            batch = []
+        if limit and seen >= limit:
+            break
+    if batch:
+        yield batch
 
 
 def main(argv: List[str]) -> int:
@@ -75,24 +103,25 @@ def main(argv: List[str]) -> int:
     coll = get_collection(create=True)
     print(f"Library: {LIBRARY_DIR}\nChroma: {CHROMA_DIR}\nCollection: {coll.name}")
 
-    batch: List[Chunk] = []
     total = 0   # successfully indexed
     seen = 0    # processed (includes skipped)
     t0 = time.monotonic()
-    for chunk in iter_corpus():
-        batch.append(chunk)
-        seen += 1
-        if len(batch) >= args.batch:
-            total += _flush(coll, batch)
-            batch = []
+
+    # One embed worker; the main thread upserts the *previous* batch while the
+    # next one embeds in the background.
+    with ThreadPoolExecutor(max_workers=1) as ex:
+        pending = None  # Future for the batch currently embedding
+        for batch in _iter_batches(args.batch, args.limit):
+            seen += len(batch)
+            fut = ex.submit(_embed_batch, batch)
+            if pending is not None:
+                total += _upsert_pairs(coll, pending.result())
+            pending = fut
             if seen % (args.batch * 10) == 0:
                 rate = seen / max(time.monotonic() - t0, 1e-6)
-                print(f"  {seen} chunks processed, {total} indexed ({rate:.0f}/s)")
-        if args.limit and seen >= args.limit:
-            break
-
-    if batch and (not args.limit or seen < args.limit):
-        total += _flush(coll, batch)
+                print(f"  {seen} chunks processed, {total} indexed ({rate:.1f}/s)")
+        if pending is not None:
+            total += _upsert_pairs(coll, pending.result())
 
     dt = time.monotonic() - t0
     print(f"Done: {seen} processed, {total} indexed in {dt:.0f}s. "
