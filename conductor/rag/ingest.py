@@ -16,6 +16,7 @@ instance anyway, so the win is overlapping the (cheap) DB write with the
 from __future__ import annotations
 
 import argparse
+import hashlib
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -29,6 +30,26 @@ from .core import (LIBRARY_DIR, CHROMA_DIR, EMBED_BATCH, Chunk, embed,
 _VERBOSE = True
 
 Pair = Tuple[Chunk, List[float]]
+
+
+def _chash(text: str) -> str:
+    """Short content hash of a chunk's text — stored as `chash` metadata so a
+    re-run can skip chunks whose text is unchanged (golden rule 3)."""
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+
+
+def _filter_unchanged(coll, batch: List[Chunk]) -> List[Chunk]:
+    """Drops chunks already in Chroma with a matching content hash. One get()
+    round-trip per batch saves embedding ~all chunks on a re-run (embedding is
+    orders of magnitude costlier than the lookup). On any error, embeds all."""
+    ids = [c.chunk_id for c in batch]
+    try:
+        existing = coll.get(ids=ids, include=["metadatas"])
+    except Exception:  # noqa: BLE001 — never let the lookup block ingest
+        return batch
+    have = {i: (m or {}).get("chash")
+            for i, m in zip(existing.get("ids", []), existing.get("metadatas", []))}
+    return [c for c in batch if have.get(c.chunk_id) != _chash(c.text)]
 
 
 def _embed_batch(batch: List[Chunk]) -> List[Pair]:
@@ -65,7 +86,8 @@ def _upsert_pairs(coll, pairs: List[Pair]) -> int:
         embeddings=[e for _, e in pairs],
         documents=[c.text for c in chunks],
         metadatas=[{"source": c.source, "category": c.category,
-                    "section": c.section, "path": c.path} for c in chunks],
+                    "section": c.section, "path": c.path,
+                    "chash": _chash(c.text)} for c in chunks],
     )
     return len(chunks)
 
@@ -91,6 +113,8 @@ def main(argv: List[str]) -> int:
     ap.add_argument("--limit", type=int, default=0, help="max chunks (0 = all)")
     ap.add_argument("--batch", type=int, default=EMBED_BATCH, help="embed batch size")
     ap.add_argument("--quiet", action="store_true", help="suppress per-batch telemetry")
+    ap.add_argument("--force", action="store_true",
+                    help="re-embed every chunk (skip the content-hash dedup)")
     args = ap.parse_args(argv)
     force_utf8()
     global _VERBOSE
@@ -103,9 +127,13 @@ def main(argv: List[str]) -> int:
     coll = get_collection(create=True)
     print(f"Library: {LIBRARY_DIR}\nChroma: {CHROMA_DIR}\nCollection: {coll.name}")
 
-    total = 0   # successfully indexed
-    seen = 0    # processed (includes skipped)
+    total = 0     # successfully indexed (embedded + upserted)
+    seen = 0      # processed (includes skipped)
+    skipped = 0   # unchanged, skipped by the content-hash dedup
     t0 = time.monotonic()
+    if not args.force:
+        print("Incremental: skipping chunks unchanged since last ingest "
+              "(use --force to re-embed all).")
 
     # One embed worker; the main thread upserts the *previous* batch while the
     # next one embeds in the background.
@@ -113,19 +141,22 @@ def main(argv: List[str]) -> int:
         pending = None  # Future for the batch currently embedding
         for batch in _iter_batches(args.batch, args.limit):
             seen += len(batch)
-            fut = ex.submit(_embed_batch, batch)
+            fresh = batch if args.force else _filter_unchanged(coll, batch)
+            skipped += len(batch) - len(fresh)
+            fut = ex.submit(_embed_batch, fresh) if fresh else None
             if pending is not None:
                 total += _upsert_pairs(coll, pending.result())
             pending = fut
             if seen % (args.batch * 10) == 0:
                 rate = seen / max(time.monotonic() - t0, 1e-6)
-                print(f"  {seen} chunks processed, {total} indexed ({rate:.1f}/s)")
+                print(f"  {seen} processed, {total} indexed, {skipped} skipped "
+                      f"({rate:.1f}/s)")
         if pending is not None:
             total += _upsert_pairs(coll, pending.result())
 
     dt = time.monotonic() - t0
-    print(f"Done: {seen} processed, {total} indexed in {dt:.0f}s. "
-          f"Total in collection: {coll.count()}")
+    print(f"Done: {seen} processed, {total} indexed, {skipped} skipped in "
+          f"{dt:.0f}s. Total in collection: {coll.count()}")
     return 0
 
 
