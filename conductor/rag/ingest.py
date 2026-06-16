@@ -14,6 +14,10 @@ import sys
 import time
 from typing import List
 
+# Per-batch embed telemetry: rate (chunks/s) reveals whether Ollama is the
+# bottleneck and whether GPU/CPU is being saturated. Toggle with --quiet.
+_VERBOSE = True
+
 from .core import (LIBRARY_DIR, CHROMA_DIR, EMBED_BATCH, Chunk, embed,
                    force_utf8, get_collection, iter_corpus)
 
@@ -34,7 +38,13 @@ def _flush(coll, batch: List[Chunk]) -> int:
     Returns the number of chunks actually indexed.
     """
     try:
-        _upsert(coll, batch, embed([c.text for c in batch]))
+        t0 = time.monotonic()
+        embs = embed([c.text for c in batch])
+        dt = time.monotonic() - t0
+        _upsert(coll, batch, embs)
+        if _VERBOSE:
+            rate = len(batch) / max(dt, 1e-6)
+            print(f"  embed {len(batch)} in {dt:.2f}s ({rate:.1f}/s)", file=sys.stderr)
         return len(batch)
     except Exception as e:  # noqa: BLE001 — any network/model failure
         print(f"  ! batch of {len(batch)} failed ({e}); retrying item by item", file=sys.stderr)
@@ -52,8 +62,11 @@ def main(argv: List[str]) -> int:
     ap = argparse.ArgumentParser(description="Index the library into ChromaDB.")
     ap.add_argument("--limit", type=int, default=0, help="max chunks (0 = all)")
     ap.add_argument("--batch", type=int, default=EMBED_BATCH, help="embed batch size")
+    ap.add_argument("--quiet", action="store_true", help="suppress per-batch telemetry")
     args = ap.parse_args(argv)
     force_utf8()
+    global _VERBOSE
+    _VERBOSE = not args.quiet
 
     if not LIBRARY_DIR.is_dir():
         print(f"ERROR: library not found at {LIBRARY_DIR}", file=sys.stderr)
