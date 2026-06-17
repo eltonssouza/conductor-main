@@ -9,7 +9,12 @@ automatically by Claude Code — no plugin required.
 - **Type:** {type}
 - **Stack:** see [`.cdt/stack/{type}.md`](.cdt/stack/{type}.md)
 - **Roles:** the Agents in `.claude/agents/` with their Skills in
-  `.claude/skills/` — a subset selected for this project type.
+  `.claude/skills/` — a subset selected for this project type. Each Agent
+  declares its own `model` (opus/sonnet/haiku); invoking it **as a subagent (Task
+  tool)** runs it on that tier, overriding the session default.
+- **Gates pause for you:** the flow **stops at every gate** to present its
+  decisions + library citations and **ask your approval before advancing**
+  (Gate protocol step 5). It does not run end-to-end unattended.
 
 ## Roles in this project
 
