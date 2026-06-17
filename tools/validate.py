@@ -291,6 +291,46 @@ def check_agent_model(ctx: Context) -> List[Violation]:
     return v
 
 
+# --- R9: memory tree <-> ingestion routing consistency -----------------------
+
+@rule("R9-memory-routing", "ingest routes map to scaffolded folders; refs/ never ingested")
+def check_memory_routing(ctx: Context) -> List[Violation]:
+    v: List[Violation] = []
+    where = "conductor/journal.py"
+    try:
+        from conductor.scaffold import MEMORY_TREE, MEMORY_LOCAL
+        from conductor.journal import INGEST_ROUTES, TYPE_TO_SESSION
+    except Exception as e:  # noqa: BLE001
+        return [Violation("R9-memory-routing", where, f"cannot import: {e}")]
+
+    tree = set(MEMORY_TREE)
+    types = [dtype for _, _, _, dtype in INGEST_ROUTES]
+    for subtree, suffix, _peer, dtype in INGEST_ROUTES:
+        # A route may target a leaf folder or a parent of several (e.g. `docs`
+        # covers `docs/architecture`, `docs/api`, ...).
+        covered = subtree in tree or any(k.startswith(subtree + "/") for k in tree)
+        if not covered:
+            v.append(Violation("R9-memory-routing", where,
+                               f"route '{subtree}' is not a folder in scaffold.MEMORY_TREE"))
+        if subtree.startswith("refs/"):
+            v.append(Violation("R9-memory-routing", where,
+                               f"route '{subtree}' ingests refs/ (must never be ingested)"))
+        if subtree in ("diary", "daily"):
+            v.append(Violation("R9-memory-routing", where,
+                               f"route '{subtree}' is local-only, not a document subtree"))
+        if TYPE_TO_SESSION.get(dtype) != suffix:
+            v.append(Violation("R9-memory-routing", where,
+                               f"TYPE_TO_SESSION['{dtype}'] != route suffix '{suffix}'"))
+    if len(set(types)) != len(types):
+        v.append(Violation("R9-memory-routing", where, "duplicate ingest type across routes"))
+    # local-only folders must be git-ignored (no leakage of diary/digests/cache)
+    for needed in ("memory/diary/", "memory/daily/"):
+        if needed not in set(MEMORY_LOCAL):
+            v.append(Violation("R9-memory-routing", "conductor/scaffold.py",
+                               f"'{needed}' missing from MEMORY_LOCAL (git-ignore)"))
+    return v
+
+
 # --- runner ------------------------------------------------------------------
 
 def run() -> List[Violation]:
