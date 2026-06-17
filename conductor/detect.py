@@ -188,7 +188,7 @@ def detect(root: Path) -> Tuple[str, List[str], List[str]]:
 # .cdt/stack/<type>.md so the file is actually filled in, not a blank skeleton.
 
 PROFILE_FIELDS = ("languages", "frameworks", "datastores", "build", "testing",
-                  "libraries")
+                  "tooling", "libraries")
 
 # docker-compose / pom image or driver substring -> datastore label.
 _DATASTORES = (
@@ -232,10 +232,24 @@ def _parse_pom(text: str, prof: Dict[str, List[str]]) -> None:
     def art(*subs: str) -> bool:
         return any(any(s in a for s in subs) for a in arts)
 
+    if art("spring-boot-starter-webflux"):
+        prof["frameworks"].append("Spring WebFlux")
+    elif art("spring-boot-starter-web"):
+        prof["frameworks"].append("Spring Web (REST)")
     if art("spring-boot-starter-data-jpa") or art("hibernate"):
         prof["libraries"].append("Spring Data JPA / Hibernate")
     if art("spring-boot-starter-security"):
         prof["libraries"].append("Spring Security")
+    if art("spring-boot-starter-validation"):
+        prof["libraries"].append("Bean Validation")
+    if art("spring-boot-starter-mail"):
+        prof["libraries"].append("Spring Mail")
+    if art("spring-boot-starter-actuator"):
+        prof["libraries"].append("Spring Actuator (observability)")
+    if art("springdoc", "swagger"):
+        prof["libraries"].append("OpenAPI (springdoc/Swagger)")
+    if art("micrometer"):
+        prof["libraries"].append("Micrometer (metrics)")
     if art("flyway"):
         prof["libraries"].append("Flyway (migrations)")
     if art("liquibase"):
@@ -293,9 +307,11 @@ def _parse_pkg(pkg: dict, prof: Dict[str, List[str]]) -> None:
     for name, label in (("bootstrap", "Bootstrap"),
                         ("@ng-bootstrap/ng-bootstrap", "ng-bootstrap"),
                         ("@angular/material", "Angular Material"),
+                        ("@angular/cdk", "Angular CDK"),
+                        ("@angular/localize", "Angular i18n (localize)"),
                         ("tailwindcss", "Tailwind CSS"), ("rxjs", "RxJS"),
                         ("@ngrx/store", "NgRx"), ("redux", "Redux"),
-                        ("axios", "Axios")):
+                        ("axios", "Axios"), ("sharp", "sharp (image processing)")):
         if name in deps:
             prof["libraries"].append(label)
     for name, label in (("vitest", "Vitest"), ("jest", "Jest"), ("karma", "Karma"),
@@ -303,6 +319,17 @@ def _parse_pkg(pkg: dict, prof: Dict[str, List[str]]) -> None:
                         ("@playwright/test", "Playwright"), ("playwright", "Playwright")):
         if name in deps:
             prof["testing"].append(label)
+    if any(k in deps for k in ("@vitest/coverage-v8", "karma-coverage", "nyc")):
+        prof["testing"].append("coverage")
+    # tooling: lint / format / library packaging
+    if any(k in deps for k in ("eslint", "angular-eslint", "typescript-eslint",
+                               "@eslint/js")):
+        prof["tooling"].append("ESLint")
+    for name, label in (("prettier", "Prettier"), ("stylelint", "Stylelint"),
+                        ("ng-packagr", "ng-packagr"), ("husky", "Husky"),
+                        ("storybook", "Storybook")):
+        if name in deps:
+            prof["tooling"].append(label)
     pm = pkg.get("packageManager")
     if pm:
         prof["build"].append(pm.replace("@", " "))
@@ -352,6 +379,9 @@ def profile(root: Path) -> Dict[str, List[str]]:
         for cf in ("docker-compose.yml", "docker-compose.yaml", "compose.yml"):
             if (r / cf).exists():
                 _parse_compose(_read_text(r / cf), prof)
+                prof["tooling"].append("Docker Compose")
+        if (r / "Dockerfile").exists():
+            prof["tooling"].append("Docker")
         for pf in ("pyproject.toml", "requirements.txt"):
             if (r / pf).exists():
                 py_blob += _read_text(r / pf) + "\n"

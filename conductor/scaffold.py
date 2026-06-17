@@ -57,6 +57,7 @@ def _stack_md(ptype: str, techs: List[str], evidence: List[str],
         line("Datastore(s)", "datastores"),
         line("Build / package manager", "build"),
         line("Testing", "testing"),
+        line("Tooling (lint / format / containers)", "tooling"),
         line("Notable libraries", "libraries"),
     ))
     return f"""# Stack — {ptype}
