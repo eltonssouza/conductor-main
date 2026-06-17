@@ -60,25 +60,44 @@ class HonchoBackend:
             self._client = None
         return self._client
 
-    def add(self, session_id: str, text: str, *, gate: Optional[int],
-            kind: str, as_owner: bool = False) -> HonchoResult:
+    def _post(self, session_id: str, text: str, *, peer: str,
+              metadata: dict) -> HonchoResult:
+        """Append one message (by `peer`, into `session_id`, with `metadata`).
+
+        Single guarded path shared by the diary (`add`) and the document/record
+        ingestion (`add_doc`). Never raises; returns a HonchoResult.
+        """
         client = self._connect()
         if client is None:
             return HonchoResult(False, self._error or "Honcho unavailable")
         try:
-            peer = client.peer(OWNER_PEER if as_owner else CONDUCTOR_PEER)
+            p = client.peer(peer)
             session = client.session(session_id)
-            meta = {"kind": kind}
-            if gate is not None:
-                meta["gate"] = gate
             try:
-                msg = peer.message(text, metadata=meta)
+                msg = p.message(text, metadata=metadata)
             except TypeError:           # older SDK: no metadata kwarg
-                msg = peer.message(text)
+                msg = p.message(text)
             session.add_messages([msg])
             return HonchoResult(True)
         except Exception as e:  # noqa: BLE001
-            return HonchoResult(False, f"Honcho add failed ({e})")
+            return HonchoResult(False, f"Honcho post failed ({e})")
+
+    def add(self, session_id: str, text: str, *, gate: Optional[int],
+            kind: str, as_owner: bool = False) -> HonchoResult:
+        meta = {"kind": kind}
+        if gate is not None:
+            meta["gate"] = gate
+        peer = OWNER_PEER if as_owner else CONDUCTOR_PEER
+        return self._post(session_id, text, peer=peer, metadata=meta)
+
+    def add_doc(self, session_id: str, text: str, *, peer: str,
+                metadata: dict) -> HonchoResult:
+        """Ingest a living doc / dated record. Caller owns idempotency (hash).
+
+        `metadata` carries the routing facets used by recall: at least `type`
+        and `path`, plus `area` and `hash` when available.
+        """
+        return self._post(session_id, text, peer=peer, metadata=metadata)
 
     def recall(self, session_id: str, question: str) -> HonchoResult:
         client = self._connect()

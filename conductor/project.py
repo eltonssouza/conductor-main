@@ -69,8 +69,44 @@ def stack_dir(root: Path) -> Path:
     return cdt_dir(root) / "stack"
 
 
+def memory_dir(root: Path) -> Path:
+    """Root of the per-project memory tree (`.cdt/memory/`).
+
+    Three natures live side by side: `diary/` (append-only machine events,
+    source of truth), `docs/` + `records/` (living knowledge, committed), and
+    `refs/` (pointers to external systems, never ingested by Honcho).
+    """
+    return cdt_dir(root) / "memory"
+
+
+def diary_dir(root: Path) -> Path:
+    """Append-only JSONL mirror, one file per day. Source of truth, local-only."""
+    return memory_dir(root) / "diary"
+
+
+def daily_dir(root: Path) -> Path:
+    """Human-readable digests generated from the diary. Local-only."""
+    return memory_dir(root) / "daily"
+
+
+def docs_dir(root: Path) -> Path:
+    """Living architecture/api/db/ops snapshots (committed knowledge)."""
+    return memory_dir(root) / "docs"
+
+
+def records_dir(root: Path) -> Path:
+    """Dated/numbered artefacts: bugs, ADRs, discovery, features, gaps."""
+    return memory_dir(root) / "records"
+
+
+def refs_dir(root: Path) -> Path:
+    """Pointers to external systems (Jira, PRDs, SQL, images). Not memory."""
+    return memory_dir(root) / "refs"
+
+
 def journal_dir(root: Path) -> Path:
-    return cdt_dir(root) / "journal"
+    """Back-compat alias: the diary now lives under `memory/diary/`."""
+    return diary_dir(root)
 
 
 def is_enrolled(root: Path) -> bool:
