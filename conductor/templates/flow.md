@@ -20,31 +20,41 @@ back into the spec — **each loop lowers the defect rate**.
 
 ## Gate protocol — MANDATORY at every gate
 
-Grounding and recording are **not optional**. For each gate, in order, you MUST:
+Grounding, delegation, recording, and the user checkpoint are **not optional**.
+For each gate, in order, you MUST:
 
 1. **Recall** — `conductor journal recall "<the gate's question>"` to load what
    this project already decided/attempted. Don't repeat past mistakes.
 2. **Ground** — `conductor library "<project-aware question>"` and **cite the
    book(s)** for each non-trivial claim or decision. An assertion with no library
-   citation (or an explicit "the library does not cover this") is not allowed.
-3. **Decide** — reason as the gate's roles, using the retrieved evidence.
+   citation (or an explicit "the library does not cover this") **fails the gate**.
+3. **Delegate** — hand the gate's substantive work to its roles **via the Task
+   tool (as subagents)**, not inline. Each Agent under `.claude/agents/` declares
+   a `model` (opus/sonnet/haiku); invoking it as a subagent runs it on **that
+   tier**, overriding the session default. Reasoning inline (no subagent) skips
+   the model routing and is not allowed for substantive gate work.
 4. **Record** — `conductor journal add --gate <N> --kind decision "<decision>"`
    for every key decision (and `--kind error|solution` for problems hit/fixed)
-   **before advancing**.
+   **before the checkpoint**.
+5. **Halt — user checkpoint.** Present a short gate summary: the decisions made,
+   the **library citations**, the journal entries written, and the open risks.
+   Then **STOP and ask the user to approve advancing**. Do **not** begin the next
+   gate until the user explicitly says to proceed. If the user asks for changes,
+   redo the affected steps in this gate, then ask again.
 
-The gate's **exit criterion is met only when steps 1–4 are done** and the
-gate-specific criterion below holds. State the library citations and the journal
-entries you wrote as part of closing the gate.
+The gate's **exit criterion is met only when steps 1–5 are done** — citations
+present, work delegated to the right model tier, decisions recorded, and the
+**user has approved** — and the gate-specific criterion below holds.
 
 ## How to conduct
 
 Conduct the demand through the gates **in order**, applying the Gate protocol
-above to each. Each gate has an **objective**, the responsible **roles**
-(delegate to the matching Agent / invoke the matching Skill under `.claude/`),
-and a **quality gate** — an explicit exit criterion. **Do not advance until the
-exit criterion is met**; if information is missing, state what must be discovered
-first. Adapt depth to the size of the demand, but never skip a gate or its
-protocol without justification.
+above to each. Each gate has an **objective**, the responsible **roles** (invoke
+the matching Agent **as a subagent via the Task tool**, so it runs on its
+assigned model tier), and a **quality gate** — an explicit exit criterion.
+**Never advance past a gate without the user's explicit approval** (protocol step
+5); if information is missing, state what must be discovered first. Adapt depth to
+the size of the demand, but never skip a gate or its protocol without justification.
 
 ---
 
