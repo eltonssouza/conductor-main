@@ -498,6 +498,9 @@ GRAPH_HTML = """<!doctype html>
 <html lang="pt-br"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Conductor — Library Graph</title>
+<!-- three-spritetext needs a global THREE; load three's UMD build first. Pinned
+     to 0.155 (the last line that still ships build/three.min.js as a global). -->
+<script src="https://unpkg.com/three@0.155.0/build/three.min.js"></script>
 <script src="https://unpkg.com/three-spritetext@1.8.2/dist/three-spritetext.min.js"></script>
 <script src="https://unpkg.com/3d-force-graph@1.73.4/dist/3d-force-graph.min.js"></script>
 <style>
