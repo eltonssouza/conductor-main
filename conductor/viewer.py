@@ -30,6 +30,7 @@ DEFAULT_PORT = 8765
 DEFAULT_LIMIT = 4000      # points returned per view (browser stays smooth)
 _PROFILE_PAGE = 5000      # metadata page size (avoids Chroma's SQL var limit)
 _SAMPLE_FIT = 15000       # rows PCA is fitted on (transform still covers all)
+_INDEX_VERSION = 2        # bump to invalidate a cached index after a schema change
 
 _profiles_cache: dict | None = None
 _centroids_cache: dict | None = None
@@ -63,6 +64,9 @@ def _build_index(coll) -> dict:
     blocks, metas, previews = [], [], []
     cats: dict = {}
     srcs: dict = {}
+    sums: dict = {}       # per-source embedding sum -> centroid (for /graph)
+    counts: dict = {}
+    scats: dict = {}
     offset = 0
     while offset < total:
         page = coll.get(limit=_PROFILE_PAGE, offset=offset,
@@ -72,23 +76,30 @@ def _build_index(coll) -> dict:
         ds = page.get("documents") or []
         if embs is None or len(ms) == 0:
             break
-        blocks.append(np.asarray(embs, dtype=np.float32))
+        block = np.asarray(embs, dtype=np.float32)
+        blocks.append(block)
         metas.extend(ms)
         previews.extend(((ds[i] if i < len(ds) else "") or "")[:160].replace("\n", " ")
                         for i in range(len(ms)))
-        for m in ms:
+        for i, m in enumerate(ms):
             c = (m or {}).get("category")
             s = (m or {}).get("source")
             if c:
                 cats[c] = cats.get(c, 0) + 1
             if s:
                 srcs[s] = srcs.get(s, 0) + 1
+                if s not in sums:
+                    sums[s] = np.zeros(block.shape[1], dtype=np.float64)
+                    counts[s] = 0
+                    scats[s] = c or "?"
+                sums[s] += block[i]
+                counts[s] += 1
         offset += len(ms)
         print(f"  [viewer] projecting {offset}/{total}", file=sys.stderr, flush=True)
 
     if not blocks:
-        return {"count": 0, "variance": 0.0, "points": [],
-                "categories": [], "sources": []}
+        return {"v": _INDEX_VERSION, "count": 0, "variance": 0.0, "points": [],
+                "categories": [], "sources": [], "centroids": {}}
 
     X = np.vstack(blocks)
     n = X.shape[0]
@@ -113,22 +124,28 @@ def _build_index(coll) -> dict:
             "section": m.get("section", ""),
             "preview": previews[i],
         })
-    return {"count": n, "variance": round(variance, 4), "points": points,
-            "categories": sorted(cats.items()), "sources": sorted(srcs.items())}
+    centroids = {s: {"centroid": [round(float(x), 6) for x in (sums[s] / max(counts[s], 1))],
+                     "count": counts[s], "category": scats[s]}
+                 for s in sums}
+    return {"v": _INDEX_VERSION, "count": n, "variance": round(variance, 4),
+            "points": points, "categories": sorted(cats.items()),
+            "sources": sorted(srcs.items()), "centroids": centroids}
 
 
 def _load_index(coll) -> dict:
     """Return the precomputed projection, building (and persisting) it once.
-    Invalidated automatically when the collection size changes (a new ingest)."""
+    Rebuilt when the collection size changes (a new ingest) or the schema
+    version is bumped."""
     global _index_cache
     count = coll.count()
-    if _index_cache is not None and _index_cache.get("count") == count:
+    if (_index_cache is not None and _index_cache.get("count") == count
+            and _index_cache.get("v") == _INDEX_VERSION):
         return _index_cache
     path = _index_path()
     if path.is_file():
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-            if data.get("count") == count:
+            if data.get("count") == count and data.get("v") == _INDEX_VERSION:
                 _index_cache = data
                 return data
         except (ValueError, OSError):
@@ -172,38 +189,10 @@ def _points(coll, category: str, source: str, limit: int) -> dict:
 # (3d-force-graph) in /graph.
 
 def _source_centroids(coll) -> dict:
-    """Per-source mean embedding + chunk count + category. Cached (one full
-    pass over the index, accumulated page by page)."""
-    global _centroids_cache
-    if _centroids_cache is not None:
-        return _centroids_cache
-    import numpy as np
-
-    sums: dict = {}
-    counts: dict = {}
-    cats: dict = {}
-    offset, total = 0, coll.count()
-    while offset < total:
-        page = coll.get(limit=_PROFILE_PAGE, offset=offset,
-                        include=["embeddings", "metadatas"])
-        embs = page.get("embeddings")
-        metas = page.get("metadatas") or []
-        if embs is None or len(metas) == 0:
-            break
-        embs = np.asarray(embs)
-        for i, m in enumerate(metas):
-            s = (m or {}).get("source") or "?"
-            if s not in sums:
-                sums[s] = np.zeros(embs.shape[1])
-                counts[s] = 0
-                cats[s] = (m or {}).get("category") or "?"
-            sums[s] += embs[i]
-            counts[s] += 1
-        offset += len(metas)
-    _centroids_cache = {s: {"centroid": sums[s] / max(counts[s], 1),
-                            "count": counts[s], "category": cats[s]}
-                        for s in sums}
-    return _centroids_cache
+    """Per-source mean embedding + chunk count + category — read from the
+    precomputed index (built in the same pass as the 3D projection), so /graph
+    no longer refetches every embedding from Chroma."""
+    return _load_index(coll).get("centroids", {})
 
 
 def _graph(coll, category: str, knn: int = 3) -> dict:
