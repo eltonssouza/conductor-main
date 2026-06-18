@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 import threading
@@ -26,11 +27,13 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 DEFAULT_PORT = 8765
-DEFAULT_LIMIT = 4000      # points fetched per view (browser stays smooth)
+DEFAULT_LIMIT = 4000      # points returned per view (browser stays smooth)
 _PROFILE_PAGE = 5000      # metadata page size (avoids Chroma's SQL var limit)
+_SAMPLE_FIT = 15000       # rows PCA is fitted on (transform still covers all)
 
 _profiles_cache: dict | None = None
 _centroids_cache: dict | None = None
+_index_cache: dict | None = None   # the precomputed 3D projection (all points)
 
 
 # --- data access -------------------------------------------------------------
@@ -40,76 +43,67 @@ def _collection():
     return get_collection(create=False)
 
 
-def _profiles(coll) -> dict:
-    """Distinct categories and sources (the filterable 'profiles'). Cached:
-    the metadata is scanned once by paging through the whole collection."""
-    global _profiles_cache
-    if _profiles_cache is not None:
-        return _profiles_cache
+def _index_path() -> Path:
+    base = Path(os.environ.get("CONDUCTOR_HOME",
+                               str(Path.home() / ".claude" / "conductor")))
+    base.mkdir(parents=True, exist_ok=True)
+    return base / "viewer_index.json"
+
+
+def _build_index(coll) -> dict:
+    """One full pass over the collection: pull embeddings + metadata, project
+    every chunk to 3D **once** with PCA, and tally the profiles. The result is
+    what every `/api/points` and `/api/profiles` view is served from, so views
+    never refetch 1024-d vectors or rerun PCA. Embeddings are the dominant cost,
+    so PCA is fitted on a sample and used to transform all rows."""
+    import numpy as np
+    from sklearn.decomposition import PCA
+
+    total = coll.count()
+    blocks, metas, previews = [], [], []
     cats: dict = {}
     srcs: dict = {}
     offset = 0
-    total = coll.count()
     while offset < total:
-        page = coll.get(limit=_PROFILE_PAGE, offset=offset, include=["metadatas"])
-        metas = page.get("metadatas") or []
-        if not metas:
+        page = coll.get(limit=_PROFILE_PAGE, offset=offset,
+                        include=["embeddings", "metadatas", "documents"])
+        embs = page.get("embeddings")
+        ms = page.get("metadatas") or []
+        ds = page.get("documents") or []
+        if embs is None or len(ms) == 0:
             break
-        for m in metas:
+        blocks.append(np.asarray(embs, dtype=np.float32))
+        metas.extend(ms)
+        previews.extend(((ds[i] if i < len(ds) else "") or "")[:160].replace("\n", " ")
+                        for i in range(len(ms)))
+        for m in ms:
             c = (m or {}).get("category")
             s = (m or {}).get("source")
             if c:
                 cats[c] = cats.get(c, 0) + 1
             if s:
                 srcs[s] = srcs.get(s, 0) + 1
-        offset += len(metas)
-    _profiles_cache = {
-        "total": total,
-        "categories": sorted(cats.items()),
-        "sources": sorted(srcs.items()),
-    }
-    return _profiles_cache
+        offset += len(ms)
+        print(f"  [viewer] projecting {offset}/{total}", file=sys.stderr, flush=True)
 
+    if not blocks:
+        return {"count": 0, "variance": 0.0, "points": [],
+                "categories": [], "sources": []}
 
-def _where(category: str, source: str):
-    clauses = []
-    if category:
-        clauses.append({"category": category})
-    if source:
-        clauses.append({"source": source})
-    if not clauses:
-        return None
-    return clauses[0] if len(clauses) == 1 else {"$and": clauses}
-
-
-def _points(coll, category: str, source: str, limit: int) -> dict:
-    """Fetches a filtered slice and reduces its embeddings to 3D via PCA."""
-    import numpy as np
-    from sklearn.decomposition import PCA
-
-    res = coll.get(where=_where(category, source), limit=limit,
-                   include=["embeddings", "metadatas", "documents"])
-    embs = res.get("embeddings")
-    embs = np.asarray(embs) if embs is not None else np.empty((0, 0))
-    metas = res.get("metadatas") or []
-    docs = res.get("documents") or []
-    n = len(metas)
-    if n == 0:
-        return {"points": [], "variance": 0.0, "count": 0}
-
-    if embs.shape[0] >= 3 and embs.shape[1] >= 3:
-        pca = PCA(n_components=3)
-        xyz = pca.fit_transform(embs)
-        variance = float(pca.explained_variance_ratio_.sum())
-    else:  # too few points to project — lay them on a line
-        xyz = np.zeros((n, 3))
-        variance = 0.0
+    X = np.vstack(blocks)
+    n = X.shape[0]
+    pca = PCA(n_components=3)
+    if n > _SAMPLE_FIT:
+        rng = np.random.default_rng(0)
+        pca.fit(X[rng.choice(n, _SAMPLE_FIT, replace=False)])
+        xyz = pca.transform(X)
+    else:
+        xyz = pca.fit_transform(X)
+    variance = float(pca.explained_variance_ratio_.sum())
 
     points = []
-    for i in range(n):
-        m = metas[i] or {}
-        doc = (docs[i] if i < len(docs) else "") or ""
-        preview = doc[:160].replace("\n", " ")
+    for i, m in enumerate(metas):
+        m = m or {}
         points.append({
             "x": round(float(xyz[i][0]), 4),
             "y": round(float(xyz[i][1]), 4),
@@ -117,9 +111,57 @@ def _points(coll, category: str, source: str, limit: int) -> dict:
             "category": m.get("category", ""),
             "source": m.get("source", ""),
             "section": m.get("section", ""),
-            "preview": preview,
+            "preview": previews[i],
         })
-    return {"points": points, "variance": round(variance, 4), "count": n}
+    return {"count": n, "variance": round(variance, 4), "points": points,
+            "categories": sorted(cats.items()), "sources": sorted(srcs.items())}
+
+
+def _load_index(coll) -> dict:
+    """Return the precomputed projection, building (and persisting) it once.
+    Invalidated automatically when the collection size changes (a new ingest)."""
+    global _index_cache
+    count = coll.count()
+    if _index_cache is not None and _index_cache.get("count") == count:
+        return _index_cache
+    path = _index_path()
+    if path.is_file():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if data.get("count") == count:
+                _index_cache = data
+                return data
+        except (ValueError, OSError):
+            pass
+    data = _build_index(coll)
+    try:
+        path.write_text(json.dumps(data), encoding="utf-8")
+    except OSError:
+        pass
+    _index_cache = data
+    return data
+
+
+def _profiles(coll) -> dict:
+    """Distinct categories and sources (the filterable 'profiles'), read from
+    the precomputed index — no separate full-collection metadata scan."""
+    data = _load_index(coll)
+    return {"total": data.get("count", 0),
+            "categories": data.get("categories", []),
+            "sources": data.get("sources", [])}
+
+
+def _points(coll, category: str, source: str, limit: int) -> dict:
+    """Serve a filtered slice of the precomputed 3D projection — an in-memory
+    filter, no Chroma fetch and no PCA per request."""
+    data = _load_index(coll)
+    pts = data.get("points", [])
+    if category:
+        pts = [p for p in pts if p.get("category") == category]
+    if source:
+        pts = [p for p in pts if p.get("source") == source]
+    out = pts[:limit] if limit else pts
+    return {"points": out, "variance": data.get("variance", 0.0), "count": len(out)}
 
 
 # --- force-directed graph ----------------------------------------------------
@@ -273,9 +315,10 @@ def _ingest_markdown(category: str, title: str, author: str, content: str) -> di
     n = 0
     if chunks:
         n = _upsert_pairs(_collection(), _embed_batch(chunks))
-    global _profiles_cache, _centroids_cache
+    global _profiles_cache, _centroids_cache, _index_cache
     _profiles_cache = None   # new category/source -> refresh the filter lists
     _centroids_cache = None  # and the graph centroids
+    _index_cache = None      # and the 3D projection (rebuilt on next view)
     return {"file": str(dest), "chunks": n, "category": category, "source": stem}
 
 
