@@ -15,6 +15,11 @@ automatically by Claude Code — no plugin required.
 - **Gates pause for you:** the flow **stops at every gate** to present its
   decisions + library citations and **ask your approval before advancing**
   (Gate protocol step 5). It does not run end-to-end unattended.
+- **Entry point — run `/cdt <demand>`:** this slash command is the flow's
+  control loop (recall → RAG → delegate to a subagent → record → your
+  checkpoint). Driving a demand any other way leaves the flow as passive
+  guidance, which a normal task prompt will bypass. Avoid pairing it with
+  "run autonomously / commit each step" — that disables the per-gate checkpoint.
 
 ## Roles in this project
 

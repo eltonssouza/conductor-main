@@ -331,6 +331,30 @@ def check_memory_routing(ctx: Context) -> List[Violation]:
     return v
 
 
+# --- R10: /cdt flow driver command -------------------------------------------
+
+DRIVER = TEMPLATES / "commands" / "cdt.md"
+DRIVER_ANCHORS = ("AskUserQuestion", "Task tool", "conductor library",
+                  "conductor journal", "HALT")
+
+
+@rule("R10-flow-driver", "/cdt driver command exists and enforces RAG + delegation + checkpoint")
+def check_flow_driver(ctx: Context) -> List[Violation]:
+    rel = "conductor/templates/commands/cdt.md"
+    if not DRIVER.is_file():
+        return [Violation("R10-flow-driver", rel, "driver command not found")]
+    text = DRIVER.read_text(encoding="utf-8")
+    fm, _ = split_frontmatter(text)
+    v: List[Violation] = []
+    if frontmatter_field(fm, "description") is None:
+        v.append(Violation("R10-flow-driver", rel, "frontmatter missing 'description'"))
+    for anchor in DRIVER_ANCHORS:
+        if anchor not in text:
+            v.append(Violation("R10-flow-driver", rel,
+                               f"driver missing enforcement anchor: '{anchor}'"))
+    return v
+
+
 # --- runner ------------------------------------------------------------------
 
 def run() -> List[Violation]:
