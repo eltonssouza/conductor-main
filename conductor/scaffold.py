@@ -299,6 +299,24 @@ def _write_claude_md(root: Path, slug: str, ptype: str, selected: List[str]) -> 
 
 # --- scaffolding -------------------------------------------------------------
 
+def _copy_driver(project: Path) -> bool:
+    """Install the `/cdt` flow-driver slash command into `.claude/commands/`.
+
+    The driver is the interactive control loop (recall → RAG → delegate →
+    record → user checkpoint) that makes the 11-gate flow actually enforced,
+    instead of leaving it as passive CLAUDE.md guidance. Always overwritten so
+    `sync` keeps it current. It is NOT a role skill, so it stays out of the
+    36↔36 agent/skill parity.
+    """
+    src = TEMPLATES / "commands" / "cdt.md"
+    if not src.is_file():
+        return False
+    dst = project / ".claude" / "commands"
+    dst.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(src, dst / "cdt.md")
+    return True
+
+
 def _copy_roles(project: Path, selected: List[str]) -> int:
     agents_dst = project / ".claude" / "agents"
     skills_dst = project / ".claude" / "skills"
@@ -367,7 +385,9 @@ def cmd_init(args) -> int:
     print(f"[1/4] analyzing {project.name}: type={ptype}"
           + (f", detected={', '.join(techs)}" if techs else ""))
     n = _copy_roles(project, selected)
-    print(f"[2/4] .claude/: {n} agents + {n} skills ({mode} for {ptype})")
+    drv = _copy_driver(project)
+    print(f"[2/4] .claude/: {n} agents + {n} skills ({mode} for {ptype})"
+          + (" + /cdt driver" if drv else ""))
 
     stack_dir(project).mkdir(parents=True, exist_ok=True)
     leaves = _scaffold_memory_tree(project)
@@ -411,6 +431,7 @@ def cmd_sync(args) -> int:
         selected = roles_mod.select_roles(ptype)  # subset re-computed for current type
 
     n = _copy_roles(root, selected)
+    _copy_driver(root)                    # keep the /cdt flow driver current
     leaves = _scaffold_memory_tree(root)  # ensure/upgrade the memory tree (idempotent)
     _ensure_memory_gitignore(root)
     migrated = _migrate_legacy_diary(root)  # pre-0.2.20 journal/ -> memory/diary/

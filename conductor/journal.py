@@ -28,7 +28,7 @@ from .project import (daily_dir, diary_dir, docs_dir, find_project_root,
                       force_utf8, journal_dir, memory_dir, read_config,
                       records_dir)
 
-KINDS = ("reasoning", "decision", "plan", "error", "solution")
+KINDS = ("reasoning", "decision", "plan", "error", "solution", "checkpoint")
 
 # Ingestion routes: each subtree of `.cdt/memory/` maps to a durable Honcho
 # session, a peer (who authored it), and a `type` facet for recall. `docs/` is
