@@ -24,6 +24,8 @@ Commands:
                              pull the latest diary memory into the managed region.
   init | sync [path]         Aliases for `cdt init` / `cdt sync`.
   library "<question>"       Semantic search over the reference books (RAG).
+  library reindex            Index any library files not yet in ChromaDB (incremental).
+  library add <file.md>      Index specific .md file(s) already under the library.
   journal add|recall|log     Per-project development diary.
   up | down                  Start / stop the Docker RAG stack (auto-detects GPU).
   ingest                     (Re)build the index in the running stack.
