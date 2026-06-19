@@ -12,6 +12,7 @@ drifts. No third-party deps (stdlib only). Dual-mode:
 from __future__ import annotations
 
 import re
+import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -352,6 +353,65 @@ def check_flow_driver(ctx: Context) -> List[Violation]:
         if anchor not in text:
             v.append(Violation("R10-flow-driver", rel,
                                f"driver missing enforcement anchor: '{anchor}'"))
+    return v
+
+
+# --- R11: no committed secrets -----------------------------------------------
+# Scans git-TRACKED files only, so a local gitignored .env (where the real key
+# legitimately lives) is never flagged — the rule fails only if a real secret is
+# actually committed. Placeholders (sk-your-..., set-your-key) don't match: the
+# token patterns require a long run of secret-shaped characters.
+
+_SECRET_PATTERNS = [
+    ("OpenAI/DeepSeek key", re.compile(r"sk-[A-Za-z0-9]{20,}")),
+    ("GitHub token", re.compile(r"gh[posru]_[A-Za-z0-9]{30,}")),
+    ("AWS access key id", re.compile(r"AKIA[0-9A-Z]{16}")),
+    ("Slack token", re.compile(r"xox[baprs]-[A-Za-z0-9-]{10,}")),
+    ("Google API key", re.compile(r"AIza[0-9A-Za-z_\-]{30,}")),
+    ("private key block", re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")),
+]
+_SECRET_ALLOW = ("your-", "set-your", "example", "placeholder", "changeme",
+                 "redacted", "dummy", "fake", "<your", "replace")
+_BINARY_EXT = {".png", ".jpg", ".jpeg", ".gif", ".ico", ".pdf", ".7z", ".zip",
+               ".gz", ".woff", ".woff2", ".ttf", ".pyc"}
+
+
+def _tracked_files() -> List[Path] | None:
+    try:
+        r = subprocess.run(["git", "ls-files"], cwd=str(ROOT),
+                           capture_output=True, text=True, timeout=30)
+    except Exception:  # noqa: BLE001 — git missing / not a repo
+        return None
+    if r.returncode != 0:
+        return None
+    return [ROOT / line for line in r.stdout.splitlines() if line.strip()]
+
+
+@rule("R11-no-secrets", "no real API keys/tokens committed to tracked files")
+def check_secrets(ctx: Context) -> List[Violation]:
+    files = _tracked_files()
+    if files is None:           # not a git checkout — skip rather than fail CI
+        return []
+    v: List[Violation] = []
+    for p in files:
+        if p.suffix.lower() in _BINARY_EXT:
+            continue
+        if p.name == "validate.py" and p.parent.name == "tools":
+            continue            # this file defines the patterns; don't self-match
+        try:
+            text = p.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        for i, line in enumerate(text.splitlines(), 1):
+            low = line.lower()
+            if any(mark in low for mark in _SECRET_ALLOW):
+                continue
+            for label, rx in _SECRET_PATTERNS:
+                if rx.search(line):
+                    v.append(Violation("R11-no-secrets", f"{ctx.rel(p)}:{i}",
+                                       f"possible {label} committed — move it to a "
+                                       "git-ignored .env"))
+                    break
     return v
 
 
