@@ -9,13 +9,13 @@ back into the spec — **each loop lowers the defect rate**.
 
 ## Two memories
 
-- **Library (RAG)** — *what good practice says*. `conductor library "<question>"`
+- **Library (RAG)** — *what good practice says*. `cdt library "<question>"`
   retrieves passages from the reference books. Make queries **project-aware**
   using the stack in `.cdt/stack/` (e.g. add the project's framework). Do not
   invent sources; if the library does not cover it, say so.
 - **Diary (Honcho)** — *what this project already decided and learned*.
-  `conductor journal recall "<question>"` retrieves prior context;
-  `conductor journal add --gate <N> --kind <kind> "<text>"` records it
+  `cdt journal recall "<question>"` retrieves prior context;
+  `cdt journal add --gate <N> --kind <kind> "<text>"` records it
   (kinds: reasoning | decision | plan | error | solution).
 
 ## Gate protocol — MANDATORY at every gate
@@ -23,9 +23,9 @@ back into the spec — **each loop lowers the defect rate**.
 Grounding, delegation, recording, and the user checkpoint are **not optional**.
 For each gate, in order, you MUST:
 
-1. **Recall** — `conductor journal recall "<the gate's question>"` to load what
+1. **Recall** — `cdt journal recall "<the gate's question>"` to load what
    this project already decided/attempted. Don't repeat past mistakes.
-2. **Ground** — `conductor library "<project-aware question>"` and **cite the
+2. **Ground** — `cdt library "<project-aware question>"` and **cite the
    book(s)** for each non-trivial claim or decision. An assertion with no library
    citation (or an explicit "the library does not cover this") **fails the gate**.
 3. **Delegate** — hand the gate's substantive work to its roles **via the Task
@@ -33,7 +33,7 @@ For each gate, in order, you MUST:
    a `model` (opus/sonnet/haiku); invoking it as a subagent runs it on **that
    tier**, overriding the session default. Reasoning inline (no subagent) skips
    the model routing and is not allowed for substantive gate work.
-4. **Record** — `conductor journal add --gate <N> --kind decision "<decision>"`
+4. **Record** — `cdt journal add --gate <N> --kind decision "<decision>"`
    for every key decision (and `--kind error|solution` for problems hit/fixed)
    **before the checkpoint**.
 5. **Halt — user checkpoint.** Present a short gate summary: the decisions made,

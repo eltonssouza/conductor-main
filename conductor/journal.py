@@ -125,7 +125,7 @@ def cmd_ingest(root: Path, config: dict, args) -> int:
     """
     mem = memory_dir(root)
     if not mem.is_dir():
-        print(f"No memory tree at {mem} — run `conductor cdt init` first.",
+        print(f"No memory tree at {mem} — run `cdt init` first.",
               file=sys.stderr)
         return 2
     manifest = _load_manifest(root)

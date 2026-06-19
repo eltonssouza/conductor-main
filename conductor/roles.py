@@ -1,7 +1,7 @@
 """The 36-role registry: each role's matching skill, area, and the project types
 it is selected for.
 
-`conductor cdt init` uses this to pick a relevant subset of roles for a project
+`cdt init` uses this to pick a relevant subset of roles for a project
 and to resolve each role to its Agent template (`templates/agents/<role>.md`) and
 Skill template (`templates/skills/<skill>/SKILL.md`).
 """

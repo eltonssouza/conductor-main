@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""`conductor viewer` — a 3D map of the library embeddings, filtered by profile.
+"""`cdt viewer` — a 3D map of the library embeddings, filtered by profile.
 
 Serves a small local web app (stdlib http.server, no web framework) that:
   - lists the "profiles" (category + source) stored in ChromaDB metadata;
@@ -7,11 +7,11 @@ Serves a small local web app (stdlib http.server, no web framework) that:
   - reduces them to 3D with PCA (scikit-learn, already pulled by the rag extra);
   - renders an interactive Plotly 3D scatter, colored by category.
 
-  conductor viewer                 # http://localhost:8765, opens the browser
-  conductor viewer --port 9000 --no-browser
+  cdt viewer                 # http://localhost:8765, opens the browser
+  cdt viewer --port 9000 --no-browser
 
 Needs the rag extra (chromadb + scikit-learn + numpy) and a running Chroma
-(`conductor up`). Read-only against the index.
+(`cdt up`). Read-only against the index.
 """
 from __future__ import annotations
 
@@ -374,7 +374,7 @@ def _make_handler():
 
 
 def main(argv: list) -> int:
-    ap = argparse.ArgumentParser(prog="conductor viewer",
+    ap = argparse.ArgumentParser(prog="cdt viewer",
                                  description="3D map of the library embeddings.")
     ap.add_argument("--port", type=int, default=DEFAULT_PORT)
     ap.add_argument("--no-browser", action="store_true")

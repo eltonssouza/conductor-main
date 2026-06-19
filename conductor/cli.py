@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
-"""`conductor` — the global CLI entry point.
+"""`cdt` — the global CLI entry point (`conductor` is a kept alias).
 
 Subcommands:
-  conductor cdt init [path]              scaffold .claude/ + .cdt/ + CLAUDE.md
-  conductor library "<question>"         RAG search over the reference books
-  conductor journal add|recall|log ...   per-project development diary
-  conductor up | down                    start/stop the Docker RAG stack (GPU auto)
-  conductor ingest                       (re)build the index
+  cdt init [path]                  scaffold .claude/ + .cdt/ + CLAUDE.md
+  cdt library "<question>"         RAG search over the reference books
+  cdt journal add|recall|log ...   per-project development diary
+  cdt up | down                    start/stop the Docker RAG stack (GPU auto)
+  cdt ingest                       (re)build the index
 
-`cdt` is an alias for `conductor` (e.g. `cdt init`).
+Both `cdt` and `conductor` invoke this; `cdt` is canonical in the docs.
 """
 from __future__ import annotations
 
 import sys
 from typing import List, Optional
 
-USAGE = """conductor <command> [args]
+USAGE = """cdt <command> [args]   (alias: conductor)
 
 Commands:
   cdt init [path]            Enroll a project: generate .claude/ (agents+skills),
@@ -34,7 +34,7 @@ Commands:
   honcho up | down           Start / stop the Honcho diary backend (Docker).
   update [--reinstall]       Pull the latest source (editable/source install).
 
-Run `conductor <command> --help` for command options.
+Run `cdt <command> --help` for command options.
 """
 
 
@@ -51,7 +51,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         if rest and rest[0] in ("init", "sync"):
             from .scaffold import main as scaffold_main
             return scaffold_main(rest)
-        print("usage: conductor cdt init|sync [path]", file=sys.stderr)
+        print("usage: cdt init|sync [path]", file=sys.stderr)
         return 2
     if cmd in ("init", "sync"):
         from .scaffold import main as scaffold_main
@@ -88,7 +88,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         if rest and rest[0] in ("up", "down"):
             from .honcho_stack import main as honcho_stack_main
             return honcho_stack_main(rest)
-        print("usage: conductor honcho setup|up|down", file=sys.stderr)
+        print("usage: cdt honcho setup|up|down", file=sys.stderr)
         return 2
 
     if cmd == "update":
