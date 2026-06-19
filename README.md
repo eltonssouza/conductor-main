@@ -15,8 +15,8 @@ memories ground every decision:
 
 | Memory | What it knows | Backed by |
 |--------|---------------|-----------|
-| **Library (RAG)** | what good engineering practice says — a static corpus of reference books | `conductor library` → bge-m3 + ChromaDB (Docker) |
-| **Diary (Honcho)** | what *this* project decided and learned over time | `conductor journal` → Honcho (Docker) + a local JSONL mirror |
+| **Library (RAG)** | what good engineering practice says — a static corpus of reference books | `cdt library` → bge-m3 + ChromaDB (Docker) |
+| **Diary (Honcho)** | what *this* project decided and learned over time | `cdt journal` → Honcho (Docker) + a local JSONL mirror |
 
 ---
 
@@ -26,12 +26,12 @@ memories ground every decision:
 2. [Requirements](#requirements)
 3. [Installation](#installation)
 4. [The Docker backends](#the-docker-backends)
-   - [RAG stack — `conductor up`](#rag-stack--conductor-up)
-   - [Diary backend (Honcho) — `conductor honcho up`](#diary-backend-honcho--conductor-honcho-up)
+   - [RAG stack — `cdt up`](#rag-stack--conductor-up)
+   - [Diary backend (Honcho) — `cdt honcho up`](#diary-backend-honcho--conductor-honcho-up)
    - [Where to put the DeepSeek API key](#where-to-put-the-deepseek-api-key)
 5. [Using Conductor in a project](#using-conductor-in-a-project)
-   - [`conductor cdt init`](#conductor-cdt-init)
-   - [`conductor cdt sync` — the living CLAUDE.md](#conductor-cdt-sync--the-living-claudemd)
+   - [`cdt init`](#conductor-cdt-init)
+   - [`cdt sync` — the living CLAUDE.md](#conductor-cdt-sync--the-living-claudemd)
 6. [The 11-gate flow](#the-11-gate-flow)
 7. [The library (Chroma) — grounding answers](#the-library-chroma--grounding-answers)
 8. [The 3D viewer & screen ingest](#the-3d-viewer--screen-ingest)
@@ -52,7 +52,7 @@ memories ground every decision:
                 │  conductor  (global CLI, installed with pipx/pip)    │
                 └─────────────────────────────────────────────────────┘
                       │                    │                    │
-        conductor cdt init        conductor library    conductor journal
+        cdt init        cdt library    cdt journal
                       │                    │                    │
                       ▼                    ▼                    ▼
         Generates into the          Queries the RAG      Records / recalls
@@ -89,7 +89,7 @@ facilitation), so Claude Code runs each role on a right-sized model.
   local model gives weaker results. See
   [Where to put the DeepSeek API key](#where-to-put-the-deepseek-api-key).
 - **The reference-book corpus** as `to-brain.7z` — the archive of markdown books
-  the RAG indexes. Place it where `conductor up` can find it (see the RAG stack
+  the RAG indexes. Place it where `cdt up` can find it (see the RAG stack
   section). It is never committed to git.
 
 ---
@@ -111,8 +111,8 @@ clone is needed to run them):
 git clone https://github.com/eltonssouza/conductor-main.git
 cd conductor-main
 pipx install --editable .       # or: pip install -e .
-pip install -e .[rag]           # ChromaDB client + scikit-learn/numpy, for `conductor library` and `conductor viewer`
-pip install -e .[honcho]        # Honcho SDK, for `conductor journal` recall
+pip install -e .[rag]           # ChromaDB client + scikit-learn/numpy, for `cdt library` and `cdt viewer`
+pip install -e .[honcho]        # Honcho SDK, for `cdt journal` recall
 ```
 
 This gives you the `conductor` command (and a `cdt` alias). Verify:
@@ -127,7 +127,7 @@ conductor --help
 
 Conductor's two long-term memories run in Docker. Each is a single command.
 
-### RAG stack — `conductor up`
+### RAG stack — `cdt up`
 
 Builds and starts the library RAG: **Ollama** (serving the `bge-m3` embedding
 model), **ChromaDB** (the vector store), and a one-shot **conductor** service that
@@ -136,13 +136,13 @@ extracts the books, pulls the model, and ingests everything.
 ```bash
 # Put the books archive where the launcher can find it: either as
 # infra/conductor/to-brain.7z, at the repo root, or pointed to by CONDUCTOR_ARCHIVE.
-conductor up                    # attached (watch the progress)
-conductor up -d                 # detached  (then: docker compose logs -f conductor)
-conductor down                  # stop the stack
-conductor ingest                # re-run the ingest only (idempotent)
+cdt up                    # attached (watch the progress)
+cdt up -d                 # detached  (then: docker compose logs -f conductor)
+cdt down                  # stop the stack
+cdt ingest                # re-run the ingest only (idempotent)
 ```
 
-`conductor up` automatically:
+`cdt up` automatically:
 
 - **detects an NVIDIA GPU** + Docker's NVIDIA runtime and enables the GPU for
   Ollama (≈0.5 s per embed); otherwise it prints that it is running on CPU;
@@ -165,30 +165,30 @@ it finishes, the `conductor` service exits; **Ollama and ChromaDB keep running**
 serve queries. ChromaDB is exposed on `localhost:8001`, Ollama on `localhost:11434`
 (both bound to localhost only).
 
-### Diary backend (Honcho) — `conductor honcho up`
+### Diary backend (Honcho) — `cdt honcho up`
 
 [Honcho](https://honcho.dev) is the long-term memory behind the diary: it stores
-the journal messages and reasons over them in the background, so `conductor journal
+the journal messages and reasons over them in the background, so `cdt journal
 recall` answers by *meaning*, not keywords. The diary's local JSONL mirror works
 without Honcho, so this backend is **optional** — it adds intelligent recall on top.
 
 ```bash
 pip install -e .[honcho]                       # the Honcho SDK
-conductor honcho setup --provider deepseek     # writes the .env (key auto-read, see below)
-conductor honcho up                            # clone + build + start (one command)
-conductor honcho down                          # stop
+cdt honcho setup --provider deepseek     # writes the .env (key auto-read, see below)
+cdt honcho up                            # clone + build + start (one command)
+cdt honcho down                          # stop
 ```
 
-`conductor honcho up` does everything the stack needs automatically — it clones
+`cdt honcho up` does everything the stack needs automatically — it clones
 Honcho if missing, fixes the Windows CRLF line endings that break the container
 entrypoint, builds from the local clone, brings the stack up (api + deriver +
 Postgres/pgvector + Redis), and — on a fresh database — reconfigures the vector
 dimension to 1024 for the local `bge-m3` embeddings.
 
-> **Note:** run `conductor up` as well. Honcho embeds its messages using the same
+> **Note:** run `cdt up` as well. Honcho embeds its messages using the same
 > local `bge-m3` that the RAG stack's Ollama serves.
 
-**Reasoning vs. embeddings.** `conductor honcho setup` ships presets for
+**Reasoning vs. embeddings.** `cdt honcho setup` ships presets for
 `openai | deepseek | openrouter | ollama | anthropic`. Because DeepSeek (and
 Anthropic / OpenRouter) have no compatible embeddings API, Conductor uses a
 **hybrid** by default:
@@ -205,12 +205,12 @@ Create the file **`C:\honcho\deep-seek-key.txt`** containing a line in this form
 API-KEY-DEEP_SEEK: "sk-your-deepseek-key"
 ```
 
-When you run `conductor honcho setup --provider deepseek` **without** `--api-key`,
+When you run `cdt honcho setup --provider deepseek` **without** `--api-key`,
 Conductor reads the key from that file and writes it into the (gitignored) Honcho
 `.env`. The key is never passed on the command line or printed.
 
 - Override the path with the environment variable `CONDUCTOR_DEEPSEEK_KEY_FILE`.
-- You can still pass the key explicitly: `conductor honcho setup --provider
+- You can still pass the key explicitly: `cdt honcho setup --provider
   deepseek --api-key sk-...`.
 - Get a key at <https://platform.deepseek.com/>.
 
@@ -218,24 +218,24 @@ To use the **fully local, key-free** option instead:
 
 ```bash
 docker exec conductor-ollama-1 ollama pull qwen2.5:3b   # a tools-capable chat model
-conductor honcho setup --provider ollama --model qwen2.5:3b
-conductor honcho up
+cdt honcho setup --provider ollama --model qwen2.5:3b
+cdt honcho up
 ```
 
 ---
 
 ## Using Conductor in a project
 
-### `conductor cdt init`
+### `cdt init`
 
 Run it inside the project you want to conduct:
 
 ```bash
 cd /path/to/your-project
-conductor cdt init                       # detect type + stack, scaffold everything
-conductor cdt init --all                 # scaffold all 36 roles (default: a relevant subset)
-conductor cdt init --roles backend-engineer,security-engineer,quality-assurance
-conductor cdt init --type backend --force   # force the type / re-initialize
+cdt init                       # detect type + stack, scaffold everything
+cdt init --all                 # scaffold all 36 roles (default: a relevant subset)
+cdt init --roles backend-engineer,security-engineer,quality-assurance
+cdt init --type backend --force   # force the type / re-initialize
 ```
 
 It detects the project type from its manifests (Angular/React/Vue/Next,
@@ -265,20 +265,20 @@ After initializing, open the project in Claude Code. `CLAUDE.md` becomes the
 project's context and instructs Claude to conduct work through the gates while
 grounding decisions in the two memories.
 
-### `conductor cdt sync` — the living CLAUDE.md
+### `cdt sync` — the living CLAUDE.md
 
 The generated `CLAUDE.md` is a **living, standardized document**. A managed region
 (delimited by `<!-- conductor:managed:start --> … <!-- conductor:managed:end -->`)
 is owned by Conductor; anything you write **below the end marker is preserved**.
 
 ```bash
-conductor cdt sync               # re-detect the stack, refresh the roles, pull diary memory
+cdt sync               # re-detect the stack, refresh the roles, pull diary memory
 ```
 
 `sync` regenerates only the managed region: it re-detects the stack, re-selects the
 role subset (if the project type changed), and pulls the most recent diary
 decisions into a "Project memory" block. Recording a journal entry
-(`conductor journal add`) also refreshes that block automatically, so the file
+(`cdt journal add`) also refreshes that block automatically, so the file
 stays current as the project evolves.
 
 ---
@@ -306,11 +306,11 @@ until the gate's exit criterion is met.
 **Mandatory gate protocol.** At every gate the flow requires four steps before
 advancing — they are part of the exit criterion, not optional suggestions:
 
-1. **Recall** prior context — `conductor journal recall "<the gate's question>"`.
-2. **Ground** claims in the library — `conductor library "<question>"` and **cite
+1. **Recall** prior context — `cdt journal recall "<the gate's question>"`.
+2. **Ground** claims in the library — `cdt library "<question>"` and **cite
    the book** for each non-trivial decision.
 3. **Decide** as the gate's roles, using the retrieved evidence.
-4. **Record** key decisions/errors/solutions — `conductor journal add --gate N
+4. **Record** key decisions/errors/solutions — `cdt journal add --gate N
    --kind decision "…"`.
 
 This closes the loop: Gate 11's learnings flow back into Gate 2 on the next cycle,
@@ -326,30 +326,30 @@ decisions in real sources instead of relying on the model's memory (this fights
 hallucination).
 
 ```bash
-conductor library "STRIDE threat model"
-conductor library -k 8 --json "circuit breaker vs bulkhead"
-conductor library --category 09_seguranca_e_privacidade "data minimization"
+cdt library "STRIDE threat model"
+cdt library -k 8 --json "circuit breaker vs bulkhead"
+cdt library --category 09_seguranca_e_privacidade "data minimization"
 ```
 
 How it works: the question is embedded by **bge-m3** (served by Ollama on the GPU),
 then matched against the **ChromaDB** vector index of the corpus; the top-k passages
-are returned with their source book and a similarity score. `conductor library`
+are returned with their source book and a similarity score. `cdt library`
 talks to the dockerized ChromaDB on `localhost:8001` by default (no environment
-setup needed once `conductor up` is running).
+setup needed once `cdt up` is running).
 
 **When do the agents use it?** On demand, at each gate, whenever a role needs to
 ground a decision — the mandatory gate protocol requires a library citation for
 every non-trivial claim. Queries are made *project-aware* using the detected stack
 in `.cdt/stack/<TYPE>.md` (e.g. a frontend project turns "component architecture"
 into "component architecture in Angular"). The agents do not query Chroma
-autonomously in the background; Claude runs `conductor library` as instructed by
+autonomously in the background; Claude runs `cdt library` as instructed by
 `CLAUDE.md`.
 
-To (re)build the index, run `conductor up` (or `conductor ingest`); it indexes the
+To (re)build the index, run `cdt up` (or `cdt ingest`); it indexes the
 markdown books from `to-brain.7z` — roughly 60k chunks for the default corpus.
 Ingest is **incremental**: each chunk stores a content hash, so a re-run skips
 everything that is unchanged and only re-embeds new or edited chunks (embedding is
-the slow step). Use `conductor ingest --force` to re-embed the whole corpus and
+the slow step). Use `cdt ingest --force` to re-embed the whole corpus and
 `--quiet` to silence the per-batch telemetry. Embedding (Ollama) and the ChromaDB
 upsert run pipelined on separate threads, so the database write of one batch
 overlaps the embedding of the next.
@@ -358,17 +358,17 @@ overlaps the embedding of the next.
 
 ## The 3D viewer & screen ingest
 
-`conductor viewer` opens a small local web app (standard-library HTTP server, no
+`cdt viewer` opens a small local web app (standard-library HTTP server, no
 web framework) that **visualizes the library embeddings in 3D** and lets you
 **ingest a markdown file from the browser**.
 
 ```bash
-conductor viewer                 # http://localhost:8765, opens the browser
-conductor viewer --port 9000 --no-browser
+cdt viewer                 # http://localhost:8765, opens the browser
+cdt viewer --port 9000 --no-browser
 ```
 
 It needs the `rag` extra (`pip install -e .[rag]`, which also pulls `scikit-learn`
-and `numpy`) and a running ChromaDB (`conductor up`). It is read-only against the
+and `numpy`) and a running ChromaDB (`cdt up`). It is read-only against the
 index except through the ingest screen.
 
 **3D map.** The viewer fetches the 1024-dimensional `bge-m3` embeddings for a
@@ -405,14 +405,14 @@ best-effort synced to **Honcho**, which reasons over the history in the backgrou
 
 ```bash
 # Record (kinds: reasoning | decision | plan | error | solution)
-conductor journal add --gate 4 --kind decision "chose hexagonal architecture; ADR-001"
-conductor journal add --owner --kind plan "MVP first; auth in phase 2"   # attribute to you
+cdt journal add --gate 4 --kind decision "chose hexagonal architecture; ADR-001"
+cdt journal add --owner --kind plan "MVP first; auth in phase 2"   # attribute to you
 
 # Recall by meaning, then act on it
-conductor journal recall "why did we choose this architecture?"
+cdt journal recall "why did we choose this architecture?"
 
 # Dump the local mirror
-conductor journal log
+cdt journal log
 ```
 
 With the Honcho backend running, `recall` returns a **reasoned answer** synthesized
@@ -427,15 +427,15 @@ recording an entry also refreshes the "Project memory" block in `CLAUDE.md`.
 
 | Command | What it does |
 |---------|--------------|
-| `conductor cdt init [path]` | Enroll a project: generate `.claude/` (a relevant role subset), `.cdt/` (stack, diary), and `CLAUDE.md`. Flags: `--all`, `--roles a,b`, `--type T`, `--force`. |
-| `conductor cdt sync [path]` | Refresh the managed region of `CLAUDE.md` (re-detect stack, roles, pull diary memory). |
-| `conductor library "<q>"` | Semantic search over the reference books. Flags: `-k N`, `--json`, `--category C`. |
-| `conductor journal add\|recall\|log` | The per-project development diary. |
-| `conductor up` / `down` | Start / stop the Docker RAG stack (GPU auto-detected). |
-| `conductor ingest` | (Re)build the library index in the running stack. **Incremental** (content-hash skip). Flags: `--force` (re-embed all), `--quiet` (no telemetry), `--batch N`, `--limit N`. |
-| `conductor viewer` | 3D map of the library embeddings (PCA), filtered by profile; includes a screen to ingest a `.md` file formatted to the library convention. Flags: `--port`, `--no-browser`. |
-| `conductor honcho setup` | Choose the Honcho reasoning provider and write its `.env`. |
-| `conductor honcho up` / `down` | Start / stop the Honcho diary backend (clone + build + health automated). |
+| `cdt init [path]` | Enroll a project: generate `.claude/` (a relevant role subset), `.cdt/` (stack, diary), and `CLAUDE.md`. Flags: `--all`, `--roles a,b`, `--type T`, `--force`. |
+| `cdt sync [path]` | Refresh the managed region of `CLAUDE.md` (re-detect stack, roles, pull diary memory). |
+| `cdt library "<q>"` | Semantic search over the reference books. Flags: `-k N`, `--json`, `--category C`. |
+| `cdt journal add\|recall\|log` | The per-project development diary. |
+| `cdt up` / `down` | Start / stop the Docker RAG stack (GPU auto-detected). |
+| `cdt ingest` | (Re)build the library index in the running stack. **Incremental** (content-hash skip). Flags: `--force` (re-embed all), `--quiet` (no telemetry), `--batch N`, `--limit N`. |
+| `cdt viewer` | 3D map of the library embeddings (PCA), filtered by profile; includes a screen to ingest a `.md` file formatted to the library convention. Flags: `--port`, `--no-browser`. |
+| `cdt honcho setup` | Choose the Honcho reasoning provider and write its `.env`. |
+| `cdt honcho up` / `down` | Start / stop the Honcho diary backend (clone + build + health automated). |
 
 `cdt` is an alias for `conductor` (e.g. `cdt init`, `cdt sync`).
 
@@ -445,9 +445,9 @@ recording an entry also refreshes the "Project memory" block in `CLAUDE.md`.
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `CONDUCTOR_ARCHIVE` | `./to-brain.7z` (cwd / repo root) | path to the books archive used by `conductor up` |
+| `CONDUCTOR_ARCHIVE` | `./to-brain.7z` (cwd / repo root) | path to the books archive used by `cdt up` |
 | `CONDUCTOR_LIBRARY` | `/data/library` (in container) | corpus markdown root |
-| `CONDUCTOR_CHROMA_HTTP` | `localhost:8001` | ChromaDB endpoint used by `conductor library` |
+| `CONDUCTOR_CHROMA_HTTP` | `localhost:8001` | ChromaDB endpoint used by `cdt library` |
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama endpoint (bge-m3) |
 | `CONDUCTOR_EMBED_MODEL` | `bge-m3` | embedding model |
 | `CONDUCTOR_HNSW_M` / `_CONSTRUCTION_EF` / `_SEARCH_EF` | `32` / `200` / `128` | HNSW index tuning |
@@ -490,15 +490,15 @@ template registry plus the 11-gate flow, and valid `model:` tiers. It runs in CI
 
 ## Troubleshooting
 
-- **`conductor library` says "Search failed"** — the RAG stack is not running or
-  the index is empty. Run `conductor up` and check `docker compose ps`.
+- **`cdt library` says "Search failed"** — the RAG stack is not running or
+  the index is empty. Run `cdt up` and check `docker compose ps`.
 - **First ingest is extremely slow** — it is running on CPU. Install the NVIDIA
-  Container Toolkit so `conductor up` can enable the GPU (it auto-detects it).
-- **`conductor up` cannot find the Docker files** — the Docker stack is built from
+  Container Toolkit so `cdt up` can enable the GPU (it auto-detects it).
+- **`cdt up` cannot find the Docker files** — the Docker stack is built from
   source, so run it from a clone of this repository (the CLI itself works anywhere).
 - **Honcho `recall` returns the local fallback only** — the Honcho backend is not
   up, or the SDK is not installed. Run `pip install -e .[honcho]` and
-  `conductor honcho up`. `conductor honcho up` already handles the known Honcho
+  `cdt honcho up`. `cdt honcho up` already handles the known Honcho
   self-host issues automatically (Windows CRLF entrypoints, the git-URL build
   context, the 1536→1024 vector-dimension mismatch, and internal-only DB/Redis
   ports).

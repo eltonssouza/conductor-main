@@ -335,8 +335,8 @@ def check_memory_routing(ctx: Context) -> List[Violation]:
 # --- R10: /cdt flow driver command -------------------------------------------
 
 DRIVER = TEMPLATES / "commands" / "cdt.md"
-DRIVER_ANCHORS = ("AskUserQuestion", "Task tool", "conductor library",
-                  "conductor journal", "HALT")
+DRIVER_ANCHORS = ("AskUserQuestion", "Task tool", "cdt library",
+                  "cdt journal", "HALT")
 
 
 @rule("R10-flow-driver", "/cdt driver command exists and enforces RAG + delegation + checkpoint")

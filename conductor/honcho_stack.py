@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""`conductor honcho up|down` — run the self-hosted Honcho diary backend.
+"""`cdt honcho up|down` — run the self-hosted Honcho diary backend.
 
 Codifies the steps the Honcho stack needs (the git-URL build context fails on
 Docker Desktop/Windows, Windows clones give the shell scripts CRLF endings, and
@@ -10,7 +10,7 @@ a fresh DB needs its vector dimension reconfigured for local bge-m3 embeddings):
          configure_embeddings once and bring it up again.
   down — stop the stack.
 
-Run `conductor honcho-setup` first to write the .env, and `conductor up` so the
+Run `cdt honcho-setup` first to write the .env, and `cdt up` so the
 local bge-m3 (used for Honcho's embeddings) is reachable.
 """
 from __future__ import annotations
@@ -108,11 +108,11 @@ def main(argv: list) -> int:
     if cmd == "down":
         return _compose(src, "down")
     if cmd != "up":
-        print("usage: conductor honcho up|down", file=sys.stderr)
+        print("usage: cdt honcho up|down", file=sys.stderr)
         return 2
 
     if not (INFRA / ".env").is_file():
-        print("No .env yet — run `conductor honcho-setup` first.", file=sys.stderr)
+        print("No .env yet — run `cdt honcho-setup` first.", file=sys.stderr)
         return 2
     if not _ensure_clone(src):
         return 1
@@ -127,8 +127,8 @@ def main(argv: list) -> int:
 
     print(f"Honcho api: {health}")
     if health == "healthy":
-        print("Honcho ready — `conductor journal recall` now uses dialectic.")
-        print("(Ensure `conductor up` is running: Honcho embeds via the local bge-m3.)")
+        print("Honcho ready — `cdt journal recall` now uses dialectic.")
+        print("(Ensure `cdt up` is running: Honcho embeds via the local bge-m3.)")
         return 0
     print("Honcho not healthy — inspect `docker logs honcho-api-1`.", file=sys.stderr)
     return 1

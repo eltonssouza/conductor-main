@@ -8,16 +8,16 @@ Responda SEMPRE em pt-BR (português do Brasil), independentemente do idioma da 
 
 ## Project Identity
 
-- **Type:** global **CLI** (`conductor`, alias `cdt`), distributed via pipx/pip.
+- **Type:** global **CLI** (`cdt`, alias `conductor`), distributed via pipx/pip.
   NOT a Claude Code plugin (that model was dropped).
-- **What it does:** `conductor cdt init` analyzes a project and scaffolds
+- **What it does:** `cdt init` analyzes a project and scaffolds
   Claude-Code-native config into it — a relevant subset of 36 role Agents +
   Skills under `.claude/`, the detected stack under `.cdt/`, and a generated
   `CLAUDE.md` (roles + the 11-gate flow + how to use the CLI). The reasoning
   happens in the user's Claude, not inside Conductor.
-- **Two memories:** `conductor library` (RAG over reference books — bge-m3 +
-  ChromaDB) and `conductor journal` (per-project diary — Honcho + local JSONL
-  mirror). Backends run in Docker (`infra/`); `conductor up` starts them.
+- **Two memories:** `cdt library` (RAG over reference books — bge-m3 +
+  ChromaDB) and `cdt journal` (per-project diary — Honcho + local JSONL
+  mirror). Backends run in Docker (`infra/`); `cdt up` starts them.
 - **Core is pure stdlib;** `chromadb`/`honcho-ai` are optional extras
   (`[rag]`, `[honcho]`).
 

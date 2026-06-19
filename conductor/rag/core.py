@@ -35,7 +35,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 LIBRARY_DIR = Path(os.environ.get("CONDUCTOR_LIBRARY", r"C:\development\to-brain"))
 CHROMA_DIR = Path(os.environ.get("CONDUCTOR_CHROMA", str(REPO_ROOT / "rag" / "chroma")))
 # Resident Chroma server ("host:port"). Defaults to the dockerized stack
-# (`conductor up` exposes ChromaDB on localhost:8001), so `conductor library`
+# (`cdt up` exposes ChromaDB on localhost:8001), so `cdt library`
 # works with no env setup. The in-container bootstrap overrides this with
 # `chroma:8000`. Set to empty to use a local persistent index instead.
 CHROMA_HTTP = os.environ.get("CONDUCTOR_CHROMA_HTTP", "localhost:8001").strip()

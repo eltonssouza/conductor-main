@@ -2,7 +2,7 @@
 
 [Honcho](https://honcho.dev) is the long-term memory behind Conductor's
 `journal` diary. It stores the diary messages and reasons over them in the
-background (peer modeling + dialectic), so `conductor journal recall` answers by
+background (peer modeling + dialectic), so `cdt journal recall` answers by
 meaning. The diary's local JSONL mirror works without it, so Honcho is
 **optional** — it adds intelligent recall on top.
 
@@ -10,22 +10,22 @@ meaning. The diary's local JSONL mirror works without it, so Honcho is
 
 ```bash
 pip install -e .[honcho]                       # SDK
-conductor honcho setup --provider deepseek     # key auto-read (see below); or --api-key sk-...
-conductor honcho up                            # clone + build + start
+cdt honcho setup --provider deepseek     # key auto-read (see below); or --api-key sk-...
+cdt honcho up                            # clone + build + start
 ```
 
 For DeepSeek, the key is read from `C:\honcho\deep-seek-key.txt` (line
 `API-KEY-DEEP_SEEK: "sk-..."`) when `--api-key` is omitted; override the path
 with `CONDUCTOR_DEEPSEEK_KEY_FILE`.
 
-`conductor honcho up` does everything the stack needs automatically: clones
+`cdt honcho up` does everything the stack needs automatically: clones
 Honcho if missing, strips the Windows CRLF endings that break the entrypoint,
 builds from the local clone (the git-URL build context fails on Docker Desktop),
 brings the stack up, and — on the first run — reconfigures the DB vector
 dimension to 1024 (for the local bge-m3 embeddings) when it detects the
-mismatch. `conductor honcho down` stops it.
+mismatch. `cdt honcho down` stops it.
 
-> Run `conductor up` too: Honcho embeds messages via the local bge-m3, which the
+> Run `cdt up` too: Honcho embeds messages via the local bge-m3, which the
 > RAG stack's Ollama serves.
 
 Manual equivalent (if you prefer): `git clone` Honcho, `HONCHO_SRC=... docker
@@ -35,13 +35,13 @@ if the api reports a dimension mismatch.
 Then the diary syncs + recalls by meaning:
 
 ```bash
-conductor journal add --gate 4 --kind decision "chose hexagonal arch; ADR-1"
-conductor journal recall "why this architecture?"
+cdt journal add --gate 4 --kind decision "chose hexagonal arch; ADR-1"
+cdt journal recall "why this architecture?"
 ```
 
 ## Reasoning engine — your choice (recommended: DeepSeek)
 
-`conductor honcho-setup` writes the full config Honcho needs:
+`cdt honcho-setup` writes the full config Honcho needs:
 
 - **Reasoning** (deriver + dialectic + summary): the chosen provider's model.
   The dialectic uses per-level configs (`DIALECTIC_LEVELS__<level>__MODEL_CONFIG`),
@@ -72,4 +72,4 @@ Postgres/Redis on 5432/6379.
 - Windows clones may give the Honcho shell scripts CRLF endings, which break the
   container entrypoint (`set: Illegal option`). Strip them:
   `find <clone> -name '*.sh' -exec sed -i 's/\r$//' {} +`.
-- `conductor honcho-setup` writes the `.env` here (gitignored). Never commit it.
+- `cdt honcho-setup` writes the `.env` here (gitignored). Never commit it.

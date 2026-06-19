@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Semantic search over the library. Embeds the question and returns the top-k passages.
 
-  conductor library "how to define bounded context boundaries?"
-  conductor library -k 8 --json "circuit breaker vs bulkhead"
-  conductor library --category 09_seguranca_e_privacidade "STRIDE"
+  cdt library "how to define bounded context boundaries?"
+  cdt library -k 8 --json "circuit breaker vs bulkhead"
+  cdt library --category 09_seguranca_e_privacidade "STRIDE"
 """
 from __future__ import annotations
 
@@ -83,7 +83,7 @@ def cmd_reindex(argv: List[str]) -> int:
 def cmd_add(argv: List[str]) -> int:
     """Index one or more .md files already on disk under the library dir."""
     force_utf8()
-    ap = argparse.ArgumentParser(prog="conductor library add",
+    ap = argparse.ArgumentParser(prog="cdt library add",
                                  description="Index specific .md files into ChromaDB.")
     ap.add_argument("files", nargs="+", help="path(s) to .md file(s) under the library")
     args = ap.parse_args(argv)

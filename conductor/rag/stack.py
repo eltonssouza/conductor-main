@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""`conductor up|down` — launch the RAG stack, auto-detecting the GPU.
+"""`cdt up|down` — launch the RAG stack, auto-detecting the GPU.
 
 Conductor identifies an NVIDIA GPU and Docker's NVIDIA runtime; when both are
 present it adds the GPU compose override so Ollama runs bge-m3 on the GPU
@@ -9,9 +9,9 @@ It also auto-locates the books archive (cwd or CONDUCTOR_ARCHIVE).
 The Docker infra ships inside the package; the `conductor` image is built from
 the local source, so the Docker stack needs a repo clone (the CLI itself does not).
 
-  conductor up            # attached (watch progress)
-  conductor up -d         # detached
-  conductor down          # stop the stack
+  cdt up            # attached (watch progress)
+  cdt up -d         # detached
+  cdt down          # stop the stack
 """
 from __future__ import annotations
 

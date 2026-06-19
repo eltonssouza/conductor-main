@@ -18,23 +18,23 @@ defined in `CLAUDE.md` (section "The Conductor flow"). This command is
 
 ## For each applicable gate, in order
 
-1. **Recall** — `conductor journal recall "<the gate's question>"` to load what
+1. **Recall** — `cdt journal recall "<the gate's question>"` to load what
    this project already decided/attempted.
-2. **Ground (RAG)** — `conductor library --gate <N> "<project-aware question>"`
+2. **Ground (RAG)** — `cdt library --gate <N> "<project-aware question>"`
    and **cite the book(s)**. A non-trivial claim with no citation means the gate
    is not grounded — do not proceed past it.
 3. **Delegate** — invoke the gate's role(s) **via the Task tool (as subagents)**,
    never inline. Each Agent under `.claude/agents/` declares a `model`
    (opus/sonnet/haiku); running it as a subagent honors that tier. Choose the
    roles CLAUDE.md lists for that gate.
-4. **Record** — `conductor journal add --gate <N> --kind decision "<decision>"`
+4. **Record** — `cdt journal add --gate <N> --kind decision "<decision>"`
    for every key decision (`--kind error|solution` for problems hit/fixed).
 5. **HALT — user checkpoint (MANDATORY).** Present a short summary: the
    decisions, the **library citations**, the journal entries written, and the
    open risks. Then call **AskUserQuestion** offering: (a) advance to the next
    gate, (b) revise this gate, or (c) stop. **Do not begin the next gate** until
    the user chooses. Record the choice:
-   `conductor journal add --gate <N> --kind checkpoint "approved -> <next>"`.
+   `cdt journal add --gate <N> --kind checkpoint "approved -> <next>"`.
 
 ## Rules
 

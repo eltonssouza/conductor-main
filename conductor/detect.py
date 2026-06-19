@@ -1,6 +1,6 @@
 """Best-effort project type + technology detection from root manifests.
 
-Used by `conductor cdt init` to pick the role subset and seed the stack file;
+Used by `cdt init` to pick the role subset and seed the stack file;
 the user's Claude finalizes the stack from the real manifests afterwards.
 
 Monorepo-aware: scans the project root plus subdirectories up to two levels

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""`conductor update` — pull the latest source of an editable/source install.
+"""`cdt update` — pull the latest source of an editable/source install.
 
 An editable install (`pip install -e`) imports the package straight from the
 git clone, so `git pull` in that clone updates the CLI live — no reinstall
@@ -8,8 +8,8 @@ needed unless the dependencies in pyproject.toml changed (then `--reinstall`).
 A non-editable install (pip/pipx from a built artifact) has no clone to pull;
 this prints the right upgrade command instead.
 
-  conductor update              # git pull the current branch (ff-only)
-  conductor update --reinstall  # then pip install -e ".[rag,honcho]"
+  cdt update              # git pull the current branch (ff-only)
+  cdt update --reinstall  # then pip install -e ".[rag,honcho]"
 """
 from __future__ import annotations
 
@@ -62,7 +62,7 @@ def main(argv: list) -> int:
             return rc
     else:
         print("Code is live (editable install). If pyproject deps changed, run "
-              "`conductor update --reinstall`.")
+              "`cdt update --reinstall`.")
     print("Done.")
     return 0
 
