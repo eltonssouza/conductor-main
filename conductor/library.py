@@ -72,7 +72,56 @@ def search(question: str, k: int = 5, category: str = "") -> List[dict]:
     return out
 
 
+def cmd_reindex(argv: List[str]) -> int:
+    """Index every library file, skipping unchanged chunks (content-hash dedup).
+    Catches files dropped straight into the library that were never embedded."""
+    force_utf8()
+    from .rag.ingest import main as ingest_main
+    return ingest_main(argv)
+
+
+def cmd_add(argv: List[str]) -> int:
+    """Index one or more .md files already on disk under the library dir."""
+    force_utf8()
+    ap = argparse.ArgumentParser(prog="conductor library add",
+                                 description="Index specific .md files into ChromaDB.")
+    ap.add_argument("files", nargs="+", help="path(s) to .md file(s) under the library")
+    args = ap.parse_args(argv)
+
+    from pathlib import Path
+    from .rag.core import LIBRARY_DIR, chunk_markdown, get_collection
+    from .rag.ingest import _embed_batch, _upsert_pairs
+
+    lib = LIBRARY_DIR.resolve()
+    coll = get_collection(create=True)
+    total = 0
+    for raw in args.files:
+        f = Path(raw).resolve()
+        if not f.is_file():
+            print(f"skip (not found): {raw}", file=sys.stderr)
+            continue
+        try:
+            rel = f.relative_to(lib)
+        except ValueError:
+            print(f"skip (outside library {lib}): {raw}", file=sys.stderr)
+            continue
+        parts = rel.parts
+        category = parts[0] if len(parts) > 1 else "(root)"
+        chunks = chunk_markdown(f.read_text(encoding="utf-8"), source=f.stem,
+                                category=category, path=str(rel).replace("\\", "/"))
+        n = _upsert_pairs(coll, _embed_batch(chunks)) if chunks else 0
+        total += n
+        print(f"indexed {n} chunk(s): {rel}")
+    print(f"Done: {total} chunk(s) upserted. Total in collection: {coll.count()}")
+    return 0
+
+
 def main(argv: List[str]) -> int:
+    if argv and argv[0] == "reindex":
+        return cmd_reindex(argv[1:])
+    if argv and argv[0] == "add":
+        return cmd_add(argv[1:])
+
     ap = argparse.ArgumentParser(description="Semantic search over the Conductor library.")
     ap.add_argument("question", help="question / query")
     ap.add_argument("-k", type=int, default=5, help="number of passages (default 5)")
