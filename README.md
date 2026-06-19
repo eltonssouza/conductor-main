@@ -16,7 +16,13 @@ memories ground every decision:
 | Memory | What it knows | Backed by |
 |--------|---------------|-----------|
 | **Library (RAG)** | what good engineering practice says — a static corpus of reference books | `cdt library` → bge-m3 + ChromaDB (Docker) |
-| **Diary (Honcho)** | what *this* project decided and learned over time | `cdt journal` → Honcho (Docker) + a local JSONL mirror |
+| **Diary (Honcho)** | what *this* project decided and learned over time | `cdt journal` → Honcho (Docker) + a local memory tree |
+
+The work is driven by the **`/cdt` slash command**, an interactive control loop
+that walks a demand through the gates and **stops for your approval at each one**.
+The diary is **live memory**: Claude Code hooks installed by Conductor capture
+your prompts and inject what Honcho remembers back into each new session, so the
+project's memory grows as you work and follows you across sessions.
 
 ---
 
@@ -26,12 +32,12 @@ memories ground every decision:
 2. [Requirements](#requirements)
 3. [Installation](#installation)
 4. [The Docker backends](#the-docker-backends)
-   - [RAG stack — `cdt up`](#rag-stack--conductor-up)
-   - [Diary backend (Honcho) — `cdt honcho up`](#diary-backend-honcho--conductor-honcho-up)
+   - [RAG stack — `cdt up`](#rag-stack--cdt-up)
+   - [Diary backend (Honcho) — `cdt honcho up`](#diary-backend-honcho--cdt-honcho-up)
    - [Where to put the DeepSeek API key](#where-to-put-the-deepseek-api-key)
 5. [Using Conductor in a project](#using-conductor-in-a-project)
-   - [`cdt init`](#conductor-cdt-init)
-   - [`cdt sync` — the living CLAUDE.md](#conductor-cdt-sync--the-living-claudemd)
+   - [`cdt init`](#cdt-init)
+   - [`cdt sync` — the living CLAUDE.md](#cdt-sync--the-living-claudemd)
 6. [The 11-gate flow](#the-11-gate-flow)
 7. [The library (Chroma) — grounding answers](#the-library-chroma--grounding-answers)
 8. [The 3D viewer & screen ingest](#the-3d-viewer--screen-ingest)
@@ -49,7 +55,7 @@ memories ground every decision:
 
 ```
                 ┌─────────────────────────────────────────────────────┐
-                │  conductor  (global CLI, installed with pipx/pip)    │
+                │  cdt  (global CLI, installed with pipx/pip)          │
                 └─────────────────────────────────────────────────────┘
                       │                    │                    │
         cdt init        cdt library    cdt journal
@@ -115,10 +121,10 @@ pip install -e .[rag]           # ChromaDB client + scikit-learn/numpy, for `cdt
 pip install -e .[honcho]        # Honcho SDK, for `cdt journal` recall
 ```
 
-This gives you the `conductor` command (and a `cdt` alias). Verify:
+This gives you the `cdt` command (with `conductor` kept as an alias). Verify:
 
 ```bash
-conductor --help
+cdt --help
 ```
 
 ---
@@ -248,10 +254,18 @@ Maven/Gradle/Go/Python/.NET/Rust, Flutter/React-Native/Xcode…) and generates,
   .claude/
     agents/<role>.md            # a relevant subset of role Agents (Claude Code loads these)
     skills/<skill>/SKILL.md     # the matching Skills
+    commands/cdt.md             # the /cdt flow driver (the interactive gate loop)
+    settings.local.json         # machine-local hooks: Honcho capture + context injection
   .cdt/
     config.json                 # enrollment: slug, type, selected roles, Honcho workspace
     stack/<TYPE>.md             # the detected technologies (steers RAG queries)
-    journal/                    # the local diary mirror (JSONL)
+    memory/                     # the project memory tree:
+      diary/                    #   append-only machine diary (JSONL, local)
+      daily/                    #   human-readable digests generated from the diary
+      docs/                     #   living knowledge (architecture/api/db/ops), ingested into Honcho
+      records/                  #   dated artefacts: bugs, ADRs, discovery, features, gaps
+      refs/                     #   pointers to external systems (Jira/PRD/SQL/images), never ingested
+      _index.md                 #   a live map of what each folder holds
 ```
 
 `.claude/agents` and `.claude/skills` are **project-scoped Claude Code
@@ -303,15 +317,27 @@ until the gate's exit criterion is met.
 | 10 | Observability & operation | SRE, DevOps | SLIs/SLOs instrumented; actionable, symptom-based alerts |
 | 11 | Continuous learning | SRE, Eng Manager, Agile Coach | blameless postmortem; each learning fed back as a new spec/test (loop → Gate 2) |
 
-**Mandatory gate protocol.** At every gate the flow requires four steps before
+**Run it with `/cdt`.** The flow is driven by the **`/cdt <demand>`** slash
+command (installed into `.claude/commands/`). It is the control loop that turns
+the flow from passive guidance into enforced steps — and it is **interactive by
+design**, stopping for your approval at every gate. Driving a demand any other way
+(or pairing `/cdt` with "run autonomously / commit each step") leaves the gates as
+passive text that a normal prompt will bypass.
+
+**Mandatory gate protocol.** At every gate the flow requires five steps before
 advancing — they are part of the exit criterion, not optional suggestions:
 
 1. **Recall** prior context — `cdt journal recall "<the gate's question>"`.
-2. **Ground** claims in the library — `cdt library "<question>"` and **cite
-   the book** for each non-trivial decision.
-3. **Decide** as the gate's roles, using the retrieved evidence.
+2. **Ground** claims in the library — `cdt library --gate N "<question>"` and
+   **cite the book** for each non-trivial decision. A claim with no citation
+   fails the gate.
+3. **Delegate** the work to the gate's roles **via the Task tool (as subagents)**,
+   not inline — so each Agent runs on its declared `model` tier
+   (opus/sonnet/haiku), overriding the session default.
 4. **Record** key decisions/errors/solutions — `cdt journal add --gate N
    --kind decision "…"`.
+5. **Halt** at a user checkpoint — present the decisions, citations, and open
+   risks, then **ask you to approve** before the next gate begins.
 
 This closes the loop: Gate 11's learnings flow back into Gate 2 on the next cycle,
 and each loop lowers the defect rate.
@@ -354,6 +380,20 @@ the slow step). Use `cdt ingest --force` to re-embed the whole corpus and
 upsert run pipelined on separate threads, so the database write of one batch
 overlaps the embedding of the next.
 
+**Adding books after the first ingest.** A file dropped straight into the library
+directory is not embedded automatically (the dockerized bootstrap skips extraction
+once the library is populated). Index it without a full rebuild:
+
+```bash
+cdt library reindex                       # scan the library, embed only the new/changed files
+cdt library add "<path/to/Book.md>" …     # index specific files already under the library
+```
+
+Both reuse the incremental, content-hash-deduped indexer, so they only embed what
+is genuinely new. The 3D viewer's [screen ingest](#the-3d-viewer--screen-ingest)
+does the same thing from the browser, and additionally writes the formatted file
+into the library for you.
+
 ---
 
 ## The 3D viewer & screen ingest
@@ -371,13 +411,15 @@ It needs the `rag` extra (`pip install -e .[rag]`, which also pulls `scikit-lear
 and `numpy`) and a running ChromaDB (`cdt up`). It is read-only against the
 index except through the ingest screen.
 
-**3D map.** The viewer fetches the 1024-dimensional `bge-m3` embeddings for a
-filtered slice, reduces them to three dimensions with **PCA**, and renders an
-interactive Plotly scatter colored by category. Two dropdowns filter by
-**profile** — the `category` (the `NN_…` corpus folder) and the `source` (the book)
-stored in each chunk's metadata — and a point-limit control keeps the browser smooth
-on the ~60k-chunk index. Hovering a point shows its source, section, and a text
-preview; the explained variance of the 3D projection is reported in the status bar.
+**3D map.** The viewer projects the 1024-dimensional `bge-m3` embeddings down to
+three dimensions with **PCA** and renders an interactive Plotly scatter colored by
+category. To stay fast on the ~60k-chunk index, the projection (and the per-source
+centroids used by the graph) is **computed once** on first run and cached to
+`~/.claude/conductor/viewer_index.json`; every view, profile filter, and graph is
+then served from that cache in milliseconds, and it is rebuilt automatically when
+the index changes (a new ingest). Two dropdowns filter by **profile** — the
+`category` (the `NN_…` corpus folder) and the `source` (the book) — and hovering a
+point shows its source, section, and a text preview.
 
 **3D graph (`/graph`).** A force-directed network rendered with **three.js**
 (`3d-force-graph`): each source (book) is a node grouped under its category hub,
@@ -400,26 +442,47 @@ appears in the 3D map's filters immediately.
 ## The diary (Honcho) — project memory
 
 The **diary** is *dynamic knowledge*: "what this project decided and learned." Every
-entry is written to a **local JSONL mirror** first (so it works offline) and then
-best-effort synced to **Honcho**, which reasons over the history in the background.
+entry is written to the **local memory tree** first (`.cdt/memory/`, so it works
+offline) and then best-effort synced to **Honcho**, which reasons over the history
+in the background. Each project gets its own isolated Honcho workspace (keyed by the
+project slug).
 
 ```bash
-# Record (kinds: reasoning | decision | plan | error | solution)
+# Record (kinds: reasoning | decision | plan | error | solution | checkpoint)
 cdt journal add --gate 4 --kind decision "chose hexagonal architecture; ADR-001"
 cdt journal add --owner --kind plan "MVP first; auth in phase 2"   # attribute to you
 
 # Recall by meaning, then act on it
 cdt journal recall "why did we choose this architecture?"
+cdt journal recall --type adr "decisions about persistence"   # scope to a memory facet
 
-# Dump the local mirror
-cdt journal log
+# Read solved problems straight out of the diary
+cdt journal log --kind error,solution
+cdt journal log --kind decision --gate 6
+
+cdt journal digest                 # regenerate the human-readable daily/ digests
+cdt journal ingest                 # ingest docs/ + records/ markdown into Honcho (hash-idempotent)
 ```
 
 With the Honcho backend running, `recall` returns a **reasoned answer** synthesized
 from the relevant past entries (the "dialectic"). Without it (or offline), `recall`
-falls back to a keyword scan of the local mirror — so the diary is always usable.
-Each project gets its own isolated Honcho workspace (keyed by the project slug), and
-recording an entry also refreshes the "Project memory" block in `CLAUDE.md`.
+falls back to a keyword scan of the local memory — so the diary is always usable.
+Recording an entry also refreshes the "Project memory" block in `CLAUDE.md`.
+
+**Live memory (peer modeling + context injection).** Beyond deliberate entries,
+`cdt init` installs two Claude Code hooks (in `.claude/settings.local.json`) that
+make Honcho a memory that *learns about you*:
+
+- **Capture** (`cdt journal observe`, on `UserPromptSubmit`) appends *your* prompts
+  to a local log with zero network overhead, then batches them to Honcho's `owner`
+  peer at session boundaries — feeding Honcho's peer modeling.
+- **Inject** (`cdt journal context`, on `SessionStart`) asks Honcho what it knows
+  about this project and you, and prints it so Claude Code adds it to the session
+  context.
+
+Capture is owner-only and the hooks are no-ops outside an enrolled project; the
+local capture log is git-ignored. Because Honcho is model-independent, you can swap
+the underlying LLM without losing what it has learned.
 
 ---
 
@@ -427,17 +490,21 @@ recording an entry also refreshes the "Project memory" block in `CLAUDE.md`.
 
 | Command | What it does |
 |---------|--------------|
-| `cdt init [path]` | Enroll a project: generate `.claude/` (a relevant role subset), `.cdt/` (stack, diary), and `CLAUDE.md`. Flags: `--all`, `--roles a,b`, `--type T`, `--force`. |
-| `cdt sync [path]` | Refresh the managed region of `CLAUDE.md` (re-detect stack, roles, pull diary memory). |
-| `cdt library "<q>"` | Semantic search over the reference books. Flags: `-k N`, `--json`, `--category C`. |
-| `cdt journal add\|recall\|log` | The per-project development diary. |
+| `cdt init [path]` | Enroll a project: generate `.claude/` (role subset + the `/cdt` driver + hooks), `.cdt/` (stack, memory tree), and `CLAUDE.md`. Flags: `--all`, `--roles a,b`, `--type T`, `--force`. |
+| `cdt sync [path]` | Refresh the managed region of `CLAUDE.md` and the scaffolded driver/hooks/memory tree (re-detect stack, roles, pull diary memory). |
+| `cdt library "<q>"` | Semantic search over the reference books. Flags: `-k N`, `--json`, `--category C`, `--gate N`. |
+| `cdt library reindex` | Index any library files not yet in ChromaDB (incremental, content-hash skip). |
+| `cdt library add <file.md> …` | Index specific `.md` file(s) already under the library directory. |
+| `cdt journal add\|recall\|log` | The per-project development diary. `recall --type/--area`, `log --kind error,solution --gate N`. |
+| `cdt journal ingest\|digest` | Ingest `docs/`+`records/` into Honcho; regenerate the `daily/` digests. |
 | `cdt up` / `down` | Start / stop the Docker RAG stack (GPU auto-detected). |
 | `cdt ingest` | (Re)build the library index in the running stack. **Incremental** (content-hash skip). Flags: `--force` (re-embed all), `--quiet` (no telemetry), `--batch N`, `--limit N`. |
-| `cdt viewer` | 3D map of the library embeddings (PCA), filtered by profile; includes a screen to ingest a `.md` file formatted to the library convention. Flags: `--port`, `--no-browser`. |
+| `cdt viewer` | 3D map of the library embeddings (PCA, cached), filtered by profile; includes a screen to ingest a `.md` file formatted to the library convention. Flags: `--port`, `--no-browser`. |
 | `cdt honcho setup` | Choose the Honcho reasoning provider and write its `.env`. |
 | `cdt honcho up` / `down` | Start / stop the Honcho diary backend (clone + build + health automated). |
 
-`cdt` is an alias for `conductor` (e.g. `cdt init`, `cdt sync`).
+`cdt` is the canonical command; `conductor` is kept as a working alias (e.g.
+`cdt init` and `conductor init` are equivalent).
 
 ---
 
@@ -468,8 +535,8 @@ recording an entry also refreshes the "Project memory" block in `CLAUDE.md`.
     `honcho_stack.py`, `viewer.py` (the 3D map + screen-ingest web app), and
     `rag/` (`core`, `ingest`, `bootstrap`, `stack`).
   - `conductor/templates/` — the 36 role **Agents** + 36 **Skills**,
-    `CLAUDE.md.tmpl`, and `flow.md` (the 11-gate flow). These are copied into
-    target projects.
+    `CLAUDE.md.tmpl`, `flow.md` (the 11-gate flow), and `commands/cdt.md` (the
+    `/cdt` flow driver). These are copied into target projects.
   - `conductor/infra/conductor/` — the Docker RAG stack (Ollama + bge-m3 + Chroma).
   - `conductor/infra/honcho/` — the self-hosted Honcho diary backend.
 - `tools/validate.py` — the invariant validator over the templates (the CI gate).
@@ -479,10 +546,15 @@ recording an entry also refreshes the "Project memory" block in `CLAUDE.md`.
 
 ## Invariants / quality gate
 
-`python tools/validate.py` enforces 8 golden rules (R1–R8) over the templates and
-the role registry: 36 agents + 36 skills parity, frontmatter and YAML safety,
-semver, agent anchoring in reference books, skill structure, the `roles.py` ↔
-template registry plus the 11-gate flow, and valid `model:` tiers. It runs in CI
+`python tools/validate.py` enforces 11 golden rules (R1–R11) over the templates,
+the role registry, and the repository. R1–R8 cover the 36 agents + 36 skills
+parity, frontmatter and YAML safety, semver, agent anchoring in reference books,
+skill structure, the `roles.py` ↔ template registry plus the 11-gate flow, and
+valid `model:` tiers. The newer rules add: **R9** — the memory-tree ingestion
+routes stay consistent with the scaffolded folders (and `refs/` is never
+ingested); **R10** — the `/cdt` driver exists and keeps its enforcement anchors
+(RAG citation, subagent delegation, the user checkpoint); **R11** — no real API
+keys or tokens are committed to tracked files. It runs in CI
 (`.github/workflows/`) and is also Conductor's own Gate 7 for this repository. See
 [`tools/README.md`](tools/README.md).
 
