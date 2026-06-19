@@ -288,8 +288,13 @@ def cmd_recall(root: Path, config: dict, args) -> int:
     # Fallback A: the markdown memory (docs/records), honoring --type/--area.
     md_hits = _scan_markdown(root, terms, args.type, args.area)
     # Fallback B: the diary mirror (skipped when a doc-only filter is set).
+    try:
+        kinds = _parse_kinds(getattr(args, "kind", None))
+    except ValueError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        return 2
     diary_hits = ([] if (args.type or args.area)
-                  else _scan_diary(root, terms, args.gate))
+                  else _scan_diary(root, terms, args.gate, kinds))
 
     if not md_hits and not diary_hits:
         print("No matching memory.")
@@ -303,11 +308,14 @@ def cmd_recall(root: Path, config: dict, args) -> int:
     return 0
 
 
-def _scan_diary(root: Path, terms: List[str], gate: Optional[int]) -> List[dict]:
+def _scan_diary(root: Path, terms: List[str], gate: Optional[int],
+                kinds: Optional[set] = None) -> List[dict]:
     hits = []
     for jf in sorted(diary_dir(root).glob("*.jsonl")):
         for e in _read_mirror(jf):
             if gate is not None and e.get("gate") != gate:
+                continue
+            if kinds is not None and e.get("kind") not in kinds:
                 continue
             blob = e.get("text", "").lower()
             if not terms or any(t in blob for t in terms):
@@ -350,18 +358,42 @@ def _scan_markdown(root: Path, terms: List[str], dtype: Optional[str],
     return hits
 
 
+def _parse_kinds(raw: Optional[str]) -> Optional[set]:
+    """Parse a comma-separated --kind value into a validated set (or None)."""
+    if not raw:
+        return None
+    kinds = {k.strip() for k in raw.split(",") if k.strip()}
+    bad = kinds - set(KINDS)
+    if bad:
+        raise ValueError(f"unknown kind(s): {', '.join(sorted(bad))}; "
+                         f"choose from {', '.join(KINDS)}")
+    return kinds
+
+
 def cmd_log(root: Path, config: dict, args) -> int:
     session_id = _session_id(config, args.session) if args.session else None
     files = ([_mirror_path(root, session_id)] if session_id
              else sorted(journal_dir(root).glob("*.jsonl")))
+    try:
+        kinds = _parse_kinds(getattr(args, "kind", None))
+    except ValueError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        return 2
+    gate = getattr(args, "gate", None)
     n = 0
     for jf in files:
         for e in _read_mirror(jf):
+            if kinds is not None and e.get("kind") not in kinds:
+                continue
+            if gate is not None and e.get("gate") != gate:
+                continue
             g = f"gate {e['gate']}" if e.get("gate") is not None else "-"
             print(f"[{e.get('ts','')}] {e.get('author','')}/{e.get('kind','')}/{g}: {e.get('text','')}")
             n += 1
     if n == 0:
-        print("Diary empty.")
+        sel = (f" matching kind={','.join(sorted(kinds))}" if kinds else "") \
+            + (f" gate={gate}" if gate is not None else "")
+        print(f"No diary entries{sel}." if sel else "Diary empty.")
     return 0
 
 
@@ -381,10 +413,15 @@ def main(argv: List[str]) -> int:
     pr.add_argument("--type", choices=sorted(TYPE_TO_SESSION),
                     help="restrict to a memory facet (doc, adr, bug, ...)")
     pr.add_argument("--area", help="restrict docs to an area (e.g. architecture)")
+    pr.add_argument("--kind", help="restrict the diary fallback to kind(s), "
+                    "comma-separated (e.g. error,solution)")
     pr.add_argument("--gate", type=int, help="restrict the diary fallback to a gate")
     pr.add_argument("-k", type=int, default=8, help="max local fallback hits")
 
-    sub.add_parser("log", help="dump the local diary mirror")
+    pl = sub.add_parser("log", help="dump the local diary mirror")
+    pl.add_argument("--kind", help="show only kind(s), comma-separated "
+                    "(e.g. error,solution for solved problems)")
+    pl.add_argument("--gate", type=int, help="show only a given flow gate")
 
     pi = sub.add_parser("ingest", help="ingest docs/records into Honcho (hash-idempotent)")
     pi.add_argument("--force", action="store_true",
