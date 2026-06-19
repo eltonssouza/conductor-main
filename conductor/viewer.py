@@ -592,6 +592,12 @@ INGEST_HTML = """<!doctype html>
   textarea { min-height:340px; font-family:ui-monospace,monospace; resize:vertical; white-space:pre; }
   button { cursor:pointer; width:auto; padding:8px 18px; }
   button:hover { border-color:#58a6ff; }
+  .actions { position:sticky; bottom:0; background:#0d1117; padding:12px 0 6px;
+    border-top:1px solid #21262d; margin-top:12px; display:flex; align-items:center; gap:10px; }
+  button.primary { background:#238636; border-color:#2ea043; color:#fff;
+    font-weight:600; padding:11px 24px; font-size:14px; }
+  button.primary:hover { background:#2ea043; border-color:#3fb950; }
+  button.primary:disabled { opacity:.6; cursor:default; }
   #result { margin-top:14px; padding:12px; border-radius:6px; font-size:13px; white-space:pre-wrap; }
   .ok { background:#0f2417; border:1px solid #238636; }
   .err { background:#2d1518; border:1px solid #da3633; }
@@ -620,7 +626,10 @@ INGEST_HTML = """<!doctype html>
   </div>
   <div class="field"><label>Conteúdo markdown</label>
     <textarea id="content" placeholder="# Título&#10;&#10;Conteúdo..."></textarea></div>
-  <div style="margin-top:12px"><button id="send">Formatar e indexar</button></div>
+  <div class="actions">
+    <button id="send" class="primary">💾 Salvar na biblioteca</button>
+    <span class="hint">formata → embedda → indexa no ChromaDB</span>
+  </div>
   <div id="result"></div>
 </main>
 <script>
@@ -638,15 +647,24 @@ $('#file').addEventListener('change', e=>{
   r.readAsText(f);
 });
 $('#send').addEventListener('click', async ()=>{
+  const btn = $('#send');
   const body = { category:$('#category').value, title:$('#title').value,
                  author:$('#author').value, content:$('#content').value };
   if(!body.content.trim()){ show('Conteúdo vazio.', false); return; }
+  const label = btn.textContent;
+  btn.disabled = true; btn.textContent = '⏳ Salvando…';
   show('Formatando e indexando… (o embed pode levar alguns segundos)', true);
-  const r = await fetch('/api/ingest',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(body)});
-  const d = await r.json();
-  if(d.error) show('Erro: '+d.error, false);
-  else show(`OK — ${d.chunks} chunk(s) indexados.\\nArquivo: ${d.file}\\nSource: ${d.source} · categoria: ${d.category}`, true);
+  try {
+    const r = await fetch('/api/ingest',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(body)});
+    const d = await r.json();
+    if(d.error) show('Erro: '+d.error, false);
+    else show(`✅ Salvo — ${d.chunks} chunk(s) indexados.\\nArquivo: ${d.file}\\nSource: ${d.source} · categoria: ${d.category}`, true);
+  } catch(e) {
+    show('Erro de rede: '+e, false);
+  } finally {
+    btn.disabled = false; btn.textContent = label;
+  }
 });
 function show(msg, ok){ const el=$('#result'); el.textContent=msg; el.className=ok?'ok':'err'; }
 </script>
