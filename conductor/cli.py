@@ -33,8 +33,36 @@ Commands:
   honcho setup               Choose the Honcho diary reasoning provider.
   honcho up | down           Start / stop the Honcho diary backend (Docker).
   update [--reinstall]       Pull the latest source (editable/source install).
+  quickstart                 Print the ordered path: install -> first /cdt feature.
 
 Run `cdt <command> --help` for command options.
+"""
+
+QUICKSTART = """Conductor quickstart - from install to your first feature
+
+1. Install (once)
+   pipx install conductor                 # or, from a clone: pip install -e .[rag,honcho]
+
+2. Start the two memories in Docker (once per machine)
+   cdt up                                 # RAG stack: Ollama + ChromaDB + ingest the books
+   cdt honcho setup --provider deepseek   # configure the diary's reasoning (first time only)
+   cdt honcho up                          # the Honcho diary backend
+
+3. Enroll your project
+   cd /path/to/your-project
+   cdt init                               # scaffold .claude/ + .cdt/ + CLAUDE.md + /cdt + hooks
+
+4. Reload Claude Code in that project     # so the /cdt command and the hooks load
+
+5. Drive your first feature through the gates (inside Claude Code)
+   /cdt implement <your feature>          # interactive: stops for your approval at each gate
+
+Handy along the way:
+   cdt library "<question>"               # ground an answer in the reference books
+   cdt journal recall "<question>"        # recall what this project already decided
+   cdt journal log --kind error,solution  # list problems already solved
+   cdt sync                               # after upgrading Conductor: refresh an enrolled project
+   cdt viewer                             # 3D map of the library + add a book from the browser
 """
 
 
@@ -45,6 +73,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 0
 
     cmd, rest = argv[0], argv[1:]
+
+    if cmd == "quickstart":
+        print(QUICKSTART)
+        return 0
 
     # `cdt init|sync ...` (and bare `init`/`sync`)
     if cmd == "cdt":

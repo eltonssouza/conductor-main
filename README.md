@@ -26,8 +26,48 @@ project's memory grows as you work and follows you across sessions.
 
 ---
 
+## Quickstart
+
+From install to your first feature (also printed by `cdt quickstart`):
+
+```bash
+# 1. Install (once)
+pipx install conductor                 # or, from a clone: pip install -e .[rag,honcho]
+
+# 2. Start the two memories in Docker (once per machine)
+cdt up                                 # RAG stack: Ollama + ChromaDB + ingest the books
+cdt honcho setup --provider deepseek   # configure the diary's reasoning (first time only)
+cdt honcho up                          # the Honcho diary backend
+
+# 3. Enroll your project
+cd /path/to/your-project
+cdt init                               # scaffold .claude/ + .cdt/ + CLAUDE.md + /cdt + hooks
+
+# 4. Reload Claude Code in that project  -> so the /cdt command and the hooks load
+
+# 5. Drive your first feature through the gates (inside Claude Code)
+/cdt implement <your feature>          # interactive: stops for your approval at each gate
+```
+
+Handy along the way:
+
+```bash
+cdt library "<question>"               # ground an answer in the reference books
+cdt journal recall "<question>"        # recall what this project already decided
+cdt journal log --kind error,solution  # list problems already solved
+cdt sync                               # after upgrading Conductor: refresh an enrolled project
+cdt viewer                             # 3D map of the library + add a book from the browser
+```
+
+> **Upgrading?** After updating Conductor, run `cdt sync` in each enrolled
+> project so it receives new features (the `/cdt` driver, the hooks, the memory
+> tree). A project enrolled by an older version won't have `/cdt` until you sync.
+
+---
+
 ## Table of contents
 
+1. [Quickstart](#quickstart)
 1. [How it works](#how-it-works)
 2. [Requirements](#requirements)
 3. [Installation](#installation)
