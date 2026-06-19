@@ -397,6 +397,100 @@ def cmd_log(root: Path, config: dict, args) -> int:
     return 0
 
 
+# --- Honcho live memory: capture (observe) + inject (context) ----------------
+# `observe` runs on Claude Code's UserPromptSubmit hook — it only appends the
+# user's prompt to a local log (zero network, no latency). `context` runs on the
+# SessionStart hook — it flushes pending observations to Honcho in one batch and
+# prints what Honcho knows so Claude Code injects it. Capture is owner-only.
+
+_OBS_KEEP = 500          # cap the local observation log
+_OBS_FLUSH = 200         # max observations pushed to Honcho per session start
+_CONTEXT_CAP = 1800      # max chars of injected context (token budget)
+_CONTEXT_Q = ("Summarize, in a few bullet points, what you know about this "
+              "project and about me (the owner) that is relevant to working "
+              "here right now: my preferences and working style, the key "
+              "decisions made, what is in progress, and known gotchas. Be "
+              "concise; if you know little yet, say so briefly.")
+
+
+def _hook_payload() -> dict:
+    try:
+        raw = sys.stdin.read()
+        return json.loads(raw) if raw.strip() else {}
+    except Exception:  # noqa: BLE001 — a malformed/empty payload is a no-op
+        return {}
+
+
+def _observations_path(root: Path) -> Path:
+    return memory_dir(root) / ".observations.jsonl"
+
+
+def cmd_observe(root: Path, config: dict, args) -> int:
+    """UserPromptSubmit hook: append the user's prompt locally (no network)."""
+    payload = _hook_payload()
+    prompt = (payload.get("prompt") or "").strip()
+    if not prompt:
+        return 0
+    rec = {"ts": datetime.datetime.now().isoformat(timespec="seconds"),
+           "text": prompt, "synced": False}
+    p = _observations_path(root)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    lines = []
+    if p.is_file():
+        lines = [ln for ln in p.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    lines.append(json.dumps(rec, ensure_ascii=False))
+    p.write_text("\n".join(lines[-_OBS_KEEP:]) + "\n", encoding="utf-8")
+    return 0  # silent: never add noise to the user's prompt turn
+
+
+def _flush_observations(root: Path, config: dict) -> int:
+    """Best-effort: push unsynced observations to Honcho (owner peer), batched."""
+    p = _observations_path(root)
+    if not p.is_file():
+        return 0
+    recs = []
+    for ln in p.read_text(encoding="utf-8").splitlines():
+        ln = ln.strip()
+        if ln:
+            try:
+                recs.append(json.loads(ln))
+            except ValueError:
+                pass
+    pending = [r for r in recs if not r.get("synced")]
+    if not pending:
+        return 0
+    backend = HonchoBackend.from_config(config)
+    session_id = _session_id(config, None)
+    sent = 0
+    for r in pending[:_OBS_FLUSH]:
+        res = backend.add(session_id, r.get("text", ""), gate=None,
+                          kind="observation", as_owner=True)
+        if not res.ok:
+            break               # Honcho down — keep them for the next flush
+        r["synced"] = True
+        sent += 1
+    if sent:
+        p.write_text("\n".join(json.dumps(r, ensure_ascii=False)
+                               for r in recs[-_OBS_KEEP:]) + "\n", encoding="utf-8")
+    return sent
+
+
+def cmd_context(root: Path, config: dict, args) -> int:
+    """SessionStart hook: flush observations, then print what Honcho remembers
+    so Claude Code injects it into the session context. Silent on failure."""
+    _flush_observations(root, config)
+    backend = HonchoBackend.from_config(config)
+    res = backend.recall(_session_id(config, None), _CONTEXT_Q)
+    text = (res.text or "").strip() if res.ok else ""
+    if not text:
+        return 0                # nothing to inject (Honcho down or empty)
+    if len(text) > _CONTEXT_CAP:
+        text = text[:_CONTEXT_CAP].rstrip() + " …"
+    print("## What Conductor's memory (Honcho) recalls about this project\n")
+    print(text)
+    return 0
+
+
 def main(argv: List[str]) -> int:
     ap = argparse.ArgumentParser(description="Conductor per-project development diary.")
     ap.add_argument("--session", help="session id (default: <prefix>-<today>)")
@@ -430,14 +524,21 @@ def main(argv: List[str]) -> int:
     pd = sub.add_parser("digest", help="generate daily/<date>.md from the diary")
     pd.add_argument("--all", action="store_true", help="digest every diary day")
 
+    sub.add_parser("observe", help="(hook) capture the user's prompt to local memory")
+    sub.add_parser("context", help="(hook) flush observations + print Honcho's context")
+
     args = ap.parse_args(argv)
     force_utf8()
 
     root = find_project_root()
     config = read_config(root)
     if config is None:
+        # The hook commands must stay silent outside an enrolled project so they
+        # never disrupt a Claude Code session in an unrelated directory.
+        if args.cmd in ("observe", "context"):
+            return 0
         print(f"ERROR: not an enrolled project (no .cdt/ at {root}). "
-              "Run `python -m cdt.init` (or `/cdt init`) first.", file=sys.stderr)
+              "Run `cdt init` first.", file=sys.stderr)
         return 2
 
     if args.cmd == "add":
@@ -450,6 +551,10 @@ def main(argv: List[str]) -> int:
         return cmd_ingest(root, config, args)
     if args.cmd == "digest":
         return cmd_digest(root, config, args)
+    if args.cmd == "observe":
+        return cmd_observe(root, config, args)
+    if args.cmd == "context":
+        return cmd_context(root, config, args)
     return 2
 
 

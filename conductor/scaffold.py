@@ -55,7 +55,8 @@ MEMORY_TREE = {
 }
 # Local-only (git-ignored) under `.cdt/`: the machine diary and the generated
 # digests. `docs/`, `records/` and `refs/` are meant to be committed.
-MEMORY_LOCAL = ("memory/diary/", "memory/daily/", "memory/.ingest.json")
+MEMORY_LOCAL = ("memory/diary/", "memory/daily/", "memory/.ingest.json",
+                "memory/.observations.jsonl")
 
 
 def _scaffold_memory_tree(project: Path) -> int:
@@ -299,6 +300,49 @@ def _write_claude_md(root: Path, slug: str, ptype: str, selected: List[str]) -> 
 
 # --- scaffolding -------------------------------------------------------------
 
+# Claude Code hooks that make Honcho a live memory: capture the owner's prompts
+# and inject Honcho's recollection at session start. Written to the machine-local
+# settings (the machine that enrolled has `cdt`), so collaborators are unaffected.
+HONCHO_HOOKS = {
+    "UserPromptSubmit": "cdt journal observe",
+    "SessionStart": "cdt journal context",
+}
+
+
+def _scaffold_hooks(project: Path) -> int:
+    """Merge the Honcho capture/inject hooks into `.claude/settings.local.json`
+    without clobbering existing settings or other hooks. Returns hooks added."""
+    sp = project / ".claude" / "settings.local.json"
+    data: dict = {}
+    if sp.is_file():
+        try:
+            data = json.loads(sp.read_text(encoding="utf-8"))
+        except (ValueError, OSError):
+            data = {}
+    if not isinstance(data, dict):
+        data = {}
+    hooks = data.setdefault("hooks", {})
+    if not isinstance(hooks, dict):
+        return 0
+    added = 0
+    for event, command in HONCHO_HOOKS.items():
+        entries = hooks.setdefault(event, [])
+        if not isinstance(entries, list):
+            continue
+        present = any(
+            any(command in (h.get("command", "") or "")
+                for h in (e.get("hooks") or []) if isinstance(h, dict))
+            for e in entries if isinstance(e, dict))
+        if not present:
+            entries.append({"hooks": [{"type": "command", "command": command}]})
+            added += 1
+    if added:
+        sp.parent.mkdir(parents=True, exist_ok=True)
+        sp.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n",
+                      encoding="utf-8")
+    return added
+
+
 def _copy_driver(project: Path) -> bool:
     """Install the `/cdt` flow-driver slash command into `.claude/commands/`.
 
@@ -386,8 +430,10 @@ def cmd_init(args) -> int:
           + (f", detected={', '.join(techs)}" if techs else ""))
     n = _copy_roles(project, selected)
     drv = _copy_driver(project)
+    hooks = _scaffold_hooks(project)
     print(f"[2/4] .claude/: {n} agents + {n} skills ({mode} for {ptype})"
-          + (" + /cdt driver" if drv else ""))
+          + (" + /cdt driver" if drv else "")
+          + (f" + {hooks} Honcho hook(s)" if hooks else ""))
 
     stack_dir(project).mkdir(parents=True, exist_ok=True)
     leaves = _scaffold_memory_tree(project)
@@ -432,6 +478,7 @@ def cmd_sync(args) -> int:
 
     n = _copy_roles(root, selected)
     _copy_driver(root)                    # keep the /cdt flow driver current
+    _scaffold_hooks(root)                 # ensure the Honcho capture/inject hooks
     leaves = _scaffold_memory_tree(root)  # ensure/upgrade the memory tree (idempotent)
     _ensure_memory_gitignore(root)
     migrated = _migrate_legacy_diary(root)  # pre-0.2.20 journal/ -> memory/diary/
