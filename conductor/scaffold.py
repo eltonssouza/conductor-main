@@ -24,12 +24,13 @@ from pathlib import Path
 from typing import List, Optional
 
 from . import roles as roles_mod
+from . import targets as targets_mod
 from .detect import VALID_TYPES, detect, profile
+from .targets import GuideContext
 from .project import (cdt_dir, config_path, diary_dir, find_project_root,
-                      force_utf8, journal_dir, memory_dir, read_config,
+                      force_utf8, memory_dir, read_config,
                       register_project, slugify, stack_dir, write_config)
 
-TEMPLATES = Path(__file__).resolve().parent / "templates"
 DEFAULT_HONCHO_URL = "http://localhost:8000"
 
 # The per-project memory tree (relative to `.cdt/memory/`): leaf dir -> purpose.
@@ -183,12 +184,6 @@ def _ensure_memory_gitignore(project: Path) -> None:
     merged = [*existing, *extra] if existing else extra
     gi.write_text("\n".join(merged) + "\n", encoding="utf-8")
 
-MANAGED_START = "<!-- conductor:managed:start"
-MANAGED_END = "<!-- conductor:managed:end -->"
-MEMORY_KINDS = ("decision", "solution", "error", "plan")
-MEMORY_LIMIT = 15
-
-
 # --- rendering ---------------------------------------------------------------
 
 def _stack_md(ptype: str, techs: List[str], evidence: List[str],
@@ -229,155 +224,7 @@ Technologies this project uses. Agents read this so their `cdt library`
 """
 
 
-def _roles_table(selected: List[str]) -> str:
-    rows = ["| Role | Area | Skill |", "|------|------|-------|"]
-    for slug in selected:
-        r = roles_mod.ROLES[slug]
-        rows.append(f"| `{slug}` | {r.area} | `{r.skill}` |")
-    return "\n".join(rows)
-
-
-def _project_memory(root: Path, limit: int = MEMORY_LIMIT) -> str:
-    """Recent durable diary entries (decisions/solutions/errors/plans), newest first."""
-    entries = []
-    for jf in sorted(journal_dir(root).glob("*.jsonl")):
-        for line in jf.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                e = json.loads(line)
-            except ValueError:
-                continue
-            if e.get("kind") in MEMORY_KINDS:
-                entries.append(e)
-    if not entries:
-        return "_No diary entries yet._"
-    entries.sort(key=lambda e: e.get("ts", ""), reverse=True)
-    lines = []
-    for e in entries[:limit]:
-        gate = f"gate {e['gate']}" if e.get("gate") is not None else "—"
-        lines.append(f"- **[{gate}] {e.get('kind','')}** — {e.get('text','')}  "
-                     f"_({e.get('ts','')})_")
-    return "\n".join(lines)
-
-
-def _render(root: Path, slug: str, ptype: str, selected: List[str]) -> str:
-    tmpl = (TEMPLATES / "CLAUDE.md.tmpl").read_text(encoding="utf-8")
-    flow = (TEMPLATES / "flow.md").read_text(encoding="utf-8")
-    return (tmpl
-            .replace("{project}", slug)
-            .replace("{type}", ptype)
-            .replace("{roles_table}", _roles_table(selected))
-            .replace("{project_memory}", _project_memory(root))
-            .replace("{flow}", flow))
-
-
-def _managed_slice(text: str):
-    """Returns (start, end) indices spanning the managed region (incl markers), or None."""
-    s = text.find(MANAGED_START)
-    e = text.find(MANAGED_END)
-    if s == -1 or e == -1:
-        return None
-    return s, e + len(MANAGED_END)
-
-
-def _write_claude_md(root: Path, slug: str, ptype: str, selected: List[str]) -> str:
-    """Writes (init) or splices (sync) CLAUDE.md. Returns 'created' or 'synced'."""
-    fresh = _render(root, slug, ptype, selected)
-    out = root / "CLAUDE.md"
-    if out.is_file():
-        old = out.read_text(encoding="utf-8")
-        old_span, new_span = _managed_slice(old), _managed_slice(fresh)
-        if old_span and new_span:
-            region = fresh[new_span[0]:new_span[1]]
-            merged = old[:old_span[0]] + region + old[old_span[1]:]
-            out.write_text(merged, encoding="utf-8")
-            return "synced"
-    out.write_text(fresh, encoding="utf-8")
-    return "created"
-
-
 # --- scaffolding -------------------------------------------------------------
-
-# Claude Code hooks that make Honcho a live memory: capture the owner's prompts
-# and inject Honcho's recollection at session start. Written to the machine-local
-# settings (the machine that enrolled has `cdt`), so collaborators are unaffected.
-HONCHO_HOOKS = {
-    "UserPromptSubmit": "cdt journal observe",
-    "SessionStart": "cdt journal context",
-}
-
-
-def _scaffold_hooks(project: Path) -> int:
-    """Merge the Honcho capture/inject hooks into `.claude/settings.local.json`
-    without clobbering existing settings or other hooks. Returns hooks added."""
-    sp = project / ".claude" / "settings.local.json"
-    data: dict = {}
-    if sp.is_file():
-        try:
-            data = json.loads(sp.read_text(encoding="utf-8"))
-        except (ValueError, OSError):
-            data = {}
-    if not isinstance(data, dict):
-        data = {}
-    hooks = data.setdefault("hooks", {})
-    if not isinstance(hooks, dict):
-        return 0
-    added = 0
-    for event, command in HONCHO_HOOKS.items():
-        entries = hooks.setdefault(event, [])
-        if not isinstance(entries, list):
-            continue
-        present = any(
-            any(command in (h.get("command", "") or "")
-                for h in (e.get("hooks") or []) if isinstance(h, dict))
-            for e in entries if isinstance(e, dict))
-        if not present:
-            entries.append({"hooks": [{"type": "command", "command": command}]})
-            added += 1
-    if added:
-        sp.parent.mkdir(parents=True, exist_ok=True)
-        sp.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n",
-                      encoding="utf-8")
-    return added
-
-
-def _copy_driver(project: Path) -> bool:
-    """Install the `/cdt` flow-driver slash command into `.claude/commands/`.
-
-    The driver is the interactive control loop (recall → RAG → delegate →
-    record → user checkpoint) that makes the 11-gate flow actually enforced,
-    instead of leaving it as passive CLAUDE.md guidance. Always overwritten so
-    `sync` keeps it current. It is NOT a role skill, so it stays out of the
-    36↔36 agent/skill parity.
-    """
-    src = TEMPLATES / "commands" / "cdt.md"
-    if not src.is_file():
-        return False
-    dst = project / ".claude" / "commands"
-    dst.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(src, dst / "cdt.md")
-    return True
-
-
-def _copy_roles(project: Path, selected: List[str]) -> int:
-    agents_dst = project / ".claude" / "agents"
-    skills_dst = project / ".claude" / "skills"
-    agents_dst.mkdir(parents=True, exist_ok=True)
-    skills_dst.mkdir(parents=True, exist_ok=True)
-    n = 0
-    for slug in selected:
-        src_agent = TEMPLATES / "agents" / f"{slug}.md"
-        if src_agent.is_file():
-            shutil.copyfile(src_agent, agents_dst / f"{slug}.md")
-        skill = roles_mod.ROLES[slug].skill
-        src_skill = TEMPLATES / "skills" / skill / "SKILL.md"
-        if src_skill.is_file():
-            (skills_dst / skill).mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(src_skill, skills_dst / skill / "SKILL.md")
-        n += 1
-    return n
 
 
 def _resolve_selection(ptype: str, all_roles: bool, override: Optional[List[str]]):
@@ -389,18 +236,40 @@ def _resolve_selection(ptype: str, all_roles: bool, override: Optional[List[str]
     return roles_mod.select_roles(ptype), "subset"
 
 
+def _config_targets(root: Path, config: dict):
+    """The targets configured for a project: the persisted `targets` keys, or
+    (back-compat for pre-multi-harness configs) auto-detect / default."""
+    keys = config.get("targets")
+    if keys:
+        try:
+            return [targets_mod.get(k) for k in keys]
+        except KeyError:
+            pass
+    return targets_mod.resolve(None, root)
+
+
 def refresh_claude_md(root: Path) -> bool:
-    """Best-effort live refresh of the managed region (called after journal writes)."""
+    """Best-effort live refresh of each target's guide (called after journal writes).
+
+    Only refreshes guides that already exist — a journal write never creates a
+    guide that the human removed.
+    """
     config = read_config(root)
-    if config is None or not (root / "CLAUDE.md").is_file():
+    if config is None:
         return False
     selected = config.get("roles") or roles_mod.select_roles(config.get("type", "unknown"))
-    try:
-        _write_claude_md(root, config.get("project", root.name),
-                         config.get("type", "unknown"), selected)
-        return True
-    except Exception:  # noqa: BLE001 — refresh is best-effort
-        return False
+    ctx = GuideContext(root, config.get("project", root.name),
+                       config.get("type", "unknown"), selected)
+    ok = False
+    for t in _config_targets(root, config):
+        if not t.guide_path(root).is_file():
+            continue
+        try:
+            t.emit_guide(ctx)
+            ok = True
+        except Exception:  # noqa: BLE001 — refresh is best-effort
+            pass
+    return ok
 
 
 # --- commands ----------------------------------------------------------------
@@ -426,14 +295,22 @@ def cmd_init(args) -> int:
         print(f"ERROR: {e}", file=sys.stderr)
         return 2
 
+    try:
+        tgts = targets_mod.resolve(args.target, project)
+    except ValueError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        return 2
+
     print(f"[1/4] analyzing {project.name}: type={ptype}"
-          + (f", detected={', '.join(techs)}" if techs else ""))
-    n = _copy_roles(project, selected)
-    drv = _copy_driver(project)
-    hooks = _scaffold_hooks(project)
-    print(f"[2/4] .claude/: {n} agents + {n} skills ({mode} for {ptype})"
-          + (" + /cdt driver" if drv else "")
-          + (f" + {hooks} Honcho hook(s)" if hooks else ""))
+          + (f", detected={', '.join(techs)}" if techs else "")
+          + f" -> {', '.join(t.label for t in tgts)}")
+    for t in tgts:
+        n = t.emit_roles(project, selected)
+        drv = t.emit_driver(project)
+        hooks = t.emit_hooks(project)
+        print(f"[2/4] {t.label}: {n} agents + {n} skills ({mode} for {ptype})"
+              + (" + /cdt driver" if drv else "")
+              + (f" + {hooks} live-memory hook(s)" if hooks else ""))
 
     stack_dir(project).mkdir(parents=True, exist_ok=True)
     leaves = _scaffold_memory_tree(project)
@@ -442,6 +319,7 @@ def cmd_init(args) -> int:
     _ensure_memory_gitignore(project)
     write_config(project, {
         "project": slug, "type": ptype, "roles": selected, "roles_mode": mode,
+        "targets": [t.key for t in tgts],
         "honcho": {"workspace": slug, "base_url": args.honcho_url,
                    "session_prefix": "cdt"},
         "created": datetime.date.today().isoformat(),
@@ -449,9 +327,12 @@ def cmd_init(args) -> int:
     register_project(project, slug, ptype)
     print(f"[3/4] .cdt/: enrolled '{slug}', stack -> {ptype}.md, "
           f"memory tree -> {leaves} folders")
-    state = _write_claude_md(project, slug, ptype, selected)
-    print(f"[4/4] CLAUDE.md {state} ({len(selected)} roles + memory + 11-gate flow)")
-    print("Done. `cdt sync` keeps CLAUDE.md live as the project evolves.")
+    ctx = GuideContext(project, slug, ptype, selected)
+    for t in tgts:
+        state = t.emit_guide(ctx)
+        print(f"[4/4] {t.label} guide {state} "
+              f"({len(selected)} roles + memory + 11-gate flow)")
+    print("Done. `cdt sync` keeps the guide(s) live as the project evolves.")
     return 0
 
 
@@ -476,26 +357,42 @@ def cmd_sync(args) -> int:
     else:
         selected = roles_mod.select_roles(ptype)  # subset re-computed for current type
 
-    n = _copy_roles(root, selected)
-    _copy_driver(root)                    # keep the /cdt flow driver current
-    _scaffold_hooks(root)                 # ensure the Honcho capture/inject hooks
+    # `--target` overrides the persisted set; else re-emit the configured ones.
+    if getattr(args, "target", None):
+        try:
+            tgts = targets_mod.resolve(args.target, root)
+        except ValueError as e:
+            print(f"ERROR: {e}", file=sys.stderr)
+            return 2
+    else:
+        tgts = _config_targets(root, config)
+
+    n = 0
+    for t in tgts:
+        n = t.emit_roles(root, selected)
+        t.emit_driver(root)               # keep the /cdt flow driver current
+        t.emit_hooks(root)                # ensure the live-memory hooks
     leaves = _scaffold_memory_tree(root)  # ensure/upgrade the memory tree (idempotent)
     _ensure_memory_gitignore(root)
     migrated = _migrate_legacy_diary(root)  # pre-0.2.20 journal/ -> memory/diary/
     stack_dir(root).mkdir(parents=True, exist_ok=True)
     (stack_dir(root) / f"{ptype}.md").write_text(
         _stack_md(ptype, techs, evidence, prof), encoding="utf-8")
-    config.update({"type": ptype, "roles": selected, "roles_mode": mode})
+    config.update({"type": ptype, "roles": selected, "roles_mode": mode,
+                   "targets": [t.key for t in tgts]})
     write_config(root, config)
     register_project(root, slug, ptype)
     _auto_memory_sync(root, config)   # digest + ingest changed docs/records
     _write_memory_index(root)         # refresh the live map post-ingest
-    state = _write_claude_md(root, slug, ptype, selected)
+    ctx = GuideContext(root, slug, ptype, selected)
+    states = {t.label: t.emit_guide(ctx) for t in tgts}
 
     tree_note = f", memory tree +{leaves} folders" if leaves else ""
     mig_note = f", migrated {migrated} legacy diary file(s)" if migrated else ""
-    print(f"synced '{slug}' (type={ptype}, {n} roles): stack refreshed, "
-          f"diary memory pulled{tree_note}{mig_note}, CLAUDE.md {state}.")
+    guides = ", ".join(f"{label} {state}" for label, state in states.items())
+    print(f"synced '{slug}' (type={ptype}, {n} roles, "
+          f"targets={','.join(t.key for t in tgts)}): stack refreshed, "
+          f"diary memory pulled{tree_note}{mig_note}, {guides}.")
     return 0
 
 
@@ -512,6 +409,10 @@ def main(argv: List[str]) -> int:
     ap.add_argument("path", nargs="?", default=None if action == "sync" else ".",
                     help="project directory")
     ap.add_argument("--type", choices=VALID_TYPES, help="force the project type")
+    ap.add_argument("--target",
+                    help="harness target(s): comma list of "
+                         f"{{{','.join(targets_mod.available())},all}} "
+                         "(default: auto-detect, else claude)")
     if action == "init":
         ap.add_argument("--name", help="project name (default: directory name)")
         ap.add_argument("--all", action="store_true", help="scaffold all 36 roles")
