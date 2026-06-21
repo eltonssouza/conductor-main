@@ -426,9 +426,14 @@ def _observations_path(root: Path) -> Path:
 
 
 def cmd_observe(root: Path, config: dict, args) -> int:
-    """UserPromptSubmit hook: append the user's prompt locally (no network)."""
-    payload = _hook_payload()
-    prompt = (payload.get("prompt") or "").strip()
+    """UserPromptSubmit hook: append the user's prompt locally (no network).
+
+    The prompt comes from `--text` when given (harnesses like Pi pass it as an
+    argument from their input event); otherwise it is read from the stdin hook
+    JSON (Claude Code's UserPromptSubmit payload `{"prompt": ...}`).
+    """
+    text = getattr(args, "text", None)
+    prompt = (text if text is not None else (_hook_payload().get("prompt") or "")).strip()
     if not prompt:
         return 0
     rec = {"ts": datetime.datetime.now().isoformat(timespec="seconds"),
@@ -524,7 +529,9 @@ def main(argv: List[str]) -> int:
     pd = sub.add_parser("digest", help="generate daily/<date>.md from the diary")
     pd.add_argument("--all", action="store_true", help="digest every diary day")
 
-    sub.add_parser("observe", help="(hook) capture the user's prompt to local memory")
+    po = sub.add_parser("observe", help="(hook) capture the user's prompt to local memory")
+    po.add_argument("--text", help="prompt text (harnesses without a stdin hook "
+                    "payload pass it here; default: read the stdin hook JSON)")
     sub.add_parser("context", help="(hook) flush observations + print Honcho's context")
 
     args = ap.parse_args(argv)
