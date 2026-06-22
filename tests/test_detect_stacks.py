@@ -59,6 +59,12 @@ class TestLibraryStacks(unittest.TestCase):
         self._pkg({"@nestjs/core": "10.0.0", "graphql": "16.0.0"})
         self.assertIn("graphql", library_stacks(self.root))
 
+    def test_bom_manifest_still_parses(self):
+        # PowerShell Out-File / some editors prepend a UTF-8 BOM; it must not break detection
+        (self.root / "package.json").write_text(
+            '{"dependencies":{"@angular/core":"^21.0.0"}}', encoding="utf-8-sig")
+        self.assertIn("angular", library_stacks(self.root))
+
 
 class TestAutoSelect(unittest.TestCase):
     """`cdt up`'s auto_select_stacks: detect from cwd, accumulate, persist."""

@@ -31,7 +31,9 @@ MAX_DEPTH = 2
 
 def _read_json(path: Path) -> dict:
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        # utf-8-sig: tolerate a BOM (Windows editors / PowerShell Out-File add one,
+        # which would otherwise make json.loads choke and the manifest read as {}).
+        return json.loads(path.read_text(encoding="utf-8-sig"))
     except (ValueError, OSError):
         return {}
 
@@ -273,7 +275,7 @@ _DATASTORES = (
 
 def _read_text(path: Path) -> str:
     try:
-        return path.read_text(encoding="utf-8", errors="replace")
+        return path.read_text(encoding="utf-8-sig", errors="replace")  # strip a BOM if present
     except OSError:
         return ""
 
