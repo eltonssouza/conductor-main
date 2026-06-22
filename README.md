@@ -134,32 +134,52 @@ facilitation), so Claude Code runs each role on a right-sized model.
   intelligent recall. The local-Ollama option works without any key but the small
   local model gives weaker results. See
   [Where to put the DeepSeek API key](#where-to-put-the-deepseek-api-key).
-- **The reference-book corpus** as `to-brain.7z` — the archive of markdown books
-  the RAG indexes. Place it where `cdt up` can find it (see the RAG stack
-  section). It is never committed to git.
+- **The reference-book corpus** — the markdown books the RAG indexes. `cdt up`
+  fetches them automatically from the public library repo
+  ([`eltonssouza/conductor-library`](https://github.com/eltonssouza/conductor-library));
+  nothing to download by hand. Point it at a fork/branch with
+  `CONDUCTOR_LIBRARY_REPO` / `CONDUCTOR_LIBRARY_REF`.
 
 ---
 
 ## Installation
 
-Install the CLI globally:
+One line. The installer checks prerequisites, installs [uv](https://astral.sh/uv)
+(isolated, no sudo), clones Conductor into `~/.conductor/src`, and installs the
+`cdt` / `conductor` commands as an editable tool — so the Docker backends work
+too. Re-run any time to update.
 
 ```bash
-pipx install conductor          # recommended (isolated)
-# or
-pip install conductor
+# macOS / Linux
+curl -fsSL https://raw.githubusercontent.com/eltonssouza/conductor-main/main/install.sh | sh
 ```
 
-From a clone of this repository (the Docker backends are built from source, so a
-clone is needed to run them):
+```powershell
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/eltonssouza/conductor-main/main/install.ps1 | iex
+```
+
+Knobs (env vars): `CONDUCTOR_REF` (branch/tag), `CONDUCTOR_SRC` (clone dir),
+`CONDUCTOR_EXTRAS` (default `rag,honcho`; set `none` for a core-only install),
+`CONDUCTOR_DRY_RUN=1` (preview without changing anything), `NO_COLOR=1`.
+
+Preview the Windows install in a throwaway sandbox first (nothing touches your
+PATH or `~/.conductor`): `powershell -ExecutionPolicy Bypass -File tools/simulate-install.ps1 -Init`.
+
+<details>
+<summary>Manual install (from a clone)</summary>
+
+The Docker backends are built from source, so a clone is needed to run them:
 
 ```bash
 git clone https://github.com/eltonssouza/conductor-main.git
 cd conductor-main
-pipx install --editable .       # or: pip install -e .
-pip install -e .[rag]           # ChromaDB client + scikit-learn/numpy, for `cdt library` and `cdt viewer`
-pip install -e .[honcho]        # Honcho SDK, for `cdt journal` recall
+uv tool install --editable ".[rag,honcho]"   # or: pipx install --editable ".[rag,honcho]"
 ```
+
+`[rag]` adds the ChromaDB client + scikit-learn/numpy (`cdt library`, `cdt viewer`);
+`[honcho]` adds the Honcho SDK (`cdt journal recall`). Omit them for a core-only CLI.
+</details>
 
 This gives you the `cdt` command (with `conductor` kept as an alias). Verify:
 
@@ -177,11 +197,11 @@ Conductor's two long-term memories run in Docker. Each is a single command.
 
 Builds and starts the library RAG: **Ollama** (serving the `bge-m3` embedding
 model), **ChromaDB** (the vector store), and a one-shot **conductor** service that
-extracts the books, pulls the model, and ingests everything.
+fetches the books, pulls the model, and ingests everything.
 
 ```bash
-# Put the books archive where the launcher can find it: either as
-# infra/conductor/to-brain.7z, at the repo root, or pointed to by CONDUCTOR_ARCHIVE.
+# The book corpus is fetched from the public library repo automatically —
+# nothing local to place. (Override with CONDUCTOR_LIBRARY_REPO / _REF.)
 cdt up                    # attached (watch the progress)
 cdt up -d                 # detached  (then: docker compose logs -f conductor)
 cdt down                  # stop the stack
@@ -192,12 +212,16 @@ cdt ingest                # re-run the ingest only (idempotent)
 
 - **detects an NVIDIA GPU** + Docker's NVIDIA runtime and enables the GPU for
   Ollama (≈0.5 s per embed); otherwise it prints that it is running on CPU;
-- **locates the books archive** (`to-brain.7z` in the cwd / repo root, or
-  `CONDUCTOR_ARCHIVE`);
+- **fetches the books** from the library repo (`CONDUCTOR_LIBRARY_REPO@REF`,
+  default [`eltonssouza/conductor-library`](https://github.com/eltonssouza/conductor-library));
+- **auto-selects the corpus for your stack** — run from a project and it detects
+  the languages/frameworks and ingests only the matching books plus the
+  language-agnostic core (`cdt detect` previews the pick; the choice accumulates
+  across projects). Pin it explicitly with `CONDUCTOR_LIBRARY_STACKS` / `_TIERS`;
 - runs the bootstrap and prints the progress of each step:
 
 ```
-[1/4] extracting to-brain.7z -> /data/library ... 136 .md books
+[1/4] fetching library from eltonssouza/conductor-library@main ... 136 .md books
 [2/4] pulling bge-m3:  73.4%
       bge-m3 on GPU (0.7 GB VRAM) — fast embeds
 [3/4] ChromaDB is up
@@ -552,8 +576,12 @@ the underlying LLM without losing what it has learned.
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `CONDUCTOR_ARCHIVE` | `./to-brain.7z` (cwd / repo root) | path to the books archive used by `cdt up` |
-| `CONDUCTOR_LIBRARY` | `/data/library` (in container) | corpus markdown root |
+| `CONDUCTOR_LIBRARY_REPO` | `eltonssouza/conductor-library` | GitHub repo the corpus is fetched from on `cdt up` |
+| `CONDUCTOR_LIBRARY_REF` | `main` | branch/tag of the library repo to fetch |
+| `CONDUCTOR_LIBRARY_ARCHIVE` | _(unset)_ | optional offline seed: a mounted `.7z` used instead of the repo fetch |
+| `CONDUCTOR_LIBRARY` | `/data/library` (container) · `~/.conductor/library` (host) | corpus markdown root |
+| `CONDUCTOR_LIBRARY_TIERS` | `core` | which `software_dev` tiers to ingest (`core,supporting,foundational,optional`) |
+| `CONDUCTOR_LIBRARY_STACKS` | _(none)_ | languages/frameworks to add (e.g. `python,angular`); pin an edition with `stack@major` (e.g. `java@25,angular@21` → nearest book version); or `all` |
 | `CONDUCTOR_CHROMA_HTTP` | `localhost:8001` | ChromaDB endpoint used by `cdt library` |
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama endpoint (bge-m3) |
 | `CONDUCTOR_EMBED_MODEL` | `bge-m3` | embedding model |
@@ -580,7 +608,6 @@ the underlying LLM without losing what it has learned.
   - `conductor/infra/conductor/` — the Docker RAG stack (Ollama + bge-m3 + Chroma).
   - `conductor/infra/honcho/` — the self-hosted Honcho diary backend.
 - `tools/validate.py` — the invariant validator over the templates (the CI gate).
-- `plano.md` — the original plan (historical, in Portuguese).
 
 ---
 

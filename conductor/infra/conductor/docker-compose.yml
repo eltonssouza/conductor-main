@@ -1,10 +1,11 @@
 # Conductor RAG stack — Ollama + bge-m3 + ChromaDB + book ingest, all in Docker.
 #
-# Usage (preferred): `conductor up` / `conductor up -d` from a project that has a
-# to-brain.7z in its cwd (or set CONDUCTOR_ARCHIVE). The launcher auto-detects the
-# GPU and the archive. Watch progress with `docker compose logs -f conductor`.
+# Usage (preferred): `conductor up` / `conductor up -d`. The launcher auto-detects
+# the GPU. The book corpus is fetched from the public library repo
+# (CONDUCTOR_LIBRARY_REPO@REF) — nothing local is required. Watch progress with
+# `docker compose logs -f conductor`.
 #
-# The `conductor` service runs once: it extracts the books, pulls bge-m3, waits
+# The `conductor` service runs once: it fetches the books, pulls bge-m3, waits
 # for ChromaDB, and ingests — printing the progress of each step. It exits when
 # the ingest finishes; ollama + chroma keep running to serve queries.
 #
@@ -55,12 +56,17 @@ services:
       OLLAMA_HOST: http://ollama:11434
       CONDUCTOR_CHROMA_HTTP: chroma:8000
       CONDUCTOR_LIBRARY: /data/library
-      CONDUCTOR_LIBRARY_ARCHIVE: /seed/to-brain.7z
+      # Corpus is fetched from this public repo at run time (override to point at
+      # a fork/branch). For an offline seed, set CONDUCTOR_LIBRARY_ARCHIVE to a
+      # mounted .7z instead (see the bootstrap fallback).
+      CONDUCTOR_LIBRARY_REPO: ${CONDUCTOR_LIBRARY_REPO:-eltonssouza/conductor-library}
+      CONDUCTOR_LIBRARY_REF: ${CONDUCTOR_LIBRARY_REF:-main}
+      # Corpus selection (what gets ingested): default is core, language-agnostic.
+      # Opt into languages/frameworks: CONDUCTOR_LIBRARY_STACKS=python,angular,...
+      CONDUCTOR_LIBRARY_TIERS: ${CONDUCTOR_LIBRARY_TIERS:-core}
+      CONDUCTOR_LIBRARY_STACKS: ${CONDUCTOR_LIBRARY_STACKS:-}
       CONDUCTOR_EMBED_MODEL: bge-m3
     volumes:
-      # Books archive: `conductor up` sets CONDUCTOR_ARCHIVE to an absolute path
-      # (found in the cwd or via the env var). Falls back to ./to-brain.7z.
-      - ${CONDUCTOR_ARCHIVE:-./to-brain.7z}:/seed/to-brain.7z:ro
       - library:/data/library
     restart: "no"
 

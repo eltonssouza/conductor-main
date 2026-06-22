@@ -4,7 +4,8 @@
 Conductor identifies an NVIDIA GPU and Docker's NVIDIA runtime; when both are
 present it adds the GPU compose override so Ollama runs bge-m3 on the GPU
 (~0.5 s/embed). Otherwise it falls back to CPU (full-corpus ingest takes hours).
-It also auto-locates the books archive (cwd or CONDUCTOR_ARCHIVE).
+The book corpus is fetched from the public library repo by the `conductor`
+service (CONDUCTOR_LIBRARY_REPO@REF); no local archive is required.
 
 The Docker infra ships inside the package; the `conductor` image is built from
 the local source, so the Docker stack needs a repo clone (the CLI itself does not).
@@ -15,13 +16,14 @@ the local source, so the Docker stack needs a repo clone (the CLI itself does no
 """
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
-from ..project import PACKAGE_INFRA
+from ..project import PACKAGE_INFRA, REGISTRY_DIR
 
 
 def has_nvidia_gpu() -> bool:
@@ -43,22 +45,56 @@ def docker_has_nvidia_runtime() -> bool:
         return False
 
 
-def resolve_archive(env: dict) -> None:
-    """Sets CONDUCTOR_ARCHIVE to an ABSOLUTE path (compose runs from the staged
-    infra dir, so a relative path would resolve wrong)."""
-    val = env.get("CONDUCTOR_ARCHIVE")
-    if val:
-        p = Path(val)
-        env["CONDUCTOR_ARCHIVE"] = str(p if p.is_absolute() else (Path.cwd() / p).resolve())
-        print(f"Books archive: {env['CONDUCTOR_ARCHIVE']}")
+def auto_select_stacks(env: dict) -> None:
+    """Auto-pick the library stacks from the current project's detected tech,
+    unless the user set `CONDUCTOR_LIBRARY_STACKS` explicitly.
+
+    The library is a single global index, so the choice **accumulates**: each
+    `cdt up` run unions the project's detected stacks with the set picked on
+    earlier runs (persisted under CONDUCTOR_HOME). Switching from an Angular
+    project to a Ruby one grows the index to cover both instead of dropping one.
+    """
+    if env.get("CONDUCTOR_LIBRARY_STACKS"):
+        return  # explicit override wins; don't auto-detect or persist
+    from ..detect import library_stacks
+    from ..project import find_project_root
+    detected = set(library_stacks(find_project_root()))
+    store = REGISTRY_DIR / "library.json"
+    prev: set = set()
+    if store.is_file():
+        try:
+            prev = set(json.loads(store.read_text(encoding="utf-8")).get("stacks", []))
+        except (ValueError, OSError):
+            prev = set()
+    union = sorted(prev | detected)
+    if not union:
+        print("Library: no project stacks detected — ingesting core (language-agnostic).")
         return
-    cand = Path.cwd() / "to-brain.7z"
-    if cand.is_file():
-        env["CONDUCTOR_ARCHIVE"] = str(cand.resolve())
-        print(f"Books archive: {cand.resolve()}")
-    else:
-        print("WARNING: no to-brain.7z in the cwd. Set CONDUCTOR_ARCHIVE to your "
-              "archive, or the build will skip extraction (empty index).")
+    env["CONDUCTOR_LIBRARY_STACKS"] = ",".join(union)
+    try:
+        REGISTRY_DIR.mkdir(parents=True, exist_ok=True)
+        store.write_text(json.dumps({"stacks": union}, indent=2) + "\n", encoding="utf-8")
+    except OSError:
+        pass
+    new = sorted(detected - prev)
+    note = f"detected {', '.join(sorted(detected))}" if detected else "no new stacks here"
+    grew = f" (+{', '.join(new)})" if new else ""
+    print(f"Library stacks: {', '.join(union)}{grew}  [{note}]")
+
+
+def resolve_library_source(env: dict) -> None:
+    """Report where the book corpus comes from.
+
+    By default the `conductor` service fetches it from the public library repo
+    (CONDUCTOR_LIBRARY_REPO@REF) — nothing local is required. An offline seed is
+    still possible by setting CONDUCTOR_LIBRARY_ARCHIVE to a mounted .7z."""
+    archive = env.get("CONDUCTOR_LIBRARY_ARCHIVE")
+    if archive:
+        print(f"Library source: offline archive {archive}")
+        return
+    repo = env.get("CONDUCTOR_LIBRARY_REPO", "eltonssouza/conductor-library")
+    ref = env.get("CONDUCTOR_LIBRARY_REF", "main")
+    print(f"Library source: github.com/{repo}@{ref} (fetched into the stack)")
 
 
 def select_compose_files(infra: Path) -> list:
@@ -88,7 +124,9 @@ def main(argv: list) -> int:
         return 2
     cmd = argv or ["up"]
     env = dict(os.environ)
-    resolve_archive(env)
+    if cmd[0] not in ("down", "stop"):     # only when bringing the stack up
+        auto_select_stacks(env)
+    resolve_library_source(env)
     files = select_compose_files(infra)
     full = ["docker", "compose", *files, *cmd]
     print("+ " + " ".join(full))

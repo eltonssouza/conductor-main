@@ -31,7 +31,9 @@ MAX_DEPTH = 2
 
 def _read_json(path: Path) -> dict:
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        # utf-8-sig: tolerate a BOM (Windows editors / PowerShell Out-File add one,
+        # which would otherwise make json.loads choke and the manifest read as {}).
+        return json.loads(path.read_text(encoding="utf-8-sig"))
     except (ValueError, OSError):
         return {}
 
@@ -182,6 +184,107 @@ def detect(root: Path) -> Tuple[str, List[str], List[str]]:
     return ptype, list(dict.fromkeys(techs)), list(dict.fromkeys(evidence))
 
 
+# --- library stack mapping ---------------------------------------------------
+# Maps a detected technology (from detect()) to the Conductor library `stack` id
+# of the books that teach it — and only ids that actually have books in the
+# corpus. `cdt up` uses this to auto-select what to ingest for the current project.
+_TECH_STACK = {
+    "Angular": "angular",
+    "React Native": "react-native",
+    "Node.js": "node",
+    "Go": "go",
+    "Python": "python",
+    "Ruby": "ruby",
+    "Java/Maven": "java",
+    "Java/Gradle": "java",
+    # --- detected by detect(), but no book in the corpus yet. To enable: add the
+    # book to conductor-library with `software_dev: stack` + `stack: <id>`, then
+    # uncomment its line here (the id must match the book's `stack:`).
+    # "React": "react",          # plain React (react dep without react-native)
+    # "Vue": "vue",
+    # "Svelte": "svelte",
+    # "Next.js": "nextjs",
+    # "PHP": "php",
+    # "Rust": "rust",
+    # ".NET": "dotnet",
+    # "Flutter": "flutter",
+    # "iOS/Xcode": "swift",
+}
+
+
+def library_stacks(root: Path) -> List[str]:
+    """The library `stack` ids matching a project's detected technologies.
+
+    Drives `cdt up`'s auto-selection: an Angular + Java project resolves to
+    `angular`, `java` (+ `javascript` for the JS/TS ecosystem). Technologies with
+    no book in the corpus (Vue, Rust, .NET, plain React, …) simply map to nothing.
+    """
+    _, techs, _ = detect(root)
+    ids = {sid for t in techs if (sid := _TECH_STACK.get(t))}
+
+    deps: dict = {}
+    pkg_seen = False
+    for r in _search_roots(root):
+        p = r / "package.json"
+        if p.exists():
+            pkg = _read_json(p)
+            if pkg:
+                pkg_seen = True
+                deps.update(pkg.get("dependencies", {}))
+                deps.update(pkg.get("devDependencies", {}))
+    if any(k in deps for k in ("graphql", "@apollo/client", "@apollo/server", "apollo-server")):
+        ids.add("graphql")
+    if pkg_seen:                      # a JS/TS ecosystem -> the general JavaScript books
+        ids.add("javascript")
+    # --- frameworks with no book in the corpus yet. Uncomment a line once its
+    # book exists (tagged `stack: <id>` in conductor-library):
+    # if "@nestjs/core" in deps: ids.add("nestjs")
+    # if "express" in deps and "@angular/ssr" not in deps: ids.add("express")
+    # if "fastify" in deps: ids.add("fastify")
+    # Spring Boot is read from pom.xml (see profile/_parse_pom), not package.json:
+    #   scan the pom for "spring-boot-starter-parent" -> ids.add("spring")
+    # Python web frameworks come from pyproject/requirements text:
+    #   "django" -> ids.add("django"); "fastapi" -> ids.add("fastapi"); "flask" -> ids.add("flask")
+    if "ruby" in ids:                 # Rails when the Gemfile asks for it
+        for r in _search_roots(root):
+            g = r / "Gemfile"
+            if g.exists() and "rails" in _read_text(g).lower():
+                ids.add("rails")
+                break
+
+    # Attach the project's version as `id@major` where the profile knows it, so
+    # `cdt up` pins the matching book edition (nearest). Only meaningful-major
+    # techs; ids without a known version stay bare. react-native uses 0.x, so its
+    # "major" is not an edition — left bare.
+    def first_major(s: str):
+        m = re.search(r"(\d+)", s)   # first number anywhere in e.g. "Angular 21"
+        return m.group(1) if m else None
+
+    ver: dict = {}
+    prof = profile(root)
+    for lang in prof.get("languages", []):
+        low = lang.lower()
+        if low.startswith("java "):
+            ver["java"] = first_major(lang)
+        elif low.startswith("python "):
+            ver["python"] = first_major(lang)
+    for fw in prof.get("frameworks", []):
+        low = fw.lower()
+        if low.startswith("angular"):
+            ver["angular"] = first_major(fw)
+        elif low.startswith("spring boot"):
+            ver["spring"] = first_major(fw)
+        elif low.startswith("react native"):
+            pass
+        elif low.startswith("react"):
+            ver["react"] = first_major(fw)
+        elif low.startswith("vue"):
+            ver["vue"] = first_major(fw)
+        elif low.startswith("next"):
+            ver["nextjs"] = first_major(fw)
+    return sorted(f"{sid}@{ver[sid]}" if ver.get(sid) else sid for sid in ids)
+
+
 # --- rich profile ------------------------------------------------------------
 # detect() answers "what type"; profile() answers "what exactly" — the frameworks,
 # versions, datastore, build/test tooling and notable libraries written into the
@@ -203,7 +306,7 @@ _DATASTORES = (
 
 def _read_text(path: Path) -> str:
     try:
-        return path.read_text(encoding="utf-8", errors="replace")
+        return path.read_text(encoding="utf-8-sig", errors="replace")  # strip a BOM if present
     except OSError:
         return ""
 

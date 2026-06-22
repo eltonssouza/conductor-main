@@ -4,26 +4,34 @@
 Run as the `conductor` service in infra/conductor/. It brings the library RAG
 online end to end and prints the progress of each step:
 
-  [1/4] extract the books from to-brain.7z into the library
+  [1/4] fetch the books from the library repo into the library
   [2/4] pull the bge-m3 model in Ollama   (streamed % progress)
   [3/4] wait for ChromaDB to be ready
   [4/4] ingest the books into ChromaDB    (rag.ingest progress)
 
-Idempotent: extraction skips a populated library, the pull skips an existing
+Idempotent: the fetch skips a populated library, the pull skips an existing
 model, and the ingest upserts — so re-running resumes instead of duplicating.
 """
 from __future__ import annotations
 
+import io
 import json
 import os
 import sys
+import tarfile
 import time
 import urllib.error
 import urllib.request
 from pathlib import Path
 
 LIBRARY = Path(os.environ.get("CONDUCTOR_LIBRARY", "/data/library"))
-ARCHIVE = Path(os.environ.get("CONDUCTOR_LIBRARY_ARCHIVE", "/seed/to-brain.7z"))
+# Corpus source: a public GitHub repo of reference books, fetched as a tarball
+# (stdlib urllib + tarfile — no git, no py7zr). `CONDUCTOR_LIBRARY_ARCHIVE` is an
+# optional offline override (a local .7z) that wins when it points to a real file.
+LIBRARY_REPO = os.environ.get("CONDUCTOR_LIBRARY_REPO", "eltonssouza/conductor-library")
+LIBRARY_REF = os.environ.get("CONDUCTOR_LIBRARY_REF", "main")
+ARCHIVE = (Path(os.environ["CONDUCTOR_LIBRARY_ARCHIVE"])
+           if os.environ.get("CONDUCTOR_LIBRARY_ARCHIVE") else None)
 OLLAMA = os.environ.get("OLLAMA_HOST", "http://ollama:11434").rstrip("/")
 MODEL = os.environ.get("CONDUCTOR_EMBED_MODEL", "bge-m3")
 CHROMA_HTTP = os.environ.get("CONDUCTOR_CHROMA_HTTP", "chroma:8000")
@@ -54,13 +62,36 @@ def _wait(urls, name: str, step: str, timeout: int = 600) -> bool:
 
 # --- [1/4] extract books -----------------------------------------------------
 
+_SEL_MARKER = ".selection"
+
+
+def _selection_key() -> str:
+    """A stable fingerprint of the current tier/stack selection, so a re-run only
+    re-fetches when the selection changed (else the populated library is kept)."""
+    from .core import LIBRARY_TIERS, LIBRARY_STACKS
+    return f"tiers={','.join(LIBRARY_TIERS)};stacks={','.join(LIBRARY_STACKS)}"
+
+
 def step_extract() -> None:
-    if any(LIBRARY.rglob("*.md")):
-        log("1/4", f"library already populated at {LIBRARY}; skipping extraction")
+    key = _selection_key()
+    marker = LIBRARY / _SEL_MARKER
+    populated = any(LIBRARY.rglob("*.md"))
+    if populated and marker.is_file() and marker.read_text(encoding="utf-8").strip() == key:
+        log("1/4", f"library already populated for this selection; skipping fetch")
         return
-    if not ARCHIVE.is_file():
-        log("1/4", f"no archive at {ARCHIVE}; skipping (mount to-brain.7z to seed books)")
-        return
+    if ARCHIVE and ARCHIVE.is_file():
+        _extract_archive()        # offline 7z: extracts all; the ingest filters
+    else:
+        _fetch_repo_corpus()      # repo fetch: extracts only the selected books
+    try:
+        LIBRARY.mkdir(parents=True, exist_ok=True)
+        marker.write_text(key + "\n", encoding="utf-8")
+    except OSError:
+        pass
+
+
+def _extract_archive() -> None:
+    """Offline override: extract books from a local .7z (CONDUCTOR_LIBRARY_ARCHIVE)."""
     import py7zr
     LIBRARY.mkdir(parents=True, exist_ok=True)
     log("1/4", f"extracting {ARCHIVE.name} -> {LIBRARY}")
@@ -69,6 +100,56 @@ def step_extract() -> None:
         z.extractall(path=LIBRARY)
     md = sum(1 for _ in LIBRARY.rglob("*.md"))
     log("1/4", f"extracted {len(names)} entries ({md} .md books)")
+
+
+def _fetch_repo_corpus() -> None:
+    """Default: download the library repo's tarball and extract the **selected**
+    `.md` books (by `software_dev` tier + language/framework `stack`).
+
+    Only the books the developer needs are written to disk (and thus chunked and
+    embedded) — e.g. a Java+Angular dev gets `core` + `stack: java` + `stack:
+    angular`, not the Ruby/Go/React books. Keeps each book's category folder so
+    category detection works; repo-root meta files are skipped. Network failure
+    leaves the library empty (the ingest then no-ops) instead of crashing.
+    """
+    from .core import split_frontmatter, select_corpus, LIBRARY_TIERS, LIBRARY_STACKS
+    url = f"https://github.com/{LIBRARY_REPO}/archive/refs/heads/{LIBRARY_REF}.tar.gz"
+    log("1/4", f"fetching library from {LIBRARY_REPO}@{LIBRARY_REF} "
+               f"(tiers={','.join(LIBRARY_TIERS)}; stacks={','.join(LIBRARY_STACKS) or 'none'})")
+    LIBRARY.mkdir(parents=True, exist_ok=True)
+    try:
+        with urllib.request.urlopen(url, timeout=180) as resp:
+            blob = resp.read()
+    except Exception as e:  # noqa: BLE001 — network/HTTP errors must not crash the stack
+        log("1/4", f"WARNING: could not fetch {url}: {e} (library left empty)")
+        return
+    root = str(LIBRARY.resolve())
+    # Read every .md member once, keyed by its on-disk relative path; selection
+    # (incl. nearest-version stack resolution) needs to see all editions first.
+    payload: dict = {}   # rel -> bytes
+    metas: dict = {}     # rel -> frontmatter
+    with tarfile.open(fileobj=io.BytesIO(blob), mode="r:gz") as tf:
+        for m in tf.getmembers():
+            if not m.isfile() or not m.name.endswith(".md"):
+                continue
+            _, _, rel = m.name.partition("/")      # strip "<repo>-<ref>/"
+            if not rel or "/" not in rel:           # skip repo-root meta docs
+                continue
+            if not str((LIBRARY / rel).resolve()).startswith(root):  # path-traversal guard
+                continue
+            src = tf.extractfile(m)
+            if src is None:
+                continue
+            data = src.read()
+            payload[rel] = data
+            metas[rel], _ = split_frontmatter(data.decode("utf-8", "replace"))
+    selected = select_corpus(metas, LIBRARY_TIERS, LIBRARY_STACKS)
+    for rel in selected:
+        dest = LIBRARY / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(payload[rel])
+    log("1/4", f"fetched {len(selected)} selected .md book(s) into {LIBRARY} "
+               f"({len(payload) - len(selected)} skipped by selection)")
 
 
 # --- [2/4] pull bge-m3 -------------------------------------------------------

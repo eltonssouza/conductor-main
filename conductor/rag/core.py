@@ -18,7 +18,7 @@ import sys
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List
+from typing import Iterable, List, Optional
 
 
 def force_utf8() -> None:
@@ -32,8 +32,26 @@ def force_utf8() -> None:
 # --- configuration -----------------------------------------------------------
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-LIBRARY_DIR = Path(os.environ.get("CONDUCTOR_LIBRARY", r"C:\development\to-brain"))
+# Host-side library dir, used only by `cdt library add|reindex` (search hits
+# ChromaDB over HTTP, not the disk). Defaults to a per-user cache; the Docker
+# stack fetches its own copy from the library repo into a container volume.
+LIBRARY_DIR = Path(os.environ.get(
+    "CONDUCTOR_LIBRARY", str(Path.home() / ".conductor" / "library")))
 CHROMA_DIR = Path(os.environ.get("CONDUCTOR_CHROMA", str(REPO_ROOT / "rag" / "chroma")))
+
+
+def _csv_env(name: str) -> List[str]:
+    return [s.strip().lower() for s in os.environ.get(name, "").split(",") if s.strip()]
+
+
+# Corpus selection — what gets ingested (the rest is fetched but skipped):
+#  - TIERS: `software_dev` frontmatter tiers to include (default: core only).
+#  - STACKS: language/framework `stack:` tags to include. Empty = stack-less,
+#    language-agnostic books only (the default). "all" includes every stack.
+# So out of the box the index is "core, language-agnostic"; a user opts into the
+# languages/frameworks they use via CONDUCTOR_LIBRARY_STACKS=python,angular,...
+LIBRARY_TIERS = _csv_env("CONDUCTOR_LIBRARY_TIERS") or ["core"]
+LIBRARY_STACKS = _csv_env("CONDUCTOR_LIBRARY_STACKS")
 # Resident Chroma server ("host:port"). Defaults to the dockerized stack
 # (`cdt up` exposes ChromaDB on localhost:8001), so `cdt library`
 # works with no env setup. The in-container bootstrap overrides this with
@@ -147,17 +165,128 @@ def chunk_markdown(text: str, *, source: str, category: str, path: str) -> List[
     return chunks
 
 
-def iter_corpus(library: Path = LIBRARY_DIR) -> Iterable[Chunk]:
-    """Walks `library/**/*.md` and yields all chunks."""
-    for md in sorted(library.rglob("*.md")):
+def split_frontmatter(text: str):
+    """Returns ({key: value}, body) for a leading `--- key: value --- ` block.
+
+    Flat `key: value` lines only (the corpus convention: `software_dev`, `stack`).
+    Returns ({}, text) when there is no frontmatter.
+    """
+    if not text.startswith("---"):
+        return {}, text
+    end = text.find("\n---", 3)
+    if end == -1:
+        return {}, text
+    meta = {}
+    for line in text[3:end].strip("\n").splitlines():
+        if ":" in line and not line.startswith(" "):
+            k, _, v = line.partition(":")
+            meta[k.strip().lower()] = v.strip().lower()
+    body = text[end + 4:].lstrip("\n")
+    return meta, body
+
+
+def is_selected(meta: dict, tiers: List[str], stacks: List[str]) -> bool:
+    """Whether a file's frontmatter passes the current corpus selection.
+
+    A `stack:` field marks a language/framework-specific book (the corpus tags
+    these `software_dev: stack`); it is **opt-in** — included only when its stack
+    is chosen (or "all"), regardless of tier. Everything else is selected by its
+    `software_dev` tier (default: core). A missing tier defaults to `core`.
+    """
+    stack = meta.get("stack", "")
+    if stack:
+        return "all" in stacks or stack in stacks
+    tier = meta.get("software_dev", "core") or "core"
+    return tier in tiers
+
+
+def _parse_stacks(stacks: List[str]):
+    """`['java@25', 'angular', 'all']` -> ({'java': 25, 'angular': None}, want_all)."""
+    req: dict = {}
+    want_all = False
+    for s in stacks:
+        s = s.strip().lower()
+        if not s:
+            continue
+        if s == "all":
+            want_all = True
+            continue
+        sid, _, ver = s.partition("@")
+        req[sid] = int(ver) if ver.isdigit() else None
+    return req, want_all
+
+
+def _book_version(meta: dict):
+    v = meta.get("version")
+    try:
+        return int(str(v).split(".")[0]) if v not in (None, "") else None
+    except (TypeError, ValueError):
+        return None
+
+
+def select_corpus(metas: "dict[str, dict]", tiers: List[str], stacks: List[str]) -> set:
+    """Pick the corpus keys to ingest from {key: frontmatter}.
+
+    Tier (non-`stack`) books are chosen by `software_dev` tier. `stack` books are
+    opt-in: a requested `stack@<version>` resolves to the **nearest** book version
+    (closest major; ties prefer the higher), while a bare `stack` (or `all`) takes
+    every edition. Unversioned editions of a requested stack are always included.
+    """
+    req, want_all = _parse_stacks(stacks)
+    groups: dict = {}     # stack_id -> list[(version|None, key)]
+    chosen: set = set()
+    for key, meta in metas.items():
+        stack = (meta.get("stack") or "").strip().lower()
+        if stack:
+            groups.setdefault(stack, []).append((_book_version(meta), key))
+        else:
+            tier = (meta.get("software_dev") or "core").strip().lower()
+            if tier in tiers:
+                chosen.add(key)
+    for sid, editions in groups.items():
+        if not (want_all or sid in req):
+            continue
+        target = None if want_all else req.get(sid)
+        versioned = [(v, k) for v, k in editions if v is not None]
+        chosen.update(k for v, k in editions if v is None)   # unversioned: always in
+        if target is None or not versioned:
+            chosen.update(k for _, k in versioned)            # take every edition
+        else:                                                 # nearest major (tie -> higher)
+            best = min(abs(v - target) for v, _ in versioned)
+            near = sorted((v for v, _ in versioned if abs(v - target) == best), reverse=True)[0]
+            chosen.update(k for v, k in versioned if v == near)
+    return chosen
+
+
+def iter_corpus(library: Path = LIBRARY_DIR, *, tiers: Optional[List[str]] = None,
+                stacks: Optional[List[str]] = None) -> Iterable[Chunk]:
+    """Walks `library/**/*.md` and yields chunks for the *selected* books.
+
+    Selection (tiers + language/framework stacks) defaults to the env-configured
+    `LIBRARY_TIERS` / `LIBRARY_STACKS`. The frontmatter block is stripped before
+    chunking so the `software_dev`/`stack` tags are not embedded.
+    """
+    tiers = tiers if tiers is not None else LIBRARY_TIERS
+    stacks = stacks if stacks is not None else LIBRARY_STACKS
+    files = {str(md.relative_to(library)): md for md in sorted(library.rglob("*.md"))}
+    # Pass 1: read just the frontmatter head (cheap) to decide selection — nearest
+    # version matching needs to see every edition before picking.
+    metas = {}
+    for key, md in files.items():
+        try:
+            head = md.open(encoding="utf-8", errors="replace").read(4096)
+        except OSError:
+            continue
+        metas[key], _ = split_frontmatter(head)
+    selected = select_corpus(metas, tiers, stacks)
+    # Pass 2: chunk only the selected books (frontmatter stripped from the body).
+    for key in sorted(selected):
+        md = files[key]
         rel = md.relative_to(library)
-        parts = rel.parts
-        category = parts[0] if len(parts) > 1 else "(root)"
-        # sanitize() is applied once per chunk body in chunk_markdown(), so we
-        # no longer scrub the whole file here (avoids a second O(file) regex pass).
-        text = md.read_text(encoding="utf-8", errors="replace")
+        category = rel.parts[0] if len(rel.parts) > 1 else "(root)"
+        _, body = split_frontmatter(md.read_text(encoding="utf-8", errors="replace"))
         yield from chunk_markdown(
-            text, source=md.stem, category=category, path=str(rel).replace("\\", "/"),
+            body, source=md.stem, category=category, path=str(rel).replace("\\", "/"),
         )
 
 

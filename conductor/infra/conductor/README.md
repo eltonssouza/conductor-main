@@ -22,8 +22,10 @@ The launcher (`conductor/rag/stack.py`, invoked by `cdt up`):
 - **detects an NVIDIA GPU** (`nvidia-smi`) **and Docker's NVIDIA runtime** — if
   both are present it adds `docker-compose.gpu.yml` so Ollama uses the GPU; if
   not, it says so and runs on CPU (slow). It prints which mode it chose.
-- **auto-locates the books archive**: a `to-brain.7z` in `infra/conductor/` or at
-  the repo root is used automatically; otherwise set `CONDUCTOR_ARCHIVE`.
+- **fetches the book corpus** from the public library repo at run time
+  (`CONDUCTOR_LIBRARY_REPO@REF`, default `eltonssouza/conductor-library`); no
+  local archive needed. For an offline seed, set `CONDUCTOR_LIBRARY_ARCHIVE` to a
+  mounted `.7z`.
 
 Plain Docker still works (no auto-detect):
 
@@ -36,7 +38,7 @@ docker compose -f docker-compose.yml -f docker-compose.gpu.yml up   # GPU
 The `conductor` service prints:
 
 ```
-[1/4] extracting to-brain.7z -> /data/library ... 136 .md books
+[1/4] fetching library from eltonssouza/conductor-library@main ... 136 .md books
 [2/4] pulling bge-m3:  73.4%
 [3/4] ChromaDB is up
 [4/4] ingesting books from /data/library into ChromaDB (chroma:8000)
@@ -70,9 +72,10 @@ CPU, install the NVIDIA Container Toolkit and re-run.
 
 ## Notes
 
-- `to-brain.7z` is gitignored (it is the corpus, not source). Zip the **category
-  folders** (e.g. `08_sistemas_distribuidos/…`) at the archive root so the
-  ingest keeps the right `category` metadata.
+- The corpus lives in its own repo (`eltonssouza/conductor-library`), laid out as
+  **category folders** (e.g. `08_distributed_systems/…`) at the repo root — the
+  top folder becomes each book's `category` metadata. An offline `.7z` seed must
+  follow the same layout.
 - Port 8001 is used for Chroma so it does not clash with Honcho on 8000
   (`infra/honcho/`).
 - This stack is independent from the Honcho diary stack; run either or both.
