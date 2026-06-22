@@ -1,7 +1,7 @@
 # rag/ — semantic search over the library
 
-Implements the RAG goal from `plano.md`: retrieve passages from the library
-books to **ground** the roles' answers (fights hallucination).
+Retrieves passages from the library books to **ground** the roles' answers
+(fights hallucination).
 
 ## Stack
 

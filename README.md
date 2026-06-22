@@ -599,7 +599,6 @@ the underlying LLM without losing what it has learned.
   - `conductor/infra/conductor/` — the Docker RAG stack (Ollama + bge-m3 + Chroma).
   - `conductor/infra/honcho/` — the self-hosted Honcho diary backend.
 - `tools/validate.py` — the invariant validator over the templates (the CI gate).
-- `plano.md` — the original plan (historical, in Portuguese).
 
 ---
 

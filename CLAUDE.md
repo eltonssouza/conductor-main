@@ -50,8 +50,8 @@ Responda SEMPRE em pt-BR (português do Brasil), independentemente do idioma da 
 
 - **Versioning:** always bump the patch digit in `pyproject.toml`; on rollover
   `99` → next minor. (There is no longer a `plugin.json` to keep in sync.)
-- **Language:** all project artifacts in English EXCEPT `plano.md` (stays pt-BR,
-  historical) and chat responses (pt-BR, per Idioma above).
+- **Language:** all project artifacts in English; chat responses in pt-BR (per
+  Idioma above).
 - **Validation:** `python tools/validate.py` must exit 0 (R1–R8 over templates).
 - **Role↔skill pairing** is 1:1 and lives in `conductor/roles.py`; keep agent
   templates, skill templates, and that registry in sync (R7 enforces it).
