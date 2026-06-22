@@ -13,6 +13,7 @@ Both `cdt` and `conductor` invoke this; `cdt` is canonical in the docs.
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 from typing import List, Optional
 
 USAGE = """cdt <command> [args]   (alias: conductor)
@@ -23,6 +24,8 @@ Commands:
   cdt sync [path]            Refresh CLAUDE.md (live): re-detect stack, roles, and
                              pull the latest diary memory into the managed region.
   init | sync [path]         Aliases for `cdt init` / `cdt sync`.
+  detect [path]              Show the detected type/tech and the library stacks
+                             `cdt up` would auto-ingest for this project.
   library "<question>"       Semantic search over the reference books (RAG).
   library reindex            Index any library files not yet in ChromaDB (incremental).
   library add <file.md>      Index specific .md file(s) already under the library.
@@ -88,6 +91,22 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd in ("init", "sync"):
         from .scaffold import main as scaffold_main
         return scaffold_main([cmd, *rest])
+
+    if cmd == "detect":
+        from .detect import detect, library_stacks
+        from .project import find_project_root, force_utf8
+        force_utf8()
+        root = Path(rest[0]).resolve() if rest else find_project_root()
+        ptype, techs, _ = detect(root)
+        stacks = library_stacks(root)
+        print(f"project: {root}")
+        print(f"type:    {ptype}")
+        print(f"tech:    {', '.join(techs) or 'none detected'}")
+        print(f"stacks:  {', '.join(stacks) or 'none (core, language-agnostic only)'}")
+        if stacks:
+            print(f"\n`cdt up` from here auto-ingests core + these stacks.\n"
+                  f"Force a set with:  CONDUCTOR_LIBRARY_STACKS={','.join(stacks)} cdt up")
+        return 0
 
     if cmd == "library":
         from .library import main as library_main

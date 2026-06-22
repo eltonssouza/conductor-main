@@ -182,6 +182,55 @@ def detect(root: Path) -> Tuple[str, List[str], List[str]]:
     return ptype, list(dict.fromkeys(techs)), list(dict.fromkeys(evidence))
 
 
+# --- library stack mapping ---------------------------------------------------
+# Maps a detected technology (from detect()) to the Conductor library `stack` id
+# of the books that teach it — and only ids that actually have books in the
+# corpus. `cdt up` uses this to auto-select what to ingest for the current project.
+_TECH_STACK = {
+    "Angular": "angular",
+    "React Native": "react-native",
+    "Node.js": "node",
+    "Go": "go",
+    "Python": "python",
+    "Ruby": "ruby",
+    "Java/Maven": "java",
+    "Java/Gradle": "java",
+}
+
+
+def library_stacks(root: Path) -> List[str]:
+    """The library `stack` ids matching a project's detected technologies.
+
+    Drives `cdt up`'s auto-selection: an Angular + Java project resolves to
+    `angular`, `java` (+ `javascript` for the JS/TS ecosystem). Technologies with
+    no book in the corpus (Vue, Rust, .NET, plain React, …) simply map to nothing.
+    """
+    _, techs, _ = detect(root)
+    ids = {sid for t in techs if (sid := _TECH_STACK.get(t))}
+
+    deps: dict = {}
+    pkg_seen = False
+    for r in _search_roots(root):
+        p = r / "package.json"
+        if p.exists():
+            pkg = _read_json(p)
+            if pkg:
+                pkg_seen = True
+                deps.update(pkg.get("dependencies", {}))
+                deps.update(pkg.get("devDependencies", {}))
+    if any(k in deps for k in ("graphql", "@apollo/client", "@apollo/server", "apollo-server")):
+        ids.add("graphql")
+    if pkg_seen:                      # a JS/TS ecosystem -> the general JavaScript books
+        ids.add("javascript")
+    if "ruby" in ids:                 # Rails when the Gemfile asks for it
+        for r in _search_roots(root):
+            g = r / "Gemfile"
+            if g.exists() and "rails" in _read_text(g).lower():
+                ids.add("rails")
+                break
+    return sorted(ids)
+
+
 # --- rich profile ------------------------------------------------------------
 # detect() answers "what type"; profile() answers "what exactly" — the frameworks,
 # versions, datastore, build/test tooling and notable libraries written into the

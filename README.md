@@ -214,6 +214,10 @@ cdt ingest                # re-run the ingest only (idempotent)
   Ollama (≈0.5 s per embed); otherwise it prints that it is running on CPU;
 - **fetches the books** from the library repo (`CONDUCTOR_LIBRARY_REPO@REF`,
   default [`eltonssouza/conductor-library`](https://github.com/eltonssouza/conductor-library));
+- **auto-selects the corpus for your stack** — run from a project and it detects
+  the languages/frameworks and ingests only the matching books plus the
+  language-agnostic core (`cdt detect` previews the pick; the choice accumulates
+  across projects). Pin it explicitly with `CONDUCTOR_LIBRARY_STACKS` / `_TIERS`;
 - runs the bootstrap and prints the progress of each step:
 
 ```
