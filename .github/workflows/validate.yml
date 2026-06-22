@@ -1,6 +1,6 @@
 name: validate
 
-# Gate 7 (quality gate): every push/PR must pass the plugin invariants.
+# Gate 7 (quality gate): every push/PR must pass the invariants + functional tests.
 on:
   push:
     branches: [main]
@@ -14,6 +14,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-      # tools/validate.py is pure stdlib — no dependencies to install.
-      - name: Run plugin invariant validator
-        run: python tools/validate.py
+      # Pure stdlib (invariants R1–R11 + the unittest suite) — nothing to install.
+      - name: Run validator + test suite
+        run: python tools/test.py
