@@ -195,6 +195,18 @@ _TECH_STACK = {
     "Ruby": "ruby",
     "Java/Maven": "java",
     "Java/Gradle": "java",
+    # --- detected by detect(), but no book in the corpus yet. To enable: add the
+    # book to conductor-library with `software_dev: stack` + `stack: <id>`, then
+    # uncomment its line here (the id must match the book's `stack:`).
+    # "React": "react",          # plain React (react dep without react-native)
+    # "Vue": "vue",
+    # "Svelte": "svelte",
+    # "Next.js": "nextjs",
+    # "PHP": "php",
+    # "Rust": "rust",
+    # ".NET": "dotnet",
+    # "Flutter": "flutter",
+    # "iOS/Xcode": "swift",
 }
 
 
@@ -222,6 +234,15 @@ def library_stacks(root: Path) -> List[str]:
         ids.add("graphql")
     if pkg_seen:                      # a JS/TS ecosystem -> the general JavaScript books
         ids.add("javascript")
+    # --- frameworks with no book in the corpus yet. Uncomment a line once its
+    # book exists (tagged `stack: <id>` in conductor-library):
+    # if "@nestjs/core" in deps: ids.add("nestjs")
+    # if "express" in deps and "@angular/ssr" not in deps: ids.add("express")
+    # if "fastify" in deps: ids.add("fastify")
+    # Spring Boot is read from pom.xml (see profile/_parse_pom), not package.json:
+    #   scan the pom for "spring-boot-starter-parent" -> ids.add("spring")
+    # Python web frameworks come from pyproject/requirements text:
+    #   "django" -> ids.add("django"); "fastapi" -> ids.add("fastapi"); "flask" -> ids.add("flask")
     if "ruby" in ids:                 # Rails when the Gemfile asks for it
         for r in _search_roots(root):
             g = r / "Gemfile"
