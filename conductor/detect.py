@@ -197,27 +197,37 @@ _TECH_STACK = {
     "Ruby": "ruby",
     "Java/Maven": "java",
     "Java/Gradle": "java",
-    # --- detected by detect(), but no book in the corpus yet. To enable: add the
-    # book to conductor-library with `software_dev: stack` + `stack: <id>`, then
-    # uncomment its line here (the id must match the book's `stack:`).
-    # "React": "react",          # plain React (react dep without react-native)
-    # "Vue": "vue",
-    # "Svelte": "svelte",
-    # "Next.js": "nextjs",
-    # "PHP": "php",
-    # "Rust": "rust",
-    # ".NET": "dotnet",
-    # "Flutter": "flutter",
-    # "iOS/Xcode": "swift",
+    "React": "react",              # plain React (react dep without react-native)
+    "Vue": "vue",
+    "Svelte": "svelte",
+    "Next.js": "nextjs",
+    "PHP": "php",
+    "Rust": "rust",
+    ".NET": "dotnet",
+    "Flutter": "flutter",
+    "iOS/Xcode": "swift",
 }
+
+# Framework label prefix (as profile() writes it) -> stack id. profile() knows
+# the version, so these resolve to `id@major`. Order: more-specific prefix first.
+# react-native uses 0.x, so its "major" is not an edition -> id only (no version).
+_FW_STACK = (
+    ("react native", "react-native"),
+    ("angular", "angular"), ("react", "react"), ("vue", "vue"),
+    ("svelte", "svelte"), ("next", "nextjs"), ("nestjs", "nestjs"),
+    ("express", "express"), ("fastify", "fastify"), ("spring boot", "spring"),
+    ("django", "django"), ("fastapi", "fastapi"), ("flask", "flask"),
+)
+_FW_NO_VERSION = {"react-native"}
 
 
 def library_stacks(root: Path) -> List[str]:
     """The library `stack` ids matching a project's detected technologies.
 
-    Drives `cdt up`'s auto-selection: an Angular + Java project resolves to
-    `angular`, `java` (+ `javascript` for the JS/TS ecosystem). Technologies with
-    no book in the corpus (Vue, Rust, .NET, plain React, …) simply map to nothing.
+    Drives `cdt up`'s auto-selection: a Java/Spring + Angular project resolves to
+    `java@<v>`, `spring@<v>`, `angular@<v>` (+ `javascript`). Languages and
+    frameworks are versioned (`id@major`) when the profile knows the version, so
+    the nearest book edition is picked. Techs with no book still map to nothing.
     """
     _, techs, _ = detect(root)
     ids = {sid for t in techs if (sid := _TECH_STACK.get(t))}
@@ -236,15 +246,6 @@ def library_stacks(root: Path) -> List[str]:
         ids.add("graphql")
     if pkg_seen:                      # a JS/TS ecosystem -> the general JavaScript books
         ids.add("javascript")
-    # --- frameworks with no book in the corpus yet. Uncomment a line once its
-    # book exists (tagged `stack: <id>` in conductor-library):
-    # if "@nestjs/core" in deps: ids.add("nestjs")
-    # if "express" in deps and "@angular/ssr" not in deps: ids.add("express")
-    # if "fastify" in deps: ids.add("fastify")
-    # Spring Boot is read from pom.xml (see profile/_parse_pom), not package.json:
-    #   scan the pom for "spring-boot-starter-parent" -> ids.add("spring")
-    # Python web frameworks come from pyproject/requirements text:
-    #   "django" -> ids.add("django"); "fastapi" -> ids.add("fastapi"); "flask" -> ids.add("flask")
     if "ruby" in ids:                 # Rails when the Gemfile asks for it
         for r in _search_roots(root):
             g = r / "Gemfile"
@@ -252,36 +253,31 @@ def library_stacks(root: Path) -> List[str]:
                 ids.add("rails")
                 break
 
-    # Attach the project's version as `id@major` where the profile knows it, so
-    # `cdt up` pins the matching book edition (nearest). Only meaningful-major
-    # techs; ids without a known version stay bare. react-native uses 0.x, so its
-    # "major" is not an edition — left bare.
+    # Frameworks (incl. backend ones that aren't detect() techs: Spring Boot,
+    # NestJS, Django, …) come from profile(), which also carries their version.
+    # That gives `id@major` so `cdt up` pins the nearest book edition; languages
+    # add Java/Python majors. Ids with no known version stay bare.
     def first_major(s: str):
-        m = re.search(r"(\d+)", s)   # first number anywhere in e.g. "Angular 21"
+        m = re.search(r"(\d+)", s)    # first number in e.g. "Angular 21"
         return m.group(1) if m else None
 
     ver: dict = {}
     prof = profile(root)
+    for fw in prof.get("frameworks", []):
+        low = fw.lower()
+        for prefix, sid in _FW_STACK:
+            if low.startswith(prefix):
+                ids.add(sid)
+                v = first_major(fw)
+                if v and sid not in _FW_NO_VERSION:
+                    ver[sid] = v
+                break
     for lang in prof.get("languages", []):
         low = lang.lower()
         if low.startswith("java "):
             ver["java"] = first_major(lang)
         elif low.startswith("python "):
             ver["python"] = first_major(lang)
-    for fw in prof.get("frameworks", []):
-        low = fw.lower()
-        if low.startswith("angular"):
-            ver["angular"] = first_major(fw)
-        elif low.startswith("spring boot"):
-            ver["spring"] = first_major(fw)
-        elif low.startswith("react native"):
-            pass
-        elif low.startswith("react"):
-            ver["react"] = first_major(fw)
-        elif low.startswith("vue"):
-            ver["vue"] = first_major(fw)
-        elif low.startswith("next"):
-            ver["nextjs"] = first_major(fw)
     return sorted(f"{sid}@{ver[sid]}" if ver.get(sid) else sid for sid in ids)
 
 
