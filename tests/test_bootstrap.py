@@ -70,5 +70,35 @@ class TestFetchCorpus(unittest.TestCase):
         self.assertEqual(list(self.lib.rglob("*.md")), [])
 
 
+def _tagged_tarball():
+    """A repo tree: one agnostic core book + three stack books (java/angular/ruby)."""
+    raw = io.BytesIO()
+    with tarfile.open(fileobj=raw, mode="w") as tf:
+        _member(tf, "conductor-library-main/03_design/clean.md",
+                b"---\nsoftware_dev: core\n---\n\n# Clean\n")
+        for lang in ("java", "angular", "ruby"):
+            _member(tf, f"conductor-library-main/lang/{lang}.md",
+                    f"---\nsoftware_dev: stack\nstack: {lang}\n---\n\n# {lang}\n".encode())
+    return gzip.compress(raw.getvalue())
+
+
+class TestSelectiveFetch(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.lib = Path(self._tmp.name)
+        self.addCleanup(self._tmp.cleanup)
+
+    def test_extracts_only_chosen_stacks(self):
+        from conductor.rag import core
+        with mock.patch.object(bootstrap, "LIBRARY", self.lib), \
+             mock.patch.object(bootstrap.urllib.request, "urlopen",
+                               return_value=_FakeResp(_tagged_tarball())), \
+             mock.patch.object(core, "LIBRARY_TIERS", ["core"]), \
+             mock.patch.object(core, "LIBRARY_STACKS", ["java", "angular"]):
+            bootstrap._fetch_repo_corpus()
+        got = sorted(p.name for p in self.lib.rglob("*.md"))
+        self.assertEqual(got, ["angular.md", "clean.md", "java.md"])  # ruby NOT downloaded
+
+
 if __name__ == "__main__":
     unittest.main()

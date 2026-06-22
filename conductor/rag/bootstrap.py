@@ -62,14 +62,32 @@ def _wait(urls, name: str, step: str, timeout: int = 600) -> bool:
 
 # --- [1/4] extract books -----------------------------------------------------
 
+_SEL_MARKER = ".selection"
+
+
+def _selection_key() -> str:
+    """A stable fingerprint of the current tier/stack selection, so a re-run only
+    re-fetches when the selection changed (else the populated library is kept)."""
+    from .core import LIBRARY_TIERS, LIBRARY_STACKS
+    return f"tiers={','.join(LIBRARY_TIERS)};stacks={','.join(LIBRARY_STACKS)}"
+
+
 def step_extract() -> None:
-    if any(LIBRARY.rglob("*.md")):
-        log("1/4", f"library already populated at {LIBRARY}; skipping fetch")
+    key = _selection_key()
+    marker = LIBRARY / _SEL_MARKER
+    populated = any(LIBRARY.rglob("*.md"))
+    if populated and marker.is_file() and marker.read_text(encoding="utf-8").strip() == key:
+        log("1/4", f"library already populated for this selection; skipping fetch")
         return
     if ARCHIVE and ARCHIVE.is_file():
-        _extract_archive()
-        return
-    _fetch_repo_corpus()
+        _extract_archive()        # offline 7z: extracts all; the ingest filters
+    else:
+        _fetch_repo_corpus()      # repo fetch: extracts only the selected books
+    try:
+        LIBRARY.mkdir(parents=True, exist_ok=True)
+        marker.write_text(key + "\n", encoding="utf-8")
+    except OSError:
+        pass
 
 
 def _extract_archive() -> None:
@@ -85,15 +103,19 @@ def _extract_archive() -> None:
 
 
 def _fetch_repo_corpus() -> None:
-    """Default: download the library repo's tarball and extract its `.md` books.
+    """Default: download the library repo's tarball and extract the **selected**
+    `.md` books (by `software_dev` tier + language/framework `stack`).
 
-    Keeps each book's category folder (the top-level dir under the repo root) so
-    the ingest's category detection still works; repo-root meta files (README,
-    LICENSE, …) are skipped. Network failure leaves the library empty (the ingest
-    then no-ops) instead of crashing the stack.
+    Only the books the developer needs are written to disk (and thus chunked and
+    embedded) — e.g. a Java+Angular dev gets `core` + `stack: java` + `stack:
+    angular`, not the Ruby/Go/React books. Keeps each book's category folder so
+    category detection works; repo-root meta files are skipped. Network failure
+    leaves the library empty (the ingest then no-ops) instead of crashing.
     """
+    from .core import split_frontmatter, is_selected, LIBRARY_TIERS, LIBRARY_STACKS
     url = f"https://github.com/{LIBRARY_REPO}/archive/refs/heads/{LIBRARY_REF}.tar.gz"
-    log("1/4", f"fetching library from {LIBRARY_REPO}@{LIBRARY_REF}")
+    log("1/4", f"fetching library from {LIBRARY_REPO}@{LIBRARY_REF} "
+               f"(tiers={','.join(LIBRARY_TIERS)}; stacks={','.join(LIBRARY_STACKS) or 'none'})")
     LIBRARY.mkdir(parents=True, exist_ok=True)
     try:
         with urllib.request.urlopen(url, timeout=180) as resp:
@@ -102,7 +124,7 @@ def _fetch_repo_corpus() -> None:
         log("1/4", f"WARNING: could not fetch {url}: {e} (library left empty)")
         return
     root = str(LIBRARY.resolve())
-    md = 0
+    md = skipped = 0
     with tarfile.open(fileobj=io.BytesIO(blob), mode="r:gz") as tf:
         for m in tf.getmembers():
             if not m.isfile() or not m.name.endswith(".md"):
@@ -116,10 +138,16 @@ def _fetch_repo_corpus() -> None:
             src = tf.extractfile(m)
             if src is None:
                 continue
+            data = src.read()
+            meta, _ = split_frontmatter(data.decode("utf-8", "replace"))
+            if not is_selected(meta, LIBRARY_TIERS, LIBRARY_STACKS):
+                skipped += 1
+                continue
             dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_bytes(src.read())
+            dest.write_bytes(data)
             md += 1
-    log("1/4", f"fetched {md} .md book(s) into {LIBRARY}")
+    log("1/4", f"fetched {md} selected .md book(s) into {LIBRARY} "
+               f"({skipped} skipped by selection)")
 
 
 # --- [2/4] pull bge-m3 -------------------------------------------------------
