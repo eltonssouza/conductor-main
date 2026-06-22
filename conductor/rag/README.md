@@ -9,7 +9,9 @@ books to **ground** the roles' answers (fights hallucination).
   at `http://localhost:11434`. Access via `urllib` (stdlib) — no extra client.
 - **Vector store:** persistent **ChromaDB** (cosine), at `rag/chroma/`
   (gitignored — built locally, not versioned).
-- **Corpus:** markdown in `C:\development\to-brain` (configurable).
+- **Corpus:** markdown books from the public library repo
+  (`eltonssouza/conductor-library`), fetched by `cdt up` into the stack. Host-side
+  `library add|reindex` uses `CONDUCTOR_LIBRARY` (default `~/.conductor/library`).
 
 ## Prerequisites
 
@@ -41,7 +43,9 @@ The generated project's `CLAUDE.md` tells the project's Claude to use
 
 | Var | Default | Purpose |
 |-----|---------|---------|
-| `CONDUCTOR_LIBRARY` | `C:\development\to-brain` | corpus markdown root |
+| `CONDUCTOR_LIBRARY` | `~/.conductor/library` | host-side corpus root (`library add|reindex`) |
+| `CONDUCTOR_LIBRARY_REPO` | `eltonssouza/conductor-library` | repo the corpus is fetched from on `cdt up` |
+| `CONDUCTOR_LIBRARY_REF` | `main` | branch/tag of the library repo |
 | `CONDUCTOR_CHROMA` | `rag/chroma` | where to persist the index |
 | `CONDUCTOR_EMBED_MODEL` | `bge-m3` | embeddings model in Ollama |
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama endpoint |

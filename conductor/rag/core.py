@@ -32,7 +32,11 @@ def force_utf8() -> None:
 # --- configuration -----------------------------------------------------------
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-LIBRARY_DIR = Path(os.environ.get("CONDUCTOR_LIBRARY", r"C:\development\to-brain"))
+# Host-side library dir, used only by `cdt library add|reindex` (search hits
+# ChromaDB over HTTP, not the disk). Defaults to a per-user cache; the Docker
+# stack fetches its own copy from the library repo into a container volume.
+LIBRARY_DIR = Path(os.environ.get(
+    "CONDUCTOR_LIBRARY", str(Path.home() / ".conductor" / "library")))
 CHROMA_DIR = Path(os.environ.get("CONDUCTOR_CHROMA", str(REPO_ROOT / "rag" / "chroma")))
 # Resident Chroma server ("host:port"). Defaults to the dockerized stack
 # (`cdt up` exposes ChromaDB on localhost:8001), so `cdt library`

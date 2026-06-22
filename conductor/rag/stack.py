@@ -4,7 +4,8 @@
 Conductor identifies an NVIDIA GPU and Docker's NVIDIA runtime; when both are
 present it adds the GPU compose override so Ollama runs bge-m3 on the GPU
 (~0.5 s/embed). Otherwise it falls back to CPU (full-corpus ingest takes hours).
-It also auto-locates the books archive (cwd or CONDUCTOR_ARCHIVE).
+The book corpus is fetched from the public library repo by the `conductor`
+service (CONDUCTOR_LIBRARY_REPO@REF); no local archive is required.
 
 The Docker infra ships inside the package; the `conductor` image is built from
 the local source, so the Docker stack needs a repo clone (the CLI itself does not).
@@ -43,22 +44,19 @@ def docker_has_nvidia_runtime() -> bool:
         return False
 
 
-def resolve_archive(env: dict) -> None:
-    """Sets CONDUCTOR_ARCHIVE to an ABSOLUTE path (compose runs from the staged
-    infra dir, so a relative path would resolve wrong)."""
-    val = env.get("CONDUCTOR_ARCHIVE")
-    if val:
-        p = Path(val)
-        env["CONDUCTOR_ARCHIVE"] = str(p if p.is_absolute() else (Path.cwd() / p).resolve())
-        print(f"Books archive: {env['CONDUCTOR_ARCHIVE']}")
+def resolve_library_source(env: dict) -> None:
+    """Report where the book corpus comes from.
+
+    By default the `conductor` service fetches it from the public library repo
+    (CONDUCTOR_LIBRARY_REPO@REF) — nothing local is required. An offline seed is
+    still possible by setting CONDUCTOR_LIBRARY_ARCHIVE to a mounted .7z."""
+    archive = env.get("CONDUCTOR_LIBRARY_ARCHIVE")
+    if archive:
+        print(f"Library source: offline archive {archive}")
         return
-    cand = Path.cwd() / "to-brain.7z"
-    if cand.is_file():
-        env["CONDUCTOR_ARCHIVE"] = str(cand.resolve())
-        print(f"Books archive: {cand.resolve()}")
-    else:
-        print("WARNING: no to-brain.7z in the cwd. Set CONDUCTOR_ARCHIVE to your "
-              "archive, or the build will skip extraction (empty index).")
+    repo = env.get("CONDUCTOR_LIBRARY_REPO", "eltonssouza/conductor-library")
+    ref = env.get("CONDUCTOR_LIBRARY_REF", "main")
+    print(f"Library source: github.com/{repo}@{ref} (fetched into the stack)")
 
 
 def select_compose_files(infra: Path) -> list:
@@ -88,7 +86,7 @@ def main(argv: list) -> int:
         return 2
     cmd = argv or ["up"]
     env = dict(os.environ)
-    resolve_archive(env)
+    resolve_library_source(env)
     files = select_compose_files(infra)
     full = ["docker", "compose", *files, *cmd]
     print("+ " + " ".join(full))
