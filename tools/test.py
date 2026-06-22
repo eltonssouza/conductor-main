@@ -18,7 +18,7 @@ sys.path.insert(0, str(ROOT))
 
 
 def _run_validator() -> bool:
-    print("== validate (R1-R8) ==", flush=True)
+    print("== validate (R1-R11) ==", flush=True)
     rc = subprocess.call([sys.executable, str(ROOT / "tools" / "validate.py")])
     return rc == 0
 
