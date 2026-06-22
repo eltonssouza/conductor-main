@@ -251,7 +251,38 @@ def library_stacks(root: Path) -> List[str]:
             if g.exists() and "rails" in _read_text(g).lower():
                 ids.add("rails")
                 break
-    return sorted(ids)
+
+    # Attach the project's version as `id@major` where the profile knows it, so
+    # `cdt up` pins the matching book edition (nearest). Only meaningful-major
+    # techs; ids without a known version stay bare. react-native uses 0.x, so its
+    # "major" is not an edition — left bare.
+    def first_major(s: str):
+        m = re.search(r"(\d+)", s)   # first number anywhere in e.g. "Angular 21"
+        return m.group(1) if m else None
+
+    ver: dict = {}
+    prof = profile(root)
+    for lang in prof.get("languages", []):
+        low = lang.lower()
+        if low.startswith("java "):
+            ver["java"] = first_major(lang)
+        elif low.startswith("python "):
+            ver["python"] = first_major(lang)
+    for fw in prof.get("frameworks", []):
+        low = fw.lower()
+        if low.startswith("angular"):
+            ver["angular"] = first_major(fw)
+        elif low.startswith("spring boot"):
+            ver["spring"] = first_major(fw)
+        elif low.startswith("react native"):
+            pass
+        elif low.startswith("react"):
+            ver["react"] = first_major(fw)
+        elif low.startswith("vue"):
+            ver["vue"] = first_major(fw)
+        elif low.startswith("next"):
+            ver["nextjs"] = first_major(fw)
+    return sorted(f"{sid}@{ver[sid]}" if ver.get(sid) else sid for sid in ids)
 
 
 # --- rich profile ------------------------------------------------------------

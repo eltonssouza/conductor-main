@@ -32,12 +32,18 @@ class TestLibraryStacks(unittest.TestCase):
 
     def test_angular_adds_javascript(self):
         self._pkg({"@angular/core": "^21.0.0"})
-        self.assertEqual(library_stacks(self.root), ["angular", "javascript"])
+        # version comes from the @angular/core major
+        self.assertEqual(library_stacks(self.root), ["angular@21", "javascript"])
 
     def test_java_plus_angular(self):
-        self._file("pom.xml", "<project/>")
+        self._file("pom.xml", "<project/>")        # no <java.version> -> java stays bare
         self._pkg({"@angular/core": "^21.0.0"})
-        self.assertEqual(library_stacks(self.root), ["angular", "java", "javascript"])
+        self.assertEqual(library_stacks(self.root), ["angular@21", "java", "javascript"])
+
+    def test_java_version_pinned(self):
+        self._file("pom.xml",
+                   "<project><properties><java.version>25</java.version></properties></project>")
+        self.assertEqual(library_stacks(self.root), ["java@25"])
 
     def test_go(self):
         self._file("go.mod", "module x")
@@ -63,7 +69,7 @@ class TestLibraryStacks(unittest.TestCase):
         # PowerShell Out-File / some editors prepend a UTF-8 BOM; it must not break detection
         (self.root / "package.json").write_text(
             '{"dependencies":{"@angular/core":"^21.0.0"}}', encoding="utf-8-sig")
-        self.assertIn("angular", library_stacks(self.root))
+        self.assertIn("angular@21", library_stacks(self.root))
 
 
 class TestAutoSelect(unittest.TestCase):
