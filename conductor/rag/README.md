@@ -46,6 +46,8 @@ The generated project's `CLAUDE.md` tells the project's Claude to use
 | `CONDUCTOR_LIBRARY` | `~/.conductor/library` | host-side corpus root (`library add|reindex`) |
 | `CONDUCTOR_LIBRARY_REPO` | `eltonssouza/conductor-library` | repo the corpus is fetched from on `cdt up` |
 | `CONDUCTOR_LIBRARY_REF` | `main` | branch/tag of the library repo |
+| `CONDUCTOR_LIBRARY_TIERS` | `core` | `software_dev` tiers to ingest (core/supporting/foundational/optional) |
+| `CONDUCTOR_LIBRARY_STACKS` | _(none)_ | language/framework stacks to add (e.g. `python,angular`) or `all` |
 | `CONDUCTOR_CHROMA` | `rag/chroma` | where to persist the index |
 | `CONDUCTOR_EMBED_MODEL` | `bge-m3` | embeddings model in Ollama |
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama endpoint |

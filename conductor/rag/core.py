@@ -18,7 +18,7 @@ import sys
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List
+from typing import Iterable, List, Optional
 
 
 def force_utf8() -> None:
@@ -38,6 +38,20 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 LIBRARY_DIR = Path(os.environ.get(
     "CONDUCTOR_LIBRARY", str(Path.home() / ".conductor" / "library")))
 CHROMA_DIR = Path(os.environ.get("CONDUCTOR_CHROMA", str(REPO_ROOT / "rag" / "chroma")))
+
+
+def _csv_env(name: str) -> List[str]:
+    return [s.strip().lower() for s in os.environ.get(name, "").split(",") if s.strip()]
+
+
+# Corpus selection — what gets ingested (the rest is fetched but skipped):
+#  - TIERS: `software_dev` frontmatter tiers to include (default: core only).
+#  - STACKS: language/framework `stack:` tags to include. Empty = stack-less,
+#    language-agnostic books only (the default). "all" includes every stack.
+# So out of the box the index is "core, language-agnostic"; a user opts into the
+# languages/frameworks they use via CONDUCTOR_LIBRARY_STACKS=python,angular,...
+LIBRARY_TIERS = _csv_env("CONDUCTOR_LIBRARY_TIERS") or ["core"]
+LIBRARY_STACKS = _csv_env("CONDUCTOR_LIBRARY_STACKS")
 # Resident Chroma server ("host:port"). Defaults to the dockerized stack
 # (`cdt up` exposes ChromaDB on localhost:8001), so `cdt library`
 # works with no env setup. The in-container bootstrap overrides this with
@@ -151,17 +165,63 @@ def chunk_markdown(text: str, *, source: str, category: str, path: str) -> List[
     return chunks
 
 
-def iter_corpus(library: Path = LIBRARY_DIR) -> Iterable[Chunk]:
-    """Walks `library/**/*.md` and yields all chunks."""
+def split_frontmatter(text: str):
+    """Returns ({key: value}, body) for a leading `--- key: value --- ` block.
+
+    Flat `key: value` lines only (the corpus convention: `software_dev`, `stack`).
+    Returns ({}, text) when there is no frontmatter.
+    """
+    if not text.startswith("---"):
+        return {}, text
+    end = text.find("\n---", 3)
+    if end == -1:
+        return {}, text
+    meta = {}
+    for line in text[3:end].strip("\n").splitlines():
+        if ":" in line and not line.startswith(" "):
+            k, _, v = line.partition(":")
+            meta[k.strip().lower()] = v.strip().lower()
+    body = text[end + 4:].lstrip("\n")
+    return meta, body
+
+
+def is_selected(meta: dict, tiers: List[str], stacks: List[str]) -> bool:
+    """Whether a file's frontmatter passes the current corpus selection.
+
+    A `stack:` field marks a language/framework-specific book (the corpus tags
+    these `software_dev: stack`); it is **opt-in** — included only when its stack
+    is chosen (or "all"), regardless of tier. Everything else is selected by its
+    `software_dev` tier (default: core). A missing tier defaults to `core`.
+    """
+    stack = meta.get("stack", "")
+    if stack:
+        return "all" in stacks or stack in stacks
+    tier = meta.get("software_dev", "core") or "core"
+    return tier in tiers
+
+
+def iter_corpus(library: Path = LIBRARY_DIR, *, tiers: Optional[List[str]] = None,
+                stacks: Optional[List[str]] = None) -> Iterable[Chunk]:
+    """Walks `library/**/*.md` and yields chunks for the *selected* books.
+
+    Selection (tiers + language/framework stacks) defaults to the env-configured
+    `LIBRARY_TIERS` / `LIBRARY_STACKS`. The frontmatter block is stripped before
+    chunking so the `software_dev`/`stack` tags are not embedded.
+    """
+    tiers = tiers if tiers is not None else LIBRARY_TIERS
+    stacks = stacks if stacks is not None else LIBRARY_STACKS
     for md in sorted(library.rglob("*.md")):
         rel = md.relative_to(library)
         parts = rel.parts
         category = parts[0] if len(parts) > 1 else "(root)"
+        text = md.read_text(encoding="utf-8", errors="replace")
+        meta, body = split_frontmatter(text)
+        if not is_selected(meta, tiers, stacks):
+            continue
         # sanitize() is applied once per chunk body in chunk_markdown(), so we
         # no longer scrub the whole file here (avoids a second O(file) regex pass).
-        text = md.read_text(encoding="utf-8", errors="replace")
         yield from chunk_markdown(
-            text, source=md.stem, category=category, path=str(rel).replace("\\", "/"),
+            body, source=md.stem, category=category, path=str(rel).replace("\\", "/"),
         )
 
 

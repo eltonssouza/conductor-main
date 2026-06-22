@@ -61,6 +61,10 @@ services:
       # mounted .7z instead (see the bootstrap fallback).
       CONDUCTOR_LIBRARY_REPO: ${CONDUCTOR_LIBRARY_REPO:-eltonssouza/conductor-library}
       CONDUCTOR_LIBRARY_REF: ${CONDUCTOR_LIBRARY_REF:-main}
+      # Corpus selection (what gets ingested): default is core, language-agnostic.
+      # Opt into languages/frameworks: CONDUCTOR_LIBRARY_STACKS=python,angular,...
+      CONDUCTOR_LIBRARY_TIERS: ${CONDUCTOR_LIBRARY_TIERS:-core}
+      CONDUCTOR_LIBRARY_STACKS: ${CONDUCTOR_LIBRARY_STACKS:-}
       CONDUCTOR_EMBED_MODEL: bge-m3
     volumes:
       - library:/data/library
