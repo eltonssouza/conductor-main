@@ -200,6 +200,64 @@ def is_selected(meta: dict, tiers: List[str], stacks: List[str]) -> bool:
     return tier in tiers
 
 
+def _parse_stacks(stacks: List[str]):
+    """`['java@25', 'angular', 'all']` -> ({'java': 25, 'angular': None}, want_all)."""
+    req: dict = {}
+    want_all = False
+    for s in stacks:
+        s = s.strip().lower()
+        if not s:
+            continue
+        if s == "all":
+            want_all = True
+            continue
+        sid, _, ver = s.partition("@")
+        req[sid] = int(ver) if ver.isdigit() else None
+    return req, want_all
+
+
+def _book_version(meta: dict):
+    v = meta.get("version")
+    try:
+        return int(str(v).split(".")[0]) if v not in (None, "") else None
+    except (TypeError, ValueError):
+        return None
+
+
+def select_corpus(metas: "dict[str, dict]", tiers: List[str], stacks: List[str]) -> set:
+    """Pick the corpus keys to ingest from {key: frontmatter}.
+
+    Tier (non-`stack`) books are chosen by `software_dev` tier. `stack` books are
+    opt-in: a requested `stack@<version>` resolves to the **nearest** book version
+    (closest major; ties prefer the higher), while a bare `stack` (or `all`) takes
+    every edition. Unversioned editions of a requested stack are always included.
+    """
+    req, want_all = _parse_stacks(stacks)
+    groups: dict = {}     # stack_id -> list[(version|None, key)]
+    chosen: set = set()
+    for key, meta in metas.items():
+        stack = (meta.get("stack") or "").strip().lower()
+        if stack:
+            groups.setdefault(stack, []).append((_book_version(meta), key))
+        else:
+            tier = (meta.get("software_dev") or "core").strip().lower()
+            if tier in tiers:
+                chosen.add(key)
+    for sid, editions in groups.items():
+        if not (want_all or sid in req):
+            continue
+        target = None if want_all else req.get(sid)
+        versioned = [(v, k) for v, k in editions if v is not None]
+        chosen.update(k for v, k in editions if v is None)   # unversioned: always in
+        if target is None or not versioned:
+            chosen.update(k for _, k in versioned)            # take every edition
+        else:                                                 # nearest major (tie -> higher)
+            best = min(abs(v - target) for v, _ in versioned)
+            near = sorted((v for v, _ in versioned if abs(v - target) == best), reverse=True)[0]
+            chosen.update(k for v, k in versioned if v == near)
+    return chosen
+
+
 def iter_corpus(library: Path = LIBRARY_DIR, *, tiers: Optional[List[str]] = None,
                 stacks: Optional[List[str]] = None) -> Iterable[Chunk]:
     """Walks `library/**/*.md` and yields chunks for the *selected* books.
@@ -210,16 +268,23 @@ def iter_corpus(library: Path = LIBRARY_DIR, *, tiers: Optional[List[str]] = Non
     """
     tiers = tiers if tiers is not None else LIBRARY_TIERS
     stacks = stacks if stacks is not None else LIBRARY_STACKS
-    for md in sorted(library.rglob("*.md")):
-        rel = md.relative_to(library)
-        parts = rel.parts
-        category = parts[0] if len(parts) > 1 else "(root)"
-        text = md.read_text(encoding="utf-8", errors="replace")
-        meta, body = split_frontmatter(text)
-        if not is_selected(meta, tiers, stacks):
+    files = {str(md.relative_to(library)): md for md in sorted(library.rglob("*.md"))}
+    # Pass 1: read just the frontmatter head (cheap) to decide selection — nearest
+    # version matching needs to see every edition before picking.
+    metas = {}
+    for key, md in files.items():
+        try:
+            head = md.open(encoding="utf-8", errors="replace").read(4096)
+        except OSError:
             continue
-        # sanitize() is applied once per chunk body in chunk_markdown(), so we
-        # no longer scrub the whole file here (avoids a second O(file) regex pass).
+        metas[key], _ = split_frontmatter(head)
+    selected = select_corpus(metas, tiers, stacks)
+    # Pass 2: chunk only the selected books (frontmatter stripped from the body).
+    for key in sorted(selected):
+        md = files[key]
+        rel = md.relative_to(library)
+        category = rel.parts[0] if len(rel.parts) > 1 else "(root)"
+        _, body = split_frontmatter(md.read_text(encoding="utf-8", errors="replace"))
         yield from chunk_markdown(
             body, source=md.stem, category=category, path=str(rel).replace("\\", "/"),
         )

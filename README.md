@@ -581,7 +581,7 @@ the underlying LLM without losing what it has learned.
 | `CONDUCTOR_LIBRARY_ARCHIVE` | _(unset)_ | optional offline seed: a mounted `.7z` used instead of the repo fetch |
 | `CONDUCTOR_LIBRARY` | `/data/library` (container) · `~/.conductor/library` (host) | corpus markdown root |
 | `CONDUCTOR_LIBRARY_TIERS` | `core` | which `software_dev` tiers to ingest (`core,supporting,foundational,optional`) |
-| `CONDUCTOR_LIBRARY_STACKS` | _(none)_ | languages/frameworks to add to the index (e.g. `python,angular`), or `all` |
+| `CONDUCTOR_LIBRARY_STACKS` | _(none)_ | languages/frameworks to add (e.g. `python,angular`); pin an edition with `stack@major` (e.g. `java@25,angular@21` → nearest book version); or `all` |
 | `CONDUCTOR_CHROMA_HTTP` | `localhost:8001` | ChromaDB endpoint used by `cdt library` |
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama endpoint (bge-m3) |
 | `CONDUCTOR_EMBED_MODEL` | `bge-m3` | embedding model |

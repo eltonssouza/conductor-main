@@ -112,7 +112,7 @@ def _fetch_repo_corpus() -> None:
     category detection works; repo-root meta files are skipped. Network failure
     leaves the library empty (the ingest then no-ops) instead of crashing.
     """
-    from .core import split_frontmatter, is_selected, LIBRARY_TIERS, LIBRARY_STACKS
+    from .core import split_frontmatter, select_corpus, LIBRARY_TIERS, LIBRARY_STACKS
     url = f"https://github.com/{LIBRARY_REPO}/archive/refs/heads/{LIBRARY_REF}.tar.gz"
     log("1/4", f"fetching library from {LIBRARY_REPO}@{LIBRARY_REF} "
                f"(tiers={','.join(LIBRARY_TIERS)}; stacks={','.join(LIBRARY_STACKS) or 'none'})")
@@ -124,30 +124,32 @@ def _fetch_repo_corpus() -> None:
         log("1/4", f"WARNING: could not fetch {url}: {e} (library left empty)")
         return
     root = str(LIBRARY.resolve())
-    md = skipped = 0
+    # Read every .md member once, keyed by its on-disk relative path; selection
+    # (incl. nearest-version stack resolution) needs to see all editions first.
+    payload: dict = {}   # rel -> bytes
+    metas: dict = {}     # rel -> frontmatter
     with tarfile.open(fileobj=io.BytesIO(blob), mode="r:gz") as tf:
         for m in tf.getmembers():
             if not m.isfile() or not m.name.endswith(".md"):
                 continue
-            head, _, rel = m.name.partition("/")  # strip "<repo>-<ref>/"
-            if not rel or "/" not in rel:          # skip repo-root meta docs
+            _, _, rel = m.name.partition("/")      # strip "<repo>-<ref>/"
+            if not rel or "/" not in rel:           # skip repo-root meta docs
                 continue
-            dest = (LIBRARY / rel).resolve()
-            if not str(dest).startswith(root):     # path-traversal guard
+            if not str((LIBRARY / rel).resolve()).startswith(root):  # path-traversal guard
                 continue
             src = tf.extractfile(m)
             if src is None:
                 continue
             data = src.read()
-            meta, _ = split_frontmatter(data.decode("utf-8", "replace"))
-            if not is_selected(meta, LIBRARY_TIERS, LIBRARY_STACKS):
-                skipped += 1
-                continue
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_bytes(data)
-            md += 1
-    log("1/4", f"fetched {md} selected .md book(s) into {LIBRARY} "
-               f"({skipped} skipped by selection)")
+            payload[rel] = data
+            metas[rel], _ = split_frontmatter(data.decode("utf-8", "replace"))
+    selected = select_corpus(metas, LIBRARY_TIERS, LIBRARY_STACKS)
+    for rel in selected:
+        dest = LIBRARY / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(payload[rel])
+    log("1/4", f"fetched {len(selected)} selected .md book(s) into {LIBRARY} "
+               f"({len(payload) - len(selected)} skipped by selection)")
 
 
 # --- [2/4] pull bge-m3 -------------------------------------------------------
