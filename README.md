@@ -144,24 +144,39 @@ facilitation), so Claude Code runs each role on a right-sized model.
 
 ## Installation
 
-Install the CLI globally:
+One line. The installer checks prerequisites, installs [uv](https://astral.sh/uv)
+(isolated, no sudo), clones Conductor into `~/.conductor/src`, and installs the
+`cdt` / `conductor` commands as an editable tool — so the Docker backends work
+too. Re-run any time to update.
 
 ```bash
-pipx install conductor          # recommended (isolated)
-# or
-pip install conductor
+# macOS / Linux
+curl -fsSL https://raw.githubusercontent.com/eltonssouza/conductor-main/main/install.sh | sh
 ```
 
-From a clone of this repository (the Docker backends are built from source, so a
-clone is needed to run them):
+```powershell
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/eltonssouza/conductor-main/main/install.ps1 | iex
+```
+
+Knobs (env vars): `CONDUCTOR_REF` (branch/tag), `CONDUCTOR_SRC` (clone dir),
+`CONDUCTOR_EXTRAS` (default `rag,honcho`; set empty for a core-only install),
+`CONDUCTOR_DRY_RUN=1` (preview without changing anything), `NO_COLOR=1`.
+
+<details>
+<summary>Manual install (from a clone)</summary>
+
+The Docker backends are built from source, so a clone is needed to run them:
 
 ```bash
 git clone https://github.com/eltonssouza/conductor-main.git
 cd conductor-main
-pipx install --editable .       # or: pip install -e .
-pip install -e .[rag]           # ChromaDB client + scikit-learn/numpy, for `cdt library` and `cdt viewer`
-pip install -e .[honcho]        # Honcho SDK, for `cdt journal` recall
+uv tool install --editable ".[rag,honcho]"   # or: pipx install --editable ".[rag,honcho]"
 ```
+
+`[rag]` adds the ChromaDB client + scikit-learn/numpy (`cdt library`, `cdt viewer`);
+`[honcho]` adds the Honcho SDK (`cdt journal recall`). Omit them for a core-only CLI.
+</details>
 
 This gives you the `cdt` command (with `conductor` kept as an alias). Verify:
 

@@ -1,0 +1,4 @@
+# Keep the POSIX installer LF so `curl | sh` never chokes on a stray CR.
+install.sh text eol=lf
+# Keep the PowerShell installer CRLF (its UTF-8 BOM is preserved as content).
+install.ps1 text eol=crlf
