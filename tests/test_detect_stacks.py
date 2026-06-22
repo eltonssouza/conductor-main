@@ -65,6 +65,30 @@ class TestLibraryStacks(unittest.TestCase):
         self._pkg({"@nestjs/core": "10.0.0", "graphql": "16.0.0"})
         self.assertIn("graphql", library_stacks(self.root))
 
+    def test_spring_boot_from_pom(self):
+        self._file("pom.xml",
+                   "<project><dependencies><dependency>"
+                   "<groupId>org.springframework.boot</groupId>"
+                   "<artifactId>spring-boot-starter-parent</artifactId>"
+                   "<version>4.0.1</version></dependency></dependencies></project>")
+        # detect adds java; profile adds Spring Boot 4 -> spring@4
+        self.assertIn("spring@4", library_stacks(self.root))
+        self.assertIn("java", library_stacks(self.root))
+
+    def test_vue_versioned(self):
+        self._pkg({"vue": "^3.5.0"})
+        self.assertIn("vue@3", library_stacks(self.root))
+
+    def test_plain_react_now_maps(self):
+        self._pkg({"react": "^19.0.0", "react-dom": "^19.0.0"})
+        out = library_stacks(self.root)
+        self.assertIn("react@19", out)
+        self.assertNotIn("react-native", out)
+
+    def test_django(self):
+        self._file("pyproject.toml", "[project]\ndependencies=['django>=5']\n")
+        self.assertIn("django", library_stacks(self.root))
+
     def test_bom_manifest_still_parses(self):
         # PowerShell Out-File / some editors prepend a UTF-8 BOM; it must not break detection
         (self.root / "package.json").write_text(
