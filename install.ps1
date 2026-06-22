@@ -9,8 +9,8 @@
   unavailable. Idempotent: re-run to update.
 
   Env overrides: CONDUCTOR_REPO, CONDUCTOR_REF, CONDUCTOR_SRC, CONDUCTOR_EXTRAS
-  (default "rag,honcho"; set empty for a core-only install), CONDUCTOR_DRY_RUN=1,
-  NO_COLOR=1.
+  (default "rag,honcho"; set "none" for a core-only install), CONDUCTOR_DRY_RUN=1,
+  CONDUCTOR_NO_PATH=1 (skip PATH edit), NO_COLOR=1.
 #>
 $ErrorActionPreference = 'Stop'
 try { [Console]::OutputEncoding = [Text.UTF8Encoding]::new() } catch {}
@@ -19,8 +19,10 @@ $Repo   = if ($env:CONDUCTOR_REPO) { $env:CONDUCTOR_REPO } else { 'https://githu
 $Ref    = if ($env:CONDUCTOR_REF)  { $env:CONDUCTOR_REF }  else { 'main' }
 $Src    = if ($env:CONDUCTOR_SRC)  { $env:CONDUCTOR_SRC }  else { Join-Path $env:USERPROFILE '.conductor\src' }
 $Extras = if ($null -ne $env:CONDUCTOR_EXTRAS) { $env:CONDUCTOR_EXTRAS } else { 'rag,honcho' }
+if ($Extras -in @('none','core','')) { $Extras = '' }   # core-only (PS env can't hold "")
 $Dry    = $env:CONDUCTOR_DRY_RUN -eq '1'
 $NoColor = [bool]$env:NO_COLOR
+$NoPath  = $env:CONDUCTOR_NO_PATH -eq '1'   # skip PATH modification (used by the sandbox simulator)
 
 function Glyph($sym, $color, $text) {
   if ($NoColor) { Write-Host "$sym $text" }
@@ -101,11 +103,11 @@ Step ("Installing the cdt CLI via $Pm" + $(if ($Extras) { " (extras: $Extras)" }
 if ($Pm -eq 'uv') {
   try { Run { uv tool install --force --editable $spec } "uv tool install $spec" }
   catch { Warn "install with extras failed — retrying core-only"; Run { uv tool install --force --editable $Src } "uv tool install core" }
-  try { Run { uv tool update-shell } "uv tool update-shell" } catch {}
+  if (-not $NoPath) { try { Run { uv tool update-shell } "uv tool update-shell" } catch {} }
 } else {
   try { Run { pipx install --force --editable $spec } "pipx install $spec" }
   catch { Warn "install with extras failed — retrying core-only"; Run { pipx install --force --editable $Src } "pipx install core" }
-  try { Run { pipx ensurepath } "pipx ensurepath" } catch {}
+  if (-not $NoPath) { try { Run { pipx ensurepath } "pipx ensurepath" } catch {} }
 }
 Ok "cdt installed"
 

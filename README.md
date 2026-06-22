@@ -160,8 +160,11 @@ irm https://raw.githubusercontent.com/eltonssouza/conductor-main/main/install.ps
 ```
 
 Knobs (env vars): `CONDUCTOR_REF` (branch/tag), `CONDUCTOR_SRC` (clone dir),
-`CONDUCTOR_EXTRAS` (default `rag,honcho`; set empty for a core-only install),
+`CONDUCTOR_EXTRAS` (default `rag,honcho`; set `none` for a core-only install),
 `CONDUCTOR_DRY_RUN=1` (preview without changing anything), `NO_COLOR=1`.
+
+Preview the Windows install in a throwaway sandbox first (nothing touches your
+PATH or `~/.conductor`): `powershell -ExecutionPolicy Bypass -File tools/simulate-install.ps1 -Init`.
 
 <details>
 <summary>Manual install (from a clone)</summary>

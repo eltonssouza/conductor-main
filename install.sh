@@ -17,7 +17,9 @@ REPO="${CONDUCTOR_REPO:-https://github.com/eltonssouza/conductor-main.git}"
 REF="${CONDUCTOR_REF:-main}"
 SRC="${CONDUCTOR_SRC:-${HOME}/.conductor/src}"
 EXTRAS="${CONDUCTOR_EXTRAS-rag,honcho}"
+case "$EXTRAS" in none|core) EXTRAS="" ;; esac   # 'none'/'core' (or empty) -> core-only
 DRY="${CONDUCTOR_DRY_RUN:-0}"
+NOPATH="${CONDUCTOR_NO_PATH:-0}"   # skip PATH modification (used by the sandbox simulator)
 
 # --- styling: ANSI colors + Unicode status glyphs (TTY only, honor NO_COLOR) ---
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
@@ -116,13 +118,13 @@ if [ "$PM" = "uv" ]; then
     warn "install with extras failed — retrying core-only"
     run uv tool install --force --editable "$SRC"
   fi
-  run uv tool update-shell || true
+  [ "$NOPATH" = "1" ] || run uv tool update-shell || true
 else
   if ! run pipx install --force --editable "$spec"; then
     warn "install with extras failed — retrying core-only"
     run pipx install --force --editable "$SRC"
   fi
-  run pipx ensurepath || true
+  [ "$NOPATH" = "1" ] || run pipx ensurepath || true
 fi
 ok "cdt installed"
 
