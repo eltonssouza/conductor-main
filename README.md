@@ -552,9 +552,9 @@ is genuinely new.
 
 > **The 3D viewer moved out.** The interactive 3D map of the library embeddings
 > (PCA scatter + force-directed graph) plus a token-economy view now live in the
-> separate **`conductor-viewer`** project. It connects read-only to the same
-> ChromaDB this RAG stack runs (`cdt up`). See that project's README to install
-> and run it.
+> separate **[`conductor-viewer`](https://github.com/eltonssouza/conductor-viewer)**
+> project. It connects read-only to the same ChromaDB this RAG stack runs
+> (`cdt up`). See that project's README to install and run it.
 
 ---
 
