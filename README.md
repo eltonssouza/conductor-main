@@ -31,23 +31,33 @@ project's memory grows as you work and follows you across sessions.
 From install to your first feature (also printed by `cdt quickstart`):
 
 ```bash
-# 1. Install (once)
-pipx install conductor                 # or, from a clone: pip install -e .[rag,honcho]
+# 1. Install (once) — one line; see Installation for details
+#    macOS / Linux
+curl -fsSL https://raw.githubusercontent.com/eltonssouza/conductor-main/main/install.sh | sh
+#    Windows (PowerShell):  irm https://raw.githubusercontent.com/eltonssouza/conductor-main/main/install.ps1 | iex
 
-# 2. Start the two memories in Docker (once per machine)
-cdt up                                 # RAG stack: Ollama + ChromaDB + ingest the books
-cdt honcho setup --provider deepseek   # configure the diary's reasoning (first time only)
-cdt honcho up                          # the Honcho diary backend
-
-# 3. Enroll your project
+# 2. Enroll your project
 cd /path/to/your-project
 cdt init                               # scaffold .claude/ + .cdt/ + CLAUDE.md + /cdt + hooks
+cdt detect                             # (optional) preview the library stacks it will ingest
+
+# 3. Start the two memories in Docker (run from the project: auto-ingests ITS stack)
+cdt up                                 # RAG: Ollama + ChromaDB + ingest core + your stack
+cdt honcho setup --provider deepseek   # configure the diary's reasoning (first time only)
+cdt honcho up                          # the Honcho diary backend
 
 # 4. Reload Claude Code in that project  -> so the /cdt command and the hooks load
 
 # 5. Drive your first feature through the gates (inside Claude Code)
 /cdt implement <your feature>          # interactive: stops for your approval at each gate
 ```
+
+> **The library auto-fits your stack.** Run `cdt up` from a project and it
+> ingests the language-agnostic core **plus** the books for the project's
+> detected languages/frameworks at the right edition (a Java 25 + Spring Boot 4 +
+> Angular 21 project gets Core Java, Spring Boot 3, and the Angular 21 guide — not
+> the other editions). The global index accumulates the stacks you work on. Pin
+> it by hand with `CONDUCTOR_LIBRARY_STACKS=java@25,angular@21`.
 
 Handy along the way:
 
@@ -95,7 +105,7 @@ cdt viewer                             # 3D map of the library + add a book from
 
 ```
                 ┌─────────────────────────────────────────────────────┐
-                │  cdt  (global CLI, installed with pipx/pip)          │
+                │  cdt  (global CLI, installed with the one-liner / uv) │
                 └─────────────────────────────────────────────────────┘
                       │                    │                    │
         cdt init        cdt library    cdt journal

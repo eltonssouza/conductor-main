@@ -43,17 +43,19 @@ Run `cdt <command> --help` for command options.
 
 QUICKSTART = """Conductor quickstart - from install to your first feature
 
-1. Install (once)
-   pipx install conductor                 # or, from a clone: pip install -e .[rag,honcho]
+1. Install (once) - one line
+   macOS/Linux:  curl -fsSL https://raw.githubusercontent.com/eltonssouza/conductor-main/main/install.sh | sh
+   Windows:      irm https://raw.githubusercontent.com/eltonssouza/conductor-main/main/install.ps1 | iex
 
-2. Start the two memories in Docker (once per machine)
-   cdt up                                 # RAG stack: Ollama + ChromaDB + ingest the books
-   cdt honcho setup --provider deepseek   # configure the diary's reasoning (first time only)
-   cdt honcho up                          # the Honcho diary backend
-
-3. Enroll your project
+2. Enroll your project
    cd /path/to/your-project
    cdt init                               # scaffold .claude/ + .cdt/ + CLAUDE.md + /cdt + hooks
+   cdt detect                             # (optional) preview the library stacks it will ingest
+
+3. Start the two memories in Docker (run from the project: auto-ingests ITS stack)
+   cdt up                                 # RAG: Ollama + ChromaDB + ingest core + your stack
+   cdt honcho setup --provider deepseek   # configure the diary's reasoning (first time only)
+   cdt honcho up                          # the Honcho diary backend
 
 4. Reload Claude Code in that project     # so the /cdt command and the hooks load
 
