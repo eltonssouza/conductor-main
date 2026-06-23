@@ -149,14 +149,26 @@ def main(argv: List[str]) -> int:
             pending = fut
             if seen % (args.batch * 10) == 0:
                 rate = seen / max(time.monotonic() - t0, 1e-6)
-                print(f"  {seen} processed, {total} indexed, {skipped} skipped "
+                print(f"  {seen} processed, {total} indexed, {skipped} unchanged "
                       f"({rate:.1f}/s)")
         if pending is not None:
             total += _upsert_pairs(coll, pending.result())
 
     dt = time.monotonic() - t0
-    print(f"Done: {seen} processed, {total} indexed, {skipped} skipped in "
-          f"{dt:.0f}s. Total in collection: {coll.count()}")
+    in_coll = coll.count()
+    # Make the final line read as a state, not an error. A run that indexes
+    # nothing because everything was already current is the healthy re-run case
+    # (content-hash dedup), not a failure — say so explicitly.
+    if seen == 0:
+        verdict = "library is empty — nothing to index"
+    elif total == 0:
+        verdict = f"index already current: {in_coll} chunks, nothing to do"
+    elif skipped == 0:
+        verdict = f"indexed {total} new chunks; collection now has {in_coll}"
+    else:
+        verdict = (f"indexed {total} new/changed chunks, {skipped} already current; "
+                   f"collection now has {in_coll}")
+    print(f"Done in {dt:.0f}s — {verdict}.")
     return 0
 
 
