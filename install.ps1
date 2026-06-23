@@ -1,16 +1,19 @@
-﻿<#
-  Conductor installer — Windows (PowerShell).
+<#
+  Conductor installer - Windows (PowerShell).
 
     irm https://raw.githubusercontent.com/eltonssouza/conductor-main/main/install.ps1 | iex
 
   Isolated, no admin: installs (or reuses) uv, clones Conductor into a cache, and
-  installs the `cdt` / `conductor` commands as an editable uv tool — so the Docker
+  installs the `cdt` / `conductor` commands as an editable uv tool - so the Docker
   backends (`cdt up`, built from the clone) work too. Falls back to pipx if uv is
   unavailable. Idempotent: re-run to update.
 
   Env overrides: CONDUCTOR_REPO, CONDUCTOR_REF, CONDUCTOR_SRC, CONDUCTOR_EXTRAS
   (default "rag,honcho"; set "none" for a core-only install), CONDUCTOR_DRY_RUN=1,
   CONDUCTOR_NO_PATH=1 (skip PATH edit), NO_COLOR=1.
+
+  NOTE: this file is ASCII with NO BOM on purpose, so `irm <url> | iex` parses it.
+  The status glyphs are built from char codes at runtime, not stored as literals.
 #>
 $ErrorActionPreference = 'Stop'
 try { [Console]::OutputEncoding = [Text.UTF8Encoding]::new() } catch {}
@@ -22,16 +25,21 @@ $Extras = if ($null -ne $env:CONDUCTOR_EXTRAS) { $env:CONDUCTOR_EXTRAS } else { 
 if ($Extras -in @('none','core','')) { $Extras = '' }   # core-only (PS env can't hold "")
 $Dry    = $env:CONDUCTOR_DRY_RUN -eq '1'
 $NoColor = [bool]$env:NO_COLOR
-$NoPath  = $env:CONDUCTOR_NO_PATH -eq '1'   # skip PATH modification (used by the sandbox simulator)
+$NoPath  = $env:CONDUCTOR_NO_PATH -eq '1'
+
+# Status glyphs built from code points (keeps this source pure ASCII / BOM-free).
+$G_OK   = [char]0x2713   # check mark
+$G_STEP = [char]0x2192   # right arrow
+$G_ERR  = [char]0x2717   # ballot x
 
 function Glyph($sym, $color, $text) {
   if ($NoColor) { Write-Host "$sym $text" }
   else { Write-Host "$sym " -ForegroundColor $color -NoNewline; Write-Host $text }
 }
-function Step($t) { Glyph '→' 'Cyan'   $t }
-function Ok($t)   { Glyph '✓' 'Green'  $t }
-function Warn($t) { Glyph '!' 'Yellow' $t }
-function Err($t)  { Glyph '✗' 'Red'    $t }
+function Step($t) { Glyph $G_STEP 'Cyan'   $t }
+function Ok($t)   { Glyph $G_OK   'Green'  $t }
+function Warn($t) { Glyph '!'     'Yellow' $t }
+function Err($t)  { Glyph $G_ERR  'Red'    $t }
 function Dim($t)  { if ($NoColor) { Write-Host "  $t" } else { Write-Host "  $t" -ForegroundColor DarkGray } }
 function Die($t)  { Err $t; exit 1 }
 function Have($n) { [bool](Get-Command $n -ErrorAction SilentlyContinue) }
@@ -45,10 +53,10 @@ function Run([scriptblock]$Block, [string]$Label) {
 function Banner {
   $c = if ($NoColor) { 'Gray' } else { 'Cyan' }
   Write-Host ''
-  Write-Host '╔══════════════════════════════════════════╗' -ForegroundColor $c
-  Write-Host '║  # Conductor Installer                    ║' -ForegroundColor $c
-  Write-Host '║  conduct your project through 11 gates    ║' -ForegroundColor $c
-  Write-Host '╚══════════════════════════════════════════╝' -ForegroundColor $c
+  Write-Host '  ===========================================' -ForegroundColor $c
+  Write-Host '   # Conductor Installer' -ForegroundColor $c
+  Write-Host '   conduct your project through 11 gates' -ForegroundColor $c
+  Write-Host '  ===========================================' -ForegroundColor $c
   Write-Host ''
 }
 
@@ -59,20 +67,20 @@ Step "Checking environment (Windows)..."
 if (-not (Have git)) { Die "git not found. Install Git for Windows (https://git-scm.com/download/win) or 'winget install Git.Git', then re-run." }
 Ok ("git " + ((git --version) -replace 'git version ',''))
 
-# [2/5] ensure uv (isolated, can manage Python) — fall back to pipx -----------
+# [2/5] ensure uv (isolated, can manage Python) - fall back to pipx -----------
 $Pm = ''
 if (Have uv) {
   Ok ("uv " + ((uv --version) -replace 'uv ','') + " (already installed)")
   $Pm = 'uv'
 } else {
-  Step "Installing uv (Astral — isolated, no admin)..."
+  Step "Installing uv (Astral - isolated, no admin)..."
   Run { Invoke-RestMethod https://astral.sh/uv/install.ps1 | Invoke-Expression } "install uv"
   $uvBin = Join-Path $env:USERPROFILE '.local\bin'
   if (Test-Path (Join-Path $uvBin 'uv.exe')) { $env:Path = "$uvBin;$env:Path" }
   if (Have uv) { Ok "uv installed"; $Pm = 'uv' }
 }
 if (-not $Pm) {
-  Warn "uv unavailable — falling back to pipx"
+  Warn "uv unavailable - falling back to pipx"
   if (-not (Have pipx)) {
     if (-not (Have python)) { Die "neither uv, pipx, nor python found. Install Python 3.9+ (https://python.org) or uv, then re-run." }
     Step "Bootstrapping pipx via python..."
@@ -102,11 +110,11 @@ $spec = if ($Extras) { "$Src[$Extras]" } else { $Src }
 Step ("Installing the cdt CLI via $Pm" + $(if ($Extras) { " (extras: $Extras)" } else { '' }) + "...")
 if ($Pm -eq 'uv') {
   try { Run { uv tool install --force --editable $spec } "uv tool install $spec" }
-  catch { Warn "install with extras failed — retrying core-only"; Run { uv tool install --force --editable $Src } "uv tool install core" }
+  catch { Warn "install with extras failed - retrying core-only"; Run { uv tool install --force --editable $Src } "uv tool install core" }
   if (-not $NoPath) { try { Run { uv tool update-shell } "uv tool update-shell" } catch {} }
 } else {
   try { Run { pipx install --force --editable $spec } "pipx install $spec" }
-  catch { Warn "install with extras failed — retrying core-only"; Run { pipx install --force --editable $Src } "pipx install core" }
+  catch { Warn "install with extras failed - retrying core-only"; Run { pipx install --force --editable $Src } "pipx install core" }
   if (-not $NoPath) { try { Run { pipx ensurepath } "pipx ensurepath" } catch {} }
 }
 Ok "cdt installed"
@@ -118,12 +126,12 @@ if (Have cdt) { $cdtExe = 'cdt' }
 elseif (Test-Path (Join-Path $env:USERPROFILE '.local\bin\cdt.exe')) { $cdtExe = Join-Path $env:USERPROFILE '.local\bin\cdt.exe' }
 
 if ($Dry) {
-  Ok "dry-run complete — no changes made"
+  Ok "dry-run complete - no changes made"
 } elseif ($cdtExe) {
   try { & $cdtExe --help *> $null; Ok "cdt is working" }
-  catch { Warn "cdt installed but not on this shell's PATH yet — open a new terminal" }
+  catch { Warn "cdt installed but not on this shell's PATH yet - open a new terminal" }
 } else {
-  Warn "cdt installed but not on this shell's PATH yet — open a new terminal"
+  Warn "cdt installed but not on this shell's PATH yet - open a new terminal"
 }
 
 # done -----------------------------------------------------------------------

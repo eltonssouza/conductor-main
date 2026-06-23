@@ -1,4 +1,5 @@
 # Keep the POSIX installer LF so `curl | sh` never chokes on a stray CR.
 install.sh text eol=lf
-# Keep PowerShell scripts CRLF (their UTF-8 BOM is preserved as content).
+# PowerShell scripts: CRLF. install.ps1 is ASCII + BOM-free on purpose so
+# `irm <url> | iex` parses it; simulate-install.ps1 keeps its BOM (run via -File).
 *.ps1 text eol=crlf
