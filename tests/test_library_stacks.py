@@ -1,8 +1,5 @@
 """Tests for stack discovery + the interactive `cdt library stacks` chooser."""
-import gzip
-import io
 import json
-import tarfile
 import tempfile
 import unittest
 from pathlib import Path
@@ -12,15 +9,17 @@ from conductor import library
 from conductor.rag import core
 
 
-def _tarball(books):
-    raw = io.BytesIO()
-    with tarfile.open(fileobj=raw, mode="w") as tf:
-        for name, fm in books:
-            data = (f"---\n{fm}\n---\n\n# x\n").encode()
-            info = tarfile.TarInfo(f"conductor-library-main/{name}")
-            info.size = len(data)
-            tf.addfile(info, io.BytesIO(data))
-    return gzip.compress(raw.getvalue())
+def _index_blob(stacks):
+    """Build a LIBRARY_INDEX.json byte blob from {sid: {"versions", "category"}}."""
+    manifest = {"schema": "conductor-library-index/v1", "stacks": {}}
+    for sid, info in stacks.items():
+        vers = info["versions"]
+        cat = info["category"]
+        editions = ([{"path": f"{cat}/{sid}-{v}.md", "title": f"{sid} {v}", "version": v}
+                     for v in vers]
+                    or [{"path": f"{cat}/{sid}.md", "title": sid}])
+        manifest["stacks"][sid] = {"versions": vers, "editions": editions}
+    return json.dumps(manifest).encode("utf-8")
 
 
 class _Resp:
@@ -32,18 +31,20 @@ class _Resp:
 
 class TestDiscoverStacks(unittest.TestCase):
     def test_groups_versions_and_category(self):
-        blob = _tarball([
-            ("14_frameworks/Angular 21.md", "software_dev: stack\nstack: angular\nversion: 21"),
-            ("14_frameworks/Angular 22.md", "software_dev: stack\nstack: angular\nversion: 22"),
-            ("01_programming_languages/Go.md", "software_dev: stack\nstack: go"),
-            ("03_design/Clean.md", "software_dev: core"),     # not a stack -> ignored
-        ])
+        blob = _index_blob({
+            "angular": {"versions": [21, 22], "category": "14_frameworks"},
+            "go": {"versions": [], "category": "01_programming_languages"},
+        })
         with mock.patch("urllib.request.urlopen", return_value=_Resp(blob)):
             out = core.discover_stacks("x/y", "main")
         self.assertEqual(set(out), {"angular", "go"})
         self.assertEqual(out["angular"]["versions"], ["21", "22"])
         self.assertEqual(out["angular"]["category"], "14_frameworks")
         self.assertEqual(out["go"]["versions"], [])
+
+    def test_unreachable_returns_empty(self):
+        with mock.patch("urllib.request.urlopen", side_effect=OSError("no net")):
+            self.assertEqual(core.discover_stacks("x/y", "main"), {})
 
 
 class TestChooser(unittest.TestCase):
