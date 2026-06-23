@@ -28,6 +28,7 @@ Commands:
                              `cdt up` would auto-ingest for this project.
   library "<question>"       Semantic search over the reference books (RAG).
   library status             Show what is ingested (books, categories, chunk counts).
+  library stacks             Choose which language/framework stacks to ingest (interactive).
   library reindex            Index any library files not yet in ChromaDB (incremental).
   library add <file.md>      Index specific .md file(s) already under the library.
   journal add|recall|log     Per-project development diary.
