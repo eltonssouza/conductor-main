@@ -1,17 +1,22 @@
 # Conductor
 
 Conductor is a **global command-line tool** that turns any software project into a
-**Claude-Code-conducted** project. You run one command inside a project and
-Conductor scaffolds Claude-Code-native configuration into it: a relevant subset of
-**36 industry role Agents + Skills** under `.claude/`, the project's detected
-**tech stack**, and a generated **`CLAUDE.md`** that describes those roles and an
-**11-gate development flow** (discovery → spec → security → architecture → test →
-code → quality gate → validation → delivery → observability → learning).
+**harness-conducted** project. You run one command inside a project and Conductor
+scaffolds harness-native configuration into it: a relevant subset of
+**36 industry role Agents + Skills**, the project's detected **tech stack**, and a
+generated **project guide** that describes those roles and an **11-gate development
+flow** (discovery → spec → security → architecture → test → code → quality gate →
+validation → delivery → observability → learning).
+
+Conductor conducts a project through any of several **AI coding harnesses** —
+**Claude Code** is the default, and **OpenCode**, **Codex**, and **Pi** are
+supported via `cdt init --target` (see [`cdt init`](#cdt-init)). The same
+harness-neutral material is projected into each harness's native layout.
 
 Conductor is **not a Claude Code plugin**. It is the tool that *prepares* a
-project. The actual reasoning happens in **your** Claude (Claude Code), driven by
-the project-local `.claude/` and `CLAUDE.md` that Conductor writes. Two long-term
-memories ground every decision:
+project. The actual reasoning happens in **your** harness (Claude Code by
+default), driven by the project-local config and guide that Conductor writes. Two
+long-term memories ground every decision:
 
 | Memory | What it knows | Backed by |
 |--------|---------------|-----------|
@@ -20,9 +25,9 @@ memories ground every decision:
 
 The work is driven by the **`/cdt` slash command**, an interactive control loop
 that walks a demand through the gates and **stops for your approval at each one**.
-The diary is **live memory**: Claude Code hooks installed by Conductor capture
-your prompts and inject what Honcho remembers back into each new session, so the
-project's memory grows as you work and follows you across sessions.
+The diary is **live memory**: harness hooks installed by Conductor (on Claude Code
+and Pi) capture your prompts and inject what Honcho remembers back into each new
+session, so the project's memory grows as you work and follows you across sessions.
 
 ---
 
@@ -70,7 +75,6 @@ cdt library "<question>"               # ground an answer in the reference books
 cdt journal recall "<question>"        # recall what this project already decided
 cdt journal log --kind error,solution  # list problems already solved
 cdt sync                               # after upgrading Conductor: refresh an enrolled project
-cdt viewer                             # 3D map of the library + add a book from the browser
 ```
 
 > **Upgrading?** After updating Conductor, run `cdt sync` in each enrolled
@@ -88,20 +92,20 @@ cdt viewer                             # 3D map of the library + add a book from
 4. [The Docker backends](#the-docker-backends)
    - [RAG stack — `cdt up`](#rag-stack--cdt-up)
    - [Diary backend (Honcho) — `cdt honcho up`](#diary-backend-honcho--cdt-honcho-up)
-   - [Where to put the DeepSeek API key](#where-to-put-the-deepseek-api-key)
+   - [Choosing the diary reasoning provider](#choosing-the-diary-reasoning-provider)
 5. [Using Conductor in a project](#using-conductor-in-a-project)
    - [`cdt init`](#cdt-init)
+   - [Targeting a harness — `--target`](#targeting-a-harness----target)
    - [`cdt sync` — the living CLAUDE.md](#cdt-sync--the-living-claudemd)
 6. [The 11-gate flow](#the-11-gate-flow)
 7. [The library (Chroma) — grounding answers](#the-library-chroma--grounding-answers)
-8. [The 3D viewer & screen ingest](#the-3d-viewer--screen-ingest)
-9. [The diary (Honcho) — project memory](#the-diary-honcho--project-memory)
-10. [CLI reference](#cli-reference)
-11. [Configuration (environment variables)](#configuration-environment-variables)
-12. [Repository layout](#repository-layout)
-13. [Invariants / quality gate](#invariants--quality-gate)
-14. [Troubleshooting](#troubleshooting)
-15. [Security notes](#security-notes)
+8. [The diary (Honcho) — project memory](#the-diary-honcho--project-memory)
+9. [CLI reference](#cli-reference)
+10. [Configuration (environment variables)](#configuration-environment-variables)
+11. [Repository layout](#repository-layout)
+12. [Invariants / quality gate](#invariants--quality-gate)
+13. [Troubleshooting](#troubleshooting)
+14. [Security notes](#security-notes)
 
 ---
 
@@ -144,10 +148,12 @@ facilitation), so Claude Code runs each role on a right-sized model.
 - **An NVIDIA GPU + the NVIDIA Container Toolkit** *(recommended, optional)* — so
   the `bge-m3` embedding model runs on the GPU. Without it the first full ingest of
   the corpus takes hours on CPU.
-- **A DeepSeek API key** *(recommended for the diary)* — powers Honcho's
-  intelligent recall. The local-Ollama option works without any key but the small
-  local model gives weaker results. See
-  [Where to put the DeepSeek API key](#where-to-put-the-deepseek-api-key).
+- **An API key for your chosen diary provider — or none, if you pick the local
+  Ollama option.** Honcho's intelligent recall is powered by an LLM you choose at
+  setup time (OpenAI, DeepSeek, OpenRouter, Anthropic, any OpenAI-compatible
+  endpoint, or local Ollama). Hosted providers need a key; the local-Ollama option
+  works **without any key** (the small local model gives weaker results). See
+  [Choosing the diary reasoning provider](#choosing-the-diary-reasoning-provider).
 - **The reference-book corpus** — the markdown books the RAG indexes. `cdt up`
   fetches them automatically from the public library repo
   ([`eltonssouza/conductor-library`](https://github.com/eltonssouza/conductor-library));
@@ -191,7 +197,8 @@ cd conductor-main
 uv tool install --editable ".[rag,honcho]"   # or: pipx install --editable ".[rag,honcho]"
 ```
 
-`[rag]` adds the ChromaDB client + scikit-learn/numpy (`cdt library`, `cdt viewer`);
+`[rag]` adds the ChromaDB client + scikit-learn/numpy (`cdt library`; the latter
+two are also used by the separate `conductor-viewer` project);
 `[honcho]` adds the Honcho SDK (`cdt journal recall`). Omit them for a core-only CLI.
 </details>
 
@@ -258,7 +265,7 @@ without Honcho, so this backend is **optional** — it adds intelligent recall o
 
 ```bash
 pip install -e .[honcho]                       # the Honcho SDK
-cdt honcho setup --provider deepseek     # writes the .env (key auto-read, see below)
+cdt honcho setup                         # pick a reasoning provider, writes the .env (see below)
 cdt honcho up                            # clone + build + start (one command)
 cdt honcho down                          # stop
 ```
@@ -273,38 +280,68 @@ dimension to 1024 for the local `bge-m3` embeddings.
 > local `bge-m3` that the RAG stack's Ollama serves.
 
 **Reasoning vs. embeddings.** `cdt honcho setup` ships presets for
-`openai | deepseek | openrouter | ollama | anthropic`. Because DeepSeek (and
-Anthropic / OpenRouter) have no compatible embeddings API, Conductor uses a
-**hybrid** by default:
+`openai | deepseek | openrouter | ollama | anthropic | custom`. Because most
+non-OpenAI providers (DeepSeek, Anthropic, OpenRouter, …) have no compatible
+embeddings API, Conductor uses a **hybrid** by default:
 
 - **Reasoning** (deriver + dialectic + summary) → your chosen provider (e.g.
-  DeepSeek `deepseek-chat`).
-- **Embeddings** → the **local Ollama `bge-m3`** (free, 1024-d).
+  DeepSeek `deepseek-chat`, OpenAI `gpt-4o-mini`, a local Ollama model).
+- **Embeddings** → the **local Ollama `bge-m3`** (free, 1024-d). Only the `openai`
+  provider uses OpenAI's hosted `text-embedding-3-small` (1536-d).
 
-### Where to put the DeepSeek API key
+### Choosing the diary reasoning provider
 
-`cdt honcho setup --provider deepseek` resolves the key in this order, writing it
-into the (gitignored) Honcho `.env` — never printed or passed on the command line:
+The LLM that powers Honcho's background reasoning is **not baked in** — you pick it
+at setup. Run it interactively or pass a provider:
 
-1. **`--api-key sk-...`** on the command line, or
-2. a **key file** (convenience): `~/.conductor/deepseek-key.txt` (override the
-   path with `CONDUCTOR_DEEPSEEK_KEY_FILE`) containing one line:
-   ```
-   API-KEY-DEEP_SEEK: "sk-your-deepseek-key"
-   ```
-3. otherwise it **prompts** (interactive) or writes a `set-your-deepseek-key`
-   placeholder you fill into the `.env` before `cdt honcho up`.
+```bash
+cdt honcho setup                         # interactive chooser (lists every provider)
+cdt honcho setup --provider ollama       # local, NO API KEY (the easiest start)
+cdt honcho setup --provider deepseek     # hosted; key auto-resolved (see below)
+cdt honcho setup --provider openai   --model gpt-4o-mini --api-key sk-...
+cdt honcho setup --provider openrouter --model google/gemini-2.5-flash --api-key sk-or-...
+cdt honcho setup --provider anthropic  --model claude-haiku-4-5 --api-key sk-ant-...
+cdt honcho setup --provider custom --base-url https://my-gateway/v1 --model my-model --api-key sk-...
+```
 
-Get a key at <https://platform.deepseek.com/>. Prefer no key at all? Use the
-**fully local** option below (`--provider ollama`).
+| Provider | Endpoint | Needs a key? |
+|----------|----------|--------------|
+| `ollama` | **local** `host.docker.internal:11434` | **No** — runs on your machine |
+| `openai` | `api.openai.com` | Yes |
+| `deepseek` | `api.deepseek.com` | Yes |
+| `openrouter` | `openrouter.ai` | Yes |
+| `anthropic` | native Anthropic API | Yes |
+| `custom` | **your** `--base-url` (vLLM, LM Studio, Groq, Together, a gateway…) | usually |
 
-To use the **fully local, key-free** option instead:
+Any OpenAI-compatible endpoint works via `--provider custom --base-url <url>
+--model <id> [--api-key <key>]` — no baked-in preset required.
+
+**Local Ollama — the no-API-key choice.** Point Honcho's reasoning at a model
+running on your own machine; nothing leaves your box and there is no key to manage:
 
 ```bash
 docker exec conductor-ollama-1 ollama pull qwen2.5:3b   # a tools-capable chat model
-cdt honcho setup --provider ollama --model qwen2.5:3b
+cdt honcho setup --provider ollama --model qwen2.5:3b   # or llama3.1, etc.
 cdt honcho up
 ```
+
+**Key resolution (any hosted provider).** When a key is needed, `cdt honcho setup`
+resolves it in this order and writes it into the (gitignored) Honcho `.env` — the
+key is never printed:
+
+1. **`--api-key …`** on the command line, or
+2. the **env var** `CONDUCTOR_<PROVIDER>_API_KEY` (e.g. `CONDUCTOR_OPENAI_API_KEY`)
+   — or the provider's transport var (`LLM_OPENAI_API_KEY` / `LLM_ANTHROPIC_API_KEY`), or
+3. a **per-provider key file** `~/.conductor/<provider>-key.txt` (override the path
+   with `CONDUCTOR_<PROVIDER>_API_KEY_FILE`). The file holds one token — a bare line,
+   `NAME=token`, or `NAME: "token"`. The legacy DeepSeek file
+   `~/.conductor/deepseek-key.txt` (var `API-KEY-DEEP_SEEK`, `CONDUCTOR_DEEPSEEK_KEY_FILE`)
+   still works, e.g.:
+   ```
+   API-KEY-DEEP_SEEK: "sk-your-deepseek-key"
+   ```
+4. otherwise it **prompts** (interactive) or writes a `set-your-<provider>-key`
+   placeholder you fill into the `.env` before `cdt honcho up`.
 
 ---
 
@@ -353,9 +390,51 @@ automatically — **no plugin required**. The role subset is chosen by project t
 roles; a backend project gets BE/SA/DBA/AppSec/SRE + core; etc.). Use `--all` for
 every role or `--roles` to pick exactly.
 
-After initializing, open the project in Claude Code. `CLAUDE.md` becomes the
-project's context and instructs Claude to conduct work through the gates while
+After initializing, open the project in your harness. The project guide
+(`CLAUDE.md`, or `AGENTS.md` for the non-Claude harnesses) becomes the project's
+context and instructs the harness to conduct work through the gates while
 grounding decisions in the two memories.
+
+> The layout above (`.claude/` + `CLAUDE.md`) is what the **default** Claude Code
+> target produces. The other harnesses get the same material in their own native
+> layout — see [Targeting a harness](#targeting-a-harness----target) below.
+
+### Targeting a harness — `--target`
+
+The same harness-neutral material (the role Agents/Skills, the `/cdt` flow driver,
+and the project guide) is projected per harness by an adapter. Pick one or more
+with `--target`:
+
+```bash
+cdt init                                   # auto-detect the harness present, else claude
+cdt init --target claude                   # the default
+cdt init --target opencode
+cdt init --target codex,pi                 # comma list — emit several at once
+cdt init --target all                      # every supported harness
+```
+
+| Target | Layout it produces | Project guide |
+|--------|--------------------|---------------|
+| `claude` *(default)* | `.claude/` — `agents/` + `skills/` + `commands/cdt.md` + `settings.local.json` (hooks) | `CLAUDE.md` |
+| `opencode` | `.opencode/` — `agents/` + `skills/` + `commands/cdt.md` + `plugins/` (live-memory hook); `opencode.json` registers the guide | `AGENTS.md` |
+| `codex` | `.agents/skills/` — roles folded into native skills (`$skill`-invokable), incl. `cdt` as `$cdt` | `AGENTS.md` |
+| `pi` | `.pi/` — `skills/` + `prompts/cdt.md` + `extensions/` (live-memory hook) | `AGENTS.md` |
+
+Notes:
+
+- **Default is auto-detect.** With no `--target`, Conductor emits for whichever
+  harness it already finds in the project (e.g. an existing `.opencode/` or
+  `AGENTS.md`); if it detects none, it falls back to **Claude Code**.
+- **The guide file differs per harness.** Only the Claude target writes `CLAUDE.md`;
+  OpenCode, Codex, and Pi write **`AGENTS.md`** instead.
+- **Roles vs. skills.** Claude Code and OpenCode get auto-loaded subagents, so a
+  role ships as its own Agent. Codex and Pi have no auto-subagents, so each role's
+  persona is **folded into its skill**.
+- **Live memory** (the Honcho capture/inject hooks) is installed for the harnesses
+  that support it — **Claude Code** and **Pi**.
+- **The choice persists.** The selected target keys are written to
+  `.cdt/config.json`, so [`cdt sync`](#cdt-sync--the-living-claudemd) re-emits the
+  same harness(es). Pass `--target` to `sync` to change the set.
 
 ### `cdt sync` — the living CLAUDE.md
 
@@ -369,7 +448,8 @@ cdt sync               # re-detect the stack, refresh the roles, pull diary memo
 
 `sync` regenerates only the managed region: it re-detects the stack, re-selects the
 role subset (if the project type changed), and pulls the most recent diary
-decisions into a "Project memory" block. Recording a journal entry
+decisions into a "Project memory" block. It re-emits for the **target harness(es)
+configured in `.cdt/config.json`** (pass `--target` to change them). Recording a journal entry
 (`cdt journal add`) also refreshes that block automatically, so the file
 stays current as the project evolves.
 
@@ -468,52 +548,13 @@ cdt library add "<path/to/Book.md>" …     # index specific files already under
 ```
 
 Both reuse the incremental, content-hash-deduped indexer, so they only embed what
-is genuinely new. The 3D viewer's [screen ingest](#the-3d-viewer--screen-ingest)
-does the same thing from the browser, and additionally writes the formatted file
-into the library for you.
+is genuinely new.
 
----
-
-## The 3D viewer & screen ingest
-
-`cdt viewer` opens a small local web app (standard-library HTTP server, no
-web framework) that **visualizes the library embeddings in 3D** and lets you
-**ingest a markdown file from the browser**.
-
-```bash
-cdt viewer                 # http://localhost:8765, opens the browser
-cdt viewer --port 9000 --no-browser
-```
-
-It needs the `rag` extra (`pip install -e .[rag]`, which also pulls `scikit-learn`
-and `numpy`) and a running ChromaDB (`cdt up`). It is read-only against the
-index except through the ingest screen.
-
-**3D map.** The viewer projects the 1024-dimensional `bge-m3` embeddings down to
-three dimensions with **PCA** and renders an interactive Plotly scatter colored by
-category. To stay fast on the ~60k-chunk index, the projection (and the per-source
-centroids used by the graph) is **computed once** on first run and cached to
-`~/.claude/conductor/viewer_index.json`; every view, profile filter, and graph is
-then served from that cache in milliseconds, and it is rebuilt automatically when
-the index changes (a new ingest). Two dropdowns filter by **profile** — the
-`category` (the `NN_…` corpus folder) and the `source` (the book) — and hovering a
-point shows its source, section, and a text preview.
-
-**3D graph (`/graph`).** A force-directed network rendered with **three.js**
-(`3d-force-graph`): each source (book) is a node grouped under its category hub,
-and sources are linked to their nearest neighbors by embedding similarity (cosine
-between per-source centroids). The kNN web clusters related books and bridges
-categories, with the big hub nodes labeled — pick a category (profile) or show them
-all. Rotatable/zoomable in 3D.
-
-**Screen ingest.** The "+ Ingest" screen accepts a `.md` file (pick a file or paste
-markdown) plus an optional title, author, and category (profile). Conductor
-**formats it to the library convention** (see `to-brain/CONVENCOES_DE_ARQUIVOS.md`):
-it strips control characters, normalizes blank lines, ensures blank lines around
-headings so chunking splits cleanly, and rebuilds a clean header (`# Title` +
-optional `**Author**`). The result is saved as `category/Title - Author.md` under
-the library, then chunked, embedded, and upserted into ChromaDB — the new source
-appears in the 3D map's filters immediately.
+> **The 3D viewer moved out.** The interactive 3D map of the library embeddings
+> (PCA scatter + force-directed graph) plus a token-economy view now live in the
+> separate **`conductor-viewer`** project. It connects read-only to the same
+> ChromaDB this RAG stack runs (`cdt up`). See that project's README to install
+> and run it.
 
 ---
 
@@ -568,7 +609,7 @@ the underlying LLM without losing what it has learned.
 
 | Command | What it does |
 |---------|--------------|
-| `cdt init [path]` | Enroll a project: generate `.claude/` (role subset + the `/cdt` driver + hooks), `.cdt/` (stack, memory tree), and `CLAUDE.md`. Flags: `--all`, `--roles a,b`, `--type T`, `--force`. |
+| `cdt init [path]` | Enroll a project: generate the harness config (role subset + the `/cdt` driver + hooks), `.cdt/` (stack, memory tree), and the project guide. Flags: `--target claude\|opencode\|codex\|pi\|all`, `--all`, `--roles a,b`, `--type T`, `--force`. |
 | `cdt sync [path]` | Refresh the managed region of `CLAUDE.md` and the scaffolded driver/hooks/memory tree (re-detect stack, roles, pull diary memory). |
 | `cdt library "<q>"` | Semantic search over the reference books. Flags: `-k N`, `--json`, `--category C`, `--gate N`. |
 | `cdt library reindex` | Index any library files not yet in ChromaDB (incremental, content-hash skip). |
@@ -577,7 +618,6 @@ the underlying LLM without losing what it has learned.
 | `cdt journal ingest\|digest` | Ingest `docs/`+`records/` into Honcho; regenerate the `daily/` digests. |
 | `cdt up` / `down` | Start / stop the Docker RAG stack (GPU auto-detected). |
 | `cdt ingest` | (Re)build the library index in the running stack. **Incremental** (content-hash skip). Flags: `--force` (re-embed all), `--quiet` (no telemetry), `--batch N`, `--limit N`. |
-| `cdt viewer` | 3D map of the library embeddings (PCA, cached), filtered by profile; includes a screen to ingest a `.md` file formatted to the library convention. Flags: `--port`, `--no-browser`. |
 | `cdt honcho setup` | Choose the Honcho reasoning provider and write its `.env`. |
 | `cdt honcho up` / `down` | Start / stop the Honcho diary backend (clone + build + health automated). |
 
@@ -601,7 +641,9 @@ the underlying LLM without losing what it has learned.
 | `CONDUCTOR_EMBED_MODEL` | `bge-m3` | embedding model |
 | `CONDUCTOR_HNSW_M` / `_CONSTRUCTION_EF` / `_SEARCH_EF` | `32` / `200` / `128` | HNSW index tuning |
 | `CONDUCTOR_HONCHO_URL` | `http://localhost:8000` | Honcho API endpoint |
-| `CONDUCTOR_DEEPSEEK_KEY_FILE` | `C:\honcho\deep-seek-key.txt` | file holding the DeepSeek key (`API-KEY-DEEP_SEEK`) |
+| `CONDUCTOR_<PROVIDER>_API_KEY` | _(unset)_ | the diary provider's key (e.g. `CONDUCTOR_OPENAI_API_KEY`); checked before the key file |
+| `CONDUCTOR_<PROVIDER>_API_KEY_FILE` | `~/.conductor/<provider>-key.txt` | file holding the diary provider's key (first token on any line) |
+| `CONDUCTOR_DEEPSEEK_KEY_FILE` | `~/.conductor/deepseek-key.txt` | legacy alias for the DeepSeek key file (`API-KEY-DEEP_SEEK`); still honored |
 | `CONDUCTOR_HOME` | `~/.claude/conductor` | global registry + staged Honcho clone |
 | `HONCHO_SRC` | `~/.claude/conductor/honcho-src` | local Honcho clone used as the build context |
 
@@ -614,8 +656,7 @@ the underlying LLM without losing what it has learned.
     `roles.py` (the 36-role registry: role → skill / area / project types),
     `scaffold.py` (the `.claude/` + `CLAUDE.md` generator), `project.py`,
     `library.py`, `journal.py`, `honcho_client.py`, `honcho_setup.py`,
-    `honcho_stack.py`, `viewer.py` (the 3D map + screen-ingest web app), and
-    `rag/` (`core`, `ingest`, `bootstrap`, `stack`).
+    `honcho_stack.py`, and `rag/` (`core`, `ingest`, `bootstrap`, `stack`).
   - `conductor/templates/` — the 36 role **Agents** + 36 **Skills**,
     `CLAUDE.md.tmpl`, `flow.md` (the 11-gate flow), and `commands/cdt.md` (the
     `/cdt` flow driver). These are copied into target projects.
@@ -660,8 +701,10 @@ keys or tokens are committed to tracked files. It runs in CI
 
 ## Security notes
 
-- The DeepSeek key lives in `C:\honcho\deep-seek-key.txt` and is copied into the
+- The diary provider's key (when one is used) is resolved from `--api-key`, an env
+  var, or a per-provider key file under `~/.conductor/`, and is copied into the
   Honcho `.env`, which is **gitignored** — it is never committed or printed. Keep
-  that file outside any repository and rotate the key if it leaks.
+  any key file outside a repository and rotate the key if it leaks. The local
+  Ollama provider needs no key at all.
 - The books archive `to-brain.7z` is gitignored (it is data, not source).
 - All Docker ports bind to `127.0.0.1` only; nothing is exposed off the host.

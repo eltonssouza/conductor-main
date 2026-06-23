@@ -33,7 +33,6 @@ Commands:
   journal add|recall|log     Per-project development diary.
   up | down                  Start / stop the Docker RAG stack (auto-detects GPU).
   ingest                     (Re)build the index in the running stack.
-  viewer                     3D map of the library embeddings (filter by profile).
   honcho setup               Choose the Honcho diary reasoning provider.
   honcho up | down           Start / stop the Honcho diary backend (Docker).
   update [--reinstall]       Pull the latest source (editable/source install).
@@ -51,7 +50,7 @@ QUICKSTART = """Conductor quickstart - from install to your first feature
 2. Start the two memories in Docker (once per machine)
    cdt up                                 # RAG: Ollama + ChromaDB + ingest the language-agnostic core
    cdt library status                     # verify what got ingested
-   cdt honcho setup --provider deepseek   # diary reasoning - needs a DeepSeek key (or --provider ollama, key-free)
+   cdt honcho setup                       # diary reasoning - pick a provider (deepseek/openai/ollama/...); ollama is key-free
    cdt honcho up                          # the Honcho diary backend
 
 3. Enroll a project - and add its stack to the library
@@ -70,7 +69,6 @@ Handy along the way:
    cdt journal recall "<question>"        # recall what this project already decided
    cdt journal log --kind error,solution  # list problems already solved
    cdt sync                               # after upgrading Conductor: refresh an enrolled project
-   cdt viewer                             # 3D map of the library + add a book from the browser
 """
 
 
@@ -128,10 +126,6 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "ingest":
         from .rag.bootstrap import main as bootstrap_main
         return bootstrap_main()
-
-    if cmd == "viewer":
-        from .viewer import main as viewer_main
-        return viewer_main(rest)
 
     if cmd == "honcho-setup":
         from .honcho_setup import main as honcho_setup_main

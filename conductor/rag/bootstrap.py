@@ -231,13 +231,26 @@ def step_ingest() -> int:
     return ingest_main([])
 
 
+def _collection_count() -> int:
+    """Best-effort chunk count for the final summary; 0 on any error."""
+    try:
+        from .core import get_collection
+        return get_collection(create=False).count()
+    except Exception:  # noqa: BLE001 — summary only, never block the build
+        return 0
+
+
 def main() -> int:
     log("0/4", "Conductor RAG bootstrap starting")
     step_extract()
     step_pull()
     step_chroma()
     rc = step_ingest()
-    log("done", "RAG stack ready" if rc == 0 else f"ingest exited with {rc}")
+    if rc == 0:
+        n = _collection_count()
+        log("done", f"RAG stack ready — library indexed ({n} chunks searchable)")
+    else:
+        log("done", f"ingest exited with {rc}")
     return rc
 
 

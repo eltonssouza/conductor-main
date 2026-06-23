@@ -10,6 +10,8 @@ works (OpenAI, DeepSeek, OpenRouter, local Ollama/vLLM…), plus native Anthropi
   python -m cdt.honcho_setup --provider deepseek     # non-interactive
   python -m cdt.honcho_setup --provider ollama       # local, no key needed
   python -m cdt.honcho_setup --provider openai --model gpt-4o --api-key sk-...
+  python -m cdt.honcho_setup --provider custom \
+      --base-url https://my-gateway/v1 --model my-model --api-key sk-...
 """
 from __future__ import annotations
 
@@ -24,28 +26,90 @@ from .project import PACKAGE_INFRA, force_utf8
 
 FEATURES = ("DERIVER", "DIALECTIC", "SUMMARY")
 
-# Optional convenience: if this file exists, the DeepSeek key is read from it
-# (line `API-KEY-DEEP_SEEK: "sk-..."`) when no --api-key is given. Default is a
-# per-user, cross-platform path; override with CONDUCTOR_DEEPSEEK_KEY_FILE.
-DEEPSEEK_KEY_FILE = Path(os.environ.get(
-    "CONDUCTOR_DEEPSEEK_KEY_FILE", str(Path.home() / ".conductor" / "deepseek-key.txt")))
+# Per-provider key-file convenience. For provider X, if no key is supplied another
+# way, Conductor reads the first token-looking value from `~/.conductor/X-key.txt`
+# (override the path with CONDUCTOR_<PROVIDER>_API_KEY_FILE). The file is a simple
+# `NAME: "value"` / `NAME=value` / bare-token text file. Backward compatible: the
+# legacy DeepSeek file `~/.conductor/deepseek-key.txt` (var `API-KEY-DEEP_SEEK`,
+# overridable via CONDUCTOR_DEEPSEEK_KEY_FILE) is still honored.
 DEEPSEEK_KEY_VAR = "API-KEY-DEEP_SEEK"
 
+# Token shapes accepted from a key file or env var. An `sk-...` token (OpenAI /
+# OpenRouter `sk-or-...` / Anthropic `sk-ant-...`) is preferred when present, so a
+# line like `API-KEY-DEEP_SEEK: "sk-..."` yields the token, not the var name.
+_SK_RE = re.compile(r"(sk-[A-Za-z0-9_\-]+)")
+# Fallback for providers whose keys are opaque (no `sk-` prefix), e.g. a bare
+# token on its own line or `NAME=token`.
+_TOKEN_RE = re.compile(r"=\s*([A-Za-z0-9][A-Za-z0-9_\-]{15,})|^\s*([A-Za-z0-9][A-Za-z0-9_\-]{15,})\s*$")
 
-def _read_key_from_file(path: Path, var: str) -> Optional[str]:
-    """Reads `var`'s value (an sk-... token) from a simple KEY: \"value\" file."""
+
+def _key_file_for(provider: str) -> Path:
+    """Per-provider key-file path, overridable via env.
+
+    Resolution: CONDUCTOR_<PROVIDER>_API_KEY_FILE, then (deepseek only) the legacy
+    CONDUCTOR_DEEPSEEK_KEY_FILE, then the default `~/.conductor/<provider>-key.txt`.
+    """
+    up = provider.upper()
+    env = os.environ.get(f"CONDUCTOR_{up}_API_KEY_FILE")
+    if not env and provider == "deepseek":
+        env = os.environ.get("CONDUCTOR_DEEPSEEK_KEY_FILE")
+    if env:
+        return Path(env)
+    return Path.home() / ".conductor" / f"{provider}-key.txt"
+
+
+def _read_key_from_file(path: Path, var: Optional[str] = None) -> Optional[str]:
+    """Reads a key token from a simple text file.
+
+    If `var` is given, the first line containing `var` wins; otherwise the first
+    line that yields a token wins. Accepts `NAME: "tok"`, `NAME=tok`, or a bare
+    token on its own line. Returns None if the file is missing/unreadable.
+    """
     try:
-        for line in path.read_text(encoding="utf-8").splitlines():
-            if var in line:
-                m = re.search(r"(sk-[A-Za-z0-9_\-]+)", line)
-                if m:
-                    return m.group(1)
+        lines = path.read_text(encoding="utf-8").splitlines()
     except OSError:
         return None
+    # Prefer a line that mentions `var` when one is requested (back-compat).
+    candidates = [ln for ln in lines if var and var in ln] or lines
+    for line in candidates:
+        body = line.split("#", 1)[0]
+        m = _SK_RE.search(body)
+        if m:
+            return m.group(1)
+        m = _TOKEN_RE.search(body)
+        if m:
+            return m.group(1) or m.group(2)
     return None
 
+
+def _resolve_key(provider: str, preset: dict, cli_key: Optional[str]) -> Optional[str]:
+    """Key resolution order, highest precedence first:
+    1. `--api-key` on the command line
+    2. env var `CONDUCTOR_<PROVIDER>_API_KEY` (or the preset's `key_env`)
+    3. per-provider key file `~/.conductor/<provider>-key.txt`
+       (override: `CONDUCTOR_<PROVIDER>_API_KEY_FILE`; legacy deepseek file honored)
+    4. None — caller falls back to interactive prompt / placeholder
+    """
+    if cli_key:
+        return cli_key
+    up = provider.upper()
+    env_key = os.environ.get(f"CONDUCTOR_{up}_API_KEY") or os.environ.get(preset["key_env"])
+    if env_key:
+        return env_key
+    # The legacy deepseek file is matched against its named var; others take the
+    # first token on any line.
+    var = DEEPSEEK_KEY_VAR if provider == "deepseek" else None
+    file_key = _read_key_from_file(_key_file_for(provider), var)
+    if file_key:
+        print(f"{provider} key loaded from {_key_file_for(provider)}")
+        return file_key
+    return None
+
+
 # Each preset is OpenAI-compatible unless transport says otherwise. base_url
-# empty = use the provider's native default.
+# empty = use the provider's native default. `custom` has no baked-in endpoint —
+# supply --base-url (+ --model, --api-key) for any OpenAI-compatible gateway
+# (vLLM, LM Studio, Groq, Together, a local proxy, …).
 PRESETS: Dict[str, dict] = {
     "openai": {"transport": "openai", "base_url": "https://api.openai.com/v1",
                "model": "gpt-4o-mini", "key_env": "LLM_OPENAI_API_KEY",
@@ -62,6 +126,9 @@ PRESETS: Dict[str, dict] = {
     "anthropic": {"transport": "anthropic", "base_url": "",
                   "model": "claude-haiku-4-5", "key_env": "LLM_ANTHROPIC_API_KEY",
                   "needs_key": True},
+    "custom": {"transport": "openai", "base_url": "",
+               "model": "", "key_env": "LLM_OPENAI_API_KEY",
+               "needs_key": True},  # any OpenAI-compatible endpoint via --base-url
 }
 
 
@@ -124,8 +191,13 @@ def _prompt_choice() -> str:
     print("Choose the Honcho reasoning provider:")
     for i, name in enumerate(names, 1):
         p = PRESETS[name]
-        loc = "local" if name == "ollama" else (p["base_url"] or "native")
-        print(f"  {i}. {name:<11} ({p['model']}, {loc})")
+        if name == "ollama":
+            loc, model = "local, no key", p["model"]
+        elif name == "custom":
+            loc, model = "your --base-url", "any OpenAI-compatible"
+        else:
+            loc, model = (p["base_url"] or "native"), p["model"]
+        print(f"  {i}. {name:<11} ({model}, {loc})")
     raw = input(f"Provider [1-{len(names)}] (default 1): ").strip()
     if not raw:
         return names[0]
@@ -158,11 +230,15 @@ def main(argv: List[str]) -> int:
     transport = preset["transport"]
     key_env = preset["key_env"]
 
-    api_key = args.api_key
-    if api_key is None and provider == "deepseek":
-        api_key = _read_key_from_file(DEEPSEEK_KEY_FILE, DEEPSEEK_KEY_VAR)
-        if api_key:
-            print(f"DeepSeek key loaded from {DEEPSEEK_KEY_FILE}")
+    if provider == "custom" and not base_url:
+        print("--provider custom needs --base-url <openai-compatible-url>.",
+              file=sys.stderr)
+        return 2
+    if provider == "custom" and not model:
+        print("--provider custom needs --model <id>.", file=sys.stderr)
+        return 2
+
+    api_key = _resolve_key(provider, preset, args.api_key)
     if api_key is None:
         if preset["needs_key"]:
             if sys.stdin.isatty():
