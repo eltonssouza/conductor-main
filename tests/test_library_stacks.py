@@ -1,0 +1,85 @@
+"""Tests for stack discovery + the interactive `cdt library stacks` chooser."""
+import gzip
+import io
+import json
+import tarfile
+import tempfile
+import unittest
+from pathlib import Path
+from unittest import mock
+
+from conductor import library
+from conductor.rag import core
+
+
+def _tarball(books):
+    raw = io.BytesIO()
+    with tarfile.open(fileobj=raw, mode="w") as tf:
+        for name, fm in books:
+            data = (f"---\n{fm}\n---\n\n# x\n").encode()
+            info = tarfile.TarInfo(f"conductor-library-main/{name}")
+            info.size = len(data)
+            tf.addfile(info, io.BytesIO(data))
+    return gzip.compress(raw.getvalue())
+
+
+class _Resp:
+    def __init__(self, b): self.b = b
+    def read(self): return self.b
+    def __enter__(self): return self
+    def __exit__(self, *a): return False
+
+
+class TestDiscoverStacks(unittest.TestCase):
+    def test_groups_versions_and_category(self):
+        blob = _tarball([
+            ("14_frameworks/Angular 21.md", "software_dev: stack\nstack: angular\nversion: 21"),
+            ("14_frameworks/Angular 22.md", "software_dev: stack\nstack: angular\nversion: 22"),
+            ("01_programming_languages/Go.md", "software_dev: stack\nstack: go"),
+            ("03_design/Clean.md", "software_dev: core"),     # not a stack -> ignored
+        ])
+        with mock.patch("urllib.request.urlopen", return_value=_Resp(blob)):
+            out = core.discover_stacks("x/y", "main")
+        self.assertEqual(set(out), {"angular", "go"})
+        self.assertEqual(out["angular"]["versions"], ["21", "22"])
+        self.assertEqual(out["angular"]["category"], "14_frameworks")
+        self.assertEqual(out["go"]["versions"], [])
+
+
+class TestChooser(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.lib = Path(self._tmp.name) / "library.json"
+        self._p = mock.patch.object(library, "_library_json", return_value=self.lib)
+        self._p.start(); self.addCleanup(self._p.stop)
+        self._avail = {
+            "java": {"versions": [], "category": "01_programming_languages"},
+            "angular": {"versions": ["21", "22"], "category": "14_frameworks"},
+            "go": {"versions": [], "category": "01_programming_languages"},
+        }
+
+    def _choose(self, answer):
+        with mock.patch("conductor.rag.core.discover_stacks", return_value=self._avail), \
+             mock.patch("sys.stdin.isatty", return_value=True), \
+             mock.patch("builtins.input", return_value=answer):
+            return library.cmd_stacks([])
+
+    def test_choose_by_id_and_pin_version_persists(self):
+        rc = self._choose("java, angular@21")
+        self.assertEqual(rc, 0)
+        saved = json.loads(self.lib.read_text(encoding="utf-8"))["stacks"]
+        self.assertEqual(saved, ["angular@21", "java"])
+
+    def test_all(self):
+        self._choose("all")
+        self.assertEqual(json.loads(self.lib.read_text())["stacks"], ["angular", "go", "java"])
+
+    def test_blank_keeps_current(self):
+        self.lib.write_text('{"stacks": ["go"]}', encoding="utf-8")
+        self._choose("")
+        self.assertEqual(json.loads(self.lib.read_text())["stacks"], ["go"])  # unchanged
+
+
+if __name__ == "__main__":
+    unittest.main()

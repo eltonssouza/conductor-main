@@ -65,8 +65,10 @@ cdt up                                 # re-run FROM the project: ingests its st
 > that project's detected languages/frameworks at the right edition (a Java 25 +
 > Spring Boot 4 + Angular 21 project adds Core Java, Spring Boot 3 and the Angular
 > 21 guide — not the other editions); the global index accumulates the stacks you
-> work on. Control it directly with `CONDUCTOR_LIBRARY_STACKS=java@25,angular@21`
-> (and `CONDUCTOR_LIBRARY_TIERS`), and check the result with `cdt library status`.
+> work on. Pick the technologies interactively with **`cdt library stacks`** (a
+> menu of every available language/framework + versions), or control it directly
+> with `CONDUCTOR_LIBRARY_STACKS=java@25,angular@21` (and `CONDUCTOR_LIBRARY_TIERS`);
+> check the result with `cdt library status`.
 
 Handy along the way:
 
