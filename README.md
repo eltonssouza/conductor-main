@@ -33,10 +33,9 @@ From install to your first feature (also printed by `cdt quickstart`):
 ```bash
 # 1. Install (once) — one line; see Installation for details
 #    macOS / Linux
-    curl -fsSL https://raw.githubusercontent.com/eltonssouza/conductor-main/main/install.sh | sh
-
-#    Windows (PowerShell):  
-    irm https://raw.githubusercontent.com/eltonssouza/conductor-main/main/install.ps1 | iex
+curl -fsSL https://raw.githubusercontent.com/eltonssouza/conductor-main/main/install.sh | sh
+#    Windows (PowerShell):
+irm https://raw.githubusercontent.com/eltonssouza/conductor-main/main/install.ps1 | iex
 
 # 2. Start the two memories in Docker (once per machine)
 cdt up                                 # RAG: Ollama + ChromaDB + ingest the language-agnostic core
