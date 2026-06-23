@@ -61,7 +61,8 @@ def _api_health() -> str:
     try:
         r = subprocess.run(["docker", "inspect", "honcho-api-1",
                             "--format", "{{.State.Health.Status}}"],
-                           capture_output=True, text=True, timeout=10)
+                           capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", timeout=10)
         return r.stdout.strip()
     except Exception:
         return ""
@@ -80,7 +81,8 @@ def _wait_health(timeout: int = 180) -> str:
 def _dim_mismatch() -> bool:
     try:
         r = subprocess.run(["docker", "logs", "honcho-api-1"],
-                           capture_output=True, text=True, timeout=15)
+                           capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", timeout=15)
         log = r.stdout + r.stderr
         return "EMBEDDING_VECTOR_DIMENSIONS" in log and "does not match" in log
     except Exception:
