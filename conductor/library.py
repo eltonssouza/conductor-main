@@ -116,11 +116,57 @@ def cmd_add(argv: List[str]) -> int:
     return 0
 
 
+def cmd_status(argv: List[str]) -> int:
+    """Show what is actually ingested in the library index (books, categories,
+    chunk counts) — so you can verify what `cdt up` downloaded for your stack."""
+    force_utf8()
+    ap = argparse.ArgumentParser(prog="cdt library status",
+                                 description="What's in the library index right now.")
+    ap.add_argument("--json", action="store_true", help="JSON output")
+    args = ap.parse_args(argv)
+
+    try:
+        coll = get_collection(create=False)
+        total = coll.count()
+    except Exception as e:  # noqa: BLE001 — Chroma down / collection missing
+        print(f"Library index not reachable: {e}\n"
+              "Hint: start the stack with `cdt up` first.", file=sys.stderr)
+        return 1
+    if total == 0:
+        print("Library index is empty. Run `cdt up` to fetch + ingest the books.")
+        return 0
+
+    from collections import defaultdict
+    data = coll.get(include=["metadatas"])          # small dicts; fine for a status
+    books: dict = defaultdict(int)
+    cats: dict = defaultdict(set)
+    for m in (data.get("metadatas") or []):
+        src, cat = m.get("source", "?"), m.get("category", "?")
+        books[src] += 1
+        cats[cat].add(src)
+
+    if args.json:
+        print(json.dumps({"chunks": total, "books": len(books),
+                          "categories": {c: sorted(s) for c, s in cats.items()}},
+                         ensure_ascii=False, indent=2))
+        return 0
+
+    print(f"Library index: {total} chunks · {len(books)} books · {len(cats)} categories\n")
+    for cat in sorted(cats):
+        srcs = sorted(cats[cat])
+        print(f"  {cat}/  ({len(srcs)} books)")
+        for s in srcs:
+            print(f"      {s}  ({books[s]} chunks)")
+    return 0
+
+
 def main(argv: List[str]) -> int:
     if argv and argv[0] == "reindex":
         return cmd_reindex(argv[1:])
     if argv and argv[0] == "add":
         return cmd_add(argv[1:])
+    if argv and argv[0] == "status":
+        return cmd_status(argv[1:])
 
     ap = argparse.ArgumentParser(description="Semantic search over the Conductor library.")
     ap.add_argument("question", help="question / query")

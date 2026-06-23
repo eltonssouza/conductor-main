@@ -24,10 +24,11 @@ from .project import PACKAGE_INFRA, force_utf8
 
 FEATURES = ("DERIVER", "DIALECTIC", "SUMMARY")
 
-# DeepSeek key is read from this file (var name API-KEY-DEEP_SEEK) when no
-# --api-key is given. Override the path with CONDUCTOR_DEEPSEEK_KEY_FILE.
+# Optional convenience: if this file exists, the DeepSeek key is read from it
+# (line `API-KEY-DEEP_SEEK: "sk-..."`) when no --api-key is given. Default is a
+# per-user, cross-platform path; override with CONDUCTOR_DEEPSEEK_KEY_FILE.
 DEEPSEEK_KEY_FILE = Path(os.environ.get(
-    "CONDUCTOR_DEEPSEEK_KEY_FILE", r"C:\honcho\deep-seek-key.txt"))
+    "CONDUCTOR_DEEPSEEK_KEY_FILE", str(Path.home() / ".conductor" / "deepseek-key.txt")))
 DEEPSEEK_KEY_VAR = "API-KEY-DEEP_SEEK"
 
 
