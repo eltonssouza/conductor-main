@@ -37,15 +37,17 @@ curl -fsSL https://raw.githubusercontent.com/eltonssouza/conductor-main/main/ins
 #    Windows (PowerShell):
 irm https://raw.githubusercontent.com/eltonssouza/conductor-main/main/install.ps1 | iex
 
-# 2. Enroll your project
+# 2. Start the two memories in Docker (once per machine)
+cdt up                                 # RAG: Ollama + ChromaDB + ingest the language-agnostic core
+cdt library status                     # verify what got ingested
+cdt honcho setup --provider deepseek   # diary reasoning — needs a DeepSeek key (see below); or --provider ollama (key-free)
+cdt honcho up                          # the Honcho diary backend
+
+# 3. Enroll a project — and add its stack to the library
 cd /path/to/your-project
 cdt init                               # scaffold .claude/ + .cdt/ + CLAUDE.md + /cdt + hooks
-cdt detect                             # (optional) preview the library stacks it will ingest
-
-# 3. Start the two memories in Docker (run from the project: auto-ingests ITS stack)
-cdt up                                 # RAG: Ollama + ChromaDB + ingest core + your stack
-cdt honcho setup --provider deepseek   # configure the diary's reasoning (first time only)
-cdt honcho up                          # the Honcho diary backend
+cdt detect                             # see the project's languages/frameworks
+cdt up                                 # re-run FROM the project: ingests its stack books too
 
 # 4. Reload Claude Code in that project  -> so the /cdt command and the hooks load
 
@@ -53,12 +55,13 @@ cdt honcho up                          # the Honcho diary backend
 /cdt implement <your feature>          # interactive: stops for your approval at each gate
 ```
 
-> **The library auto-fits your stack.** Run `cdt up` from a project and it
-> ingests the language-agnostic core **plus** the books for the project's
-> detected languages/frameworks at the right edition (a Java 25 + Spring Boot 4 +
-> Angular 21 project gets Core Java, Spring Boot 3, and the Angular 21 guide — not
-> the other editions). The global index accumulates the stacks you work on. Pin
-> it by hand with `CONDUCTOR_LIBRARY_STACKS=java@25,angular@21`.
+> **The library fits your stack.** `cdt up` outside a project ingests the
+> language-agnostic **core** only. Run it again **from a project** and it adds
+> that project's detected languages/frameworks at the right edition (a Java 25 +
+> Spring Boot 4 + Angular 21 project adds Core Java, Spring Boot 3 and the Angular
+> 21 guide — not the other editions); the global index accumulates the stacks you
+> work on. Control it directly with `CONDUCTOR_LIBRARY_STACKS=java@25,angular@21`
+> (and `CONDUCTOR_LIBRARY_TIERS`), and check the result with `cdt library status`.
 
 Handy along the way:
 
@@ -105,9 +108,9 @@ cdt viewer                             # 3D map of the library + add a book from
 ## How it works
 
 ```
-                ┌─────────────────────────────────────────────────────┐
+                ┌───────────────────────────────────────────────────────┐
                 │  cdt  (global CLI, installed with the one-liner / uv) │
-                └─────────────────────────────────────────────────────┘
+                └───────────────────────────────────────────────────────┘
                       │                    │                    │
         cdt init        cdt library    cdt journal
                       │                    │                    │
@@ -280,20 +283,20 @@ Anthropic / OpenRouter) have no compatible embeddings API, Conductor uses a
 
 ### Where to put the DeepSeek API key
 
-Create the file **`C:\honcho\deep-seek-key.txt`** containing a line in this form:
+`cdt honcho setup --provider deepseek` resolves the key in this order, writing it
+into the (gitignored) Honcho `.env` — never printed or passed on the command line:
 
-```
-API-KEY-DEEP_SEEK: "sk-your-deepseek-key"
-```
+1. **`--api-key sk-...`** on the command line, or
+2. a **key file** (convenience): `~/.conductor/deepseek-key.txt` (override the
+   path with `CONDUCTOR_DEEPSEEK_KEY_FILE`) containing one line:
+   ```
+   API-KEY-DEEP_SEEK: "sk-your-deepseek-key"
+   ```
+3. otherwise it **prompts** (interactive) or writes a `set-your-deepseek-key`
+   placeholder you fill into the `.env` before `cdt honcho up`.
 
-When you run `cdt honcho setup --provider deepseek` **without** `--api-key`,
-Conductor reads the key from that file and writes it into the (gitignored) Honcho
-`.env`. The key is never passed on the command line or printed.
-
-- Override the path with the environment variable `CONDUCTOR_DEEPSEEK_KEY_FILE`.
-- You can still pass the key explicitly: `cdt honcho setup --provider
-  deepseek --api-key sk-...`.
-- Get a key at <https://platform.deepseek.com/>.
+Get a key at <https://platform.deepseek.com/>. Prefer no key at all? Use the
+**fully local** option below (`--provider ollama`).
 
 To use the **fully local, key-free** option instead:
 

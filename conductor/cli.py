@@ -27,6 +27,7 @@ Commands:
   detect [path]              Show the detected type/tech and the library stacks
                              `cdt up` would auto-ingest for this project.
   library "<question>"       Semantic search over the reference books (RAG).
+  library status             Show what is ingested (books, categories, chunk counts).
   library reindex            Index any library files not yet in ChromaDB (incremental).
   library add <file.md>      Index specific .md file(s) already under the library.
   journal add|recall|log     Per-project development diary.
@@ -47,15 +48,17 @@ QUICKSTART = """Conductor quickstart - from install to your first feature
    macOS/Linux:  curl -fsSL https://raw.githubusercontent.com/eltonssouza/conductor-main/main/install.sh | sh
    Windows:      irm https://raw.githubusercontent.com/eltonssouza/conductor-main/main/install.ps1 | iex
 
-2. Enroll your project
+2. Start the two memories in Docker (once per machine)
+   cdt up                                 # RAG: Ollama + ChromaDB + ingest the language-agnostic core
+   cdt library status                     # verify what got ingested
+   cdt honcho setup --provider deepseek   # diary reasoning - needs a DeepSeek key (or --provider ollama, key-free)
+   cdt honcho up                          # the Honcho diary backend
+
+3. Enroll a project - and add its stack to the library
    cd /path/to/your-project
    cdt init                               # scaffold .claude/ + .cdt/ + CLAUDE.md + /cdt + hooks
-   cdt detect                             # (optional) preview the library stacks it will ingest
-
-3. Start the two memories in Docker (run from the project: auto-ingests ITS stack)
-   cdt up                                 # RAG: Ollama + ChromaDB + ingest core + your stack
-   cdt honcho setup --provider deepseek   # configure the diary's reasoning (first time only)
-   cdt honcho up                          # the Honcho diary backend
+   cdt detect                             # see the project's languages/frameworks
+   cdt up                                 # re-run FROM the project: ingests its stack books too
 
 4. Reload Claude Code in that project     # so the /cdt command and the hooks load
 
