@@ -34,7 +34,8 @@ From install to your first feature (also printed by `cdt quickstart`):
 # 1. Install (once) — one line; see Installation for details
 #    macOS / Linux
 curl -fsSL https://raw.githubusercontent.com/eltonssouza/conductor-main/main/install.sh | sh
-#    Windows (PowerShell):  irm https://raw.githubusercontent.com/eltonssouza/conductor-main/main/install.ps1 | iex
+#    Windows (PowerShell):
+irm https://raw.githubusercontent.com/eltonssouza/conductor-main/main/install.ps1 | iex
 
 # 2. Enroll your project
 cd /path/to/your-project
