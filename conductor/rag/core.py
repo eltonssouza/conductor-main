@@ -259,46 +259,34 @@ def select_corpus(metas: "dict[str, dict]", tiers: List[str], stacks: List[str])
 
 
 def discover_stacks(repo: Optional[str] = None, ref: Optional[str] = None) -> "dict[str, dict]":
-    """Download the library repo tarball and list its opt-in stacks.
+    """Read the library's generated catalog and list its opt-in stacks.
 
-    Returns `{stack_id: {"versions": [majors...], "category": "<NN_folder>"}}` by
-    reading each `software_dev: stack` book's frontmatter — the authoritative
-    source for what a user can pick to ingest. Network failure -> {} (caller
-    handles). Text tarball, read once; only frontmatter heads are decoded.
+    Returns `{stack_id: {"versions": [majors...], "category": "<NN_folder>"}}` from
+    `LIBRARY_INDEX.json` — the authoritative, machine-readable catalog the library
+    repo generates from frontmatter (see its FILE_CONVENTIONS.md §7). One small
+    fetch instead of downloading and decoding the whole tarball. Network/parse
+    failure -> {} (caller handles).
     """
-    import io
-    import tarfile
+    import json
     import urllib.request
 
     repo = repo or os.environ.get("CONDUCTOR_LIBRARY_REPO", "eltonssouza/conductor-library")
     ref = ref or os.environ.get("CONDUCTOR_LIBRARY_REF", "main")
-    url = f"https://github.com/{repo}/archive/refs/heads/{ref}.tar.gz"
+    url = f"https://raw.githubusercontent.com/{repo}/{ref}/LIBRARY_INDEX.json"
     try:
-        with urllib.request.urlopen(url, timeout=120) as r:
-            blob = r.read()
+        with urllib.request.urlopen(url, timeout=30) as r:
+            idx = json.loads(r.read().decode("utf-8", "replace"))
     except Exception:  # noqa: BLE001 — caller reports "couldn't reach the repo"
         return {}
     out: dict = {}
-    with tarfile.open(fileobj=io.BytesIO(blob), mode="r:gz") as tf:
-        for m in tf.getmembers():
-            if not m.isfile() or not m.name.endswith(".md"):
-                continue
-            _, _, rel = m.name.partition("/")
-            if "/" not in rel:
-                continue
-            src = tf.extractfile(m)
-            if src is None:
-                continue
-            meta, _ = split_frontmatter(src.read(600).decode("utf-8", "replace"))
-            sid = (meta.get("stack") or "").strip().lower()
-            if not sid:
-                continue
-            entry = out.setdefault(sid, {"versions": set(), "category": rel.split("/")[0]})
-            v = (meta.get("version") or "").strip()
-            if v:
-                entry["versions"].add(v)
-    return {k: {"versions": sorted(v["versions"], key=lambda x: (len(x), x)),
-                "category": v["category"]} for k, v in sorted(out.items())}
+    for sid, s in (idx.get("stacks") or {}).items():
+        editions = s.get("editions") or []
+        category = editions[0]["path"].split("/")[0] if editions else ""
+        out[sid] = {
+            "versions": [str(v) for v in (s.get("versions") or [])],
+            "category": category,
+        }
+    return dict(sorted(out.items()))
 
 
 def iter_corpus(library: Path = LIBRARY_DIR, *, tiers: Optional[List[str]] = None,
