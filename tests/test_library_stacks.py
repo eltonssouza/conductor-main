@@ -59,26 +59,34 @@ class TestChooser(unittest.TestCase):
             "go": {"versions": [], "category": "01_programming_languages"},
         }
 
-    def _choose(self, answer):
+    def _choose(self, stacks_ans, tiers_ans=""):
+        # two input() prompts: stacks, then tiers
         with mock.patch("conductor.rag.core.discover_stacks", return_value=self._avail), \
              mock.patch("sys.stdin.isatty", return_value=True), \
-             mock.patch("builtins.input", return_value=answer):
+             mock.patch("builtins.input", side_effect=[stacks_ans, tiers_ans]):
             return library.cmd_stacks([])
 
     def test_choose_by_id_and_pin_version_persists(self):
         rc = self._choose("java, angular@21")
         self.assertEqual(rc, 0)
-        saved = json.loads(self.lib.read_text(encoding="utf-8"))["stacks"]
-        self.assertEqual(saved, ["angular@21", "java"])
+        saved = json.loads(self.lib.read_text(encoding="utf-8"))
+        self.assertEqual(saved["stacks"], ["angular@21", "java"])
+        self.assertEqual(saved["tiers"], ["core"])           # blank tiers -> core
 
     def test_all(self):
         self._choose("all")
         self.assertEqual(json.loads(self.lib.read_text())["stacks"], ["angular", "go", "java"])
 
     def test_blank_keeps_current(self):
-        self.lib.write_text('{"stacks": ["go"]}', encoding="utf-8")
+        self.lib.write_text('{"stacks": ["go"], "tiers": ["core"]}', encoding="utf-8")
         self._choose("")
         self.assertEqual(json.loads(self.lib.read_text())["stacks"], ["go"])  # unchanged
+
+    def test_tiers_selection(self):
+        self._choose("java", "supporting, foundational, bogus")
+        saved = json.loads(self.lib.read_text(encoding="utf-8"))
+        self.assertEqual(saved["stacks"], ["java"])
+        self.assertEqual(saved["tiers"], ["core", "foundational", "supporting"])  # core always, bogus dropped
 
 
 if __name__ == "__main__":

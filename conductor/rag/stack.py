@@ -54,18 +54,26 @@ def auto_select_stacks(env: dict) -> None:
     earlier runs (persisted under CONDUCTOR_HOME). Switching from an Angular
     project to a Ruby one grows the index to cover both instead of dropping one.
     """
+    store = REGISTRY_DIR / "library.json"
+    saved: dict = {}
+    if store.is_file():
+        try:
+            saved = json.loads(store.read_text(encoding="utf-8"))
+            saved = saved if isinstance(saved, dict) else {}
+        except (ValueError, OSError):
+            saved = {}
+
+    # Tiers: the persisted `cdt library stacks` choice, unless set explicitly.
+    if not env.get("CONDUCTOR_LIBRARY_TIERS") and saved.get("tiers"):
+        env["CONDUCTOR_LIBRARY_TIERS"] = ",".join(saved["tiers"])
+        print(f"Library tiers: {', '.join(saved['tiers'])}")
+
     if env.get("CONDUCTOR_LIBRARY_STACKS"):
-        return  # explicit override wins; don't auto-detect or persist
+        return  # explicit stacks override wins; don't auto-detect or persist
     from ..detect import library_stacks
     from ..project import find_project_root
     detected = set(library_stacks(find_project_root()))
-    store = REGISTRY_DIR / "library.json"
-    prev: set = set()
-    if store.is_file():
-        try:
-            prev = set(json.loads(store.read_text(encoding="utf-8")).get("stacks", []))
-        except (ValueError, OSError):
-            prev = set()
+    prev: set = set(saved.get("stacks", []))
     union = sorted(prev | detected)
     if not union:
         print("Library: no project stacks detected — ingesting core (language-agnostic).")
@@ -73,7 +81,9 @@ def auto_select_stacks(env: dict) -> None:
     env["CONDUCTOR_LIBRARY_STACKS"] = ",".join(union)
     try:
         REGISTRY_DIR.mkdir(parents=True, exist_ok=True)
-        store.write_text(json.dumps({"stacks": union}, indent=2) + "\n", encoding="utf-8")
+        out = dict(saved)        # preserve tiers + any other keys
+        out["stacks"] = union
+        store.write_text(json.dumps(out, indent=2) + "\n", encoding="utf-8")
     except OSError:
         pass
     new = sorted(detected - prev)

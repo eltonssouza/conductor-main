@@ -172,6 +172,23 @@ def _current_stacks() -> List[str]:
         return []
 
 
+# Whole-category tiers (the `software_dev` frontmatter tier). `core` is always in.
+_TIERS = [
+    ("core", "always - the language-agnostic craft (Clean Code, DDD, architecture...)"),
+    ("supporting", "DevOps/SRE, security & privacy, management/product, design/UX"),
+    ("foundational", "algorithms, OS, networks, compilers, AI fundamentals"),
+    ("optional", "pure math / theory / hardware"),
+]
+
+
+def _current_tiers() -> List[str]:
+    try:
+        t = json.loads(_library_json().read_text(encoding="utf-8")).get("tiers", [])
+        return list(t) or ["core"]
+    except (OSError, ValueError):
+        return ["core"]
+
+
 def cmd_stacks(argv: List[str]) -> int:
     """Interactively choose which language/framework stacks to ingest.
 
@@ -197,8 +214,10 @@ def cmd_stacks(argv: List[str]) -> int:
     order: List[str] = []
     for sid, info in avail.items():
         groups[info["category"]].append((sid, info["versions"]))
-    current = _current_stacks()
-    print(f"\nCurrently selected: {', '.join(current) or '(none — core only)'}\n")
+    cur_stacks = _current_stacks()
+    cur_tiers = _current_tiers()
+    print(f"\nCurrent selection:  stacks={', '.join(cur_stacks) or '(none)'}   "
+          f"tiers={', '.join(cur_tiers)}\n")
     n = 0
     numbered: List[str] = []
     for cat in sorted(groups):
@@ -208,49 +227,61 @@ def cmd_stacks(argv: List[str]) -> int:
             n += 1
             numbered.append(sid)
             vtxt = f"  (versions: {', '.join(vers)})" if vers else ""
-            mark = " *" if sid in current or any(c.split("@")[0] == sid for c in current) else ""
+            mark = " *" if any(c.split("@")[0] == sid for c in cur_stacks) else ""
             print(f"    {n:>2}. {sid}{vtxt}{mark}")
+    print("\n  tiers (whole categories; core always in):")
+    for t, d in _TIERS:
+        mark = " *" if t in cur_tiers else ""
+        print(f"      {t:<12} {d}{mark}")
     print()
 
     if args.list or not sys.stdin.isatty():
-        print("Pick with: cdt library stacks  (interactive), or set "
-              "CONDUCTOR_LIBRARY_STACKS=<ids> before `cdt up`.")
+        print("Interactive: `cdt library stacks`. Or env (before `cdt up`): "
+              "CONDUCTOR_LIBRARY_STACKS=<ids> CONDUCTOR_LIBRARY_TIERS=core,supporting")
         return 0
 
-    raw = input("Choose stacks to ingest (numbers/ids, comma-sep; `id@major` to pin a "
-                "version; `all`; blank = keep current): ").strip()
+    # --- stacks ---
+    raw = input("Stacks to ingest (numbers/ids; `id@major` to pin a version; `all`; "
+                "blank = keep current): ").strip()
     if not raw:
-        print("Kept current selection.")
-        return 0
-    chosen: List[str] = []
-    if raw.lower() == "all":
-        chosen = sorted(avail)
+        stacks = cur_stacks
+    elif raw.lower() == "all":
+        stacks = sorted(avail)
     else:
+        picked: List[str] = []
         for tok in raw.split(","):
             tok = tok.strip()
             if not tok:
                 continue
             base, _, ver = tok.partition("@")
-            if base.isdigit():                       # a menu number
+            if base.isdigit():
                 idx = int(base) - 1
                 if 0 <= idx < len(numbered):
                     sid = numbered[idx]
-                    chosen.append(f"{sid}@{ver}" if ver else sid)
+                    picked.append(f"{sid}@{ver}" if ver else sid)
             elif base.lower() in avail:
-                chosen.append(tok.lower())
+                picked.append(tok.lower())
             else:
                 print(f"  (ignored unknown: {tok})", file=sys.stderr)
-    chosen = sorted(dict.fromkeys(chosen))
-    if not chosen:
-        print("Nothing valid chosen; selection unchanged.", file=sys.stderr)
-        return 1
+        stacks = sorted(dict.fromkeys(picked)) or cur_stacks
+
+    # --- tiers ---
+    traw = input("Add tiers beyond core (supporting,foundational,optional; comma-sep; "
+                 "blank = keep current): ").strip()
+    if not traw:
+        tiers = cur_tiers
+    else:
+        valid = {t for t, _ in _TIERS}
+        extra = sorted({x.strip().lower() for x in traw.split(",")
+                        if x.strip().lower() in valid and x.strip().lower() != "core"})
+        tiers = ["core"] + extra
 
     p = _library_json()
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps({"stacks": chosen}, indent=2) + "\n", encoding="utf-8")
-    print(f"\nSaved: {', '.join(chosen)}")
-    print(f"  -> run `cdt up` to ingest them (the index accumulates; to start clean: "
-          f"`cdt down; docker volume rm conductor_chroma; cdt up`).")
+    p.write_text(json.dumps({"stacks": stacks, "tiers": tiers}, indent=2) + "\n", encoding="utf-8")
+    print(f"\nSaved:  stacks={', '.join(stacks) or '(none)'}   tiers={', '.join(tiers)}")
+    print("  -> run `cdt up` to ingest (the index accumulates; clean start: "
+          "`cdt down; docker volume rm conductor_chroma; cdt up`).")
     return 0
 
 
