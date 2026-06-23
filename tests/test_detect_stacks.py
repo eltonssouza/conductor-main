@@ -134,6 +134,22 @@ class TestAutoSelect(unittest.TestCase):
         self.assertEqual(env["CONDUCTOR_LIBRARY_STACKS"], "ruby")
         self.assertFalse((self.home / "library.json").exists())  # not persisted
 
+    def test_reads_persisted_tiers(self):
+        (self.home / "library.json").write_text(
+            '{"stacks": [], "tiers": ["core", "supporting"]}', encoding="utf-8")
+        env = {}
+        stack_mod.auto_select_stacks(env)
+        self.assertEqual(env["CONDUCTOR_LIBRARY_TIERS"], "core,supporting")
+
+    def test_preserves_tiers_when_writing_stacks(self):
+        (self.home / "library.json").write_text(
+            '{"stacks": ["angular"], "tiers": ["core", "supporting"]}', encoding="utf-8")
+        (self.proj / "go.mod").write_text("module x", encoding="utf-8")
+        stack_mod.auto_select_stacks({})
+        saved = json.loads((self.home / "library.json").read_text(encoding="utf-8"))
+        self.assertEqual(saved["tiers"], ["core", "supporting"])   # not wiped
+        self.assertIn("go", saved["stacks"])
+
 
 if __name__ == "__main__":
     unittest.main()
