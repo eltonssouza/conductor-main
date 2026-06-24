@@ -23,7 +23,8 @@ import sys
 from pathlib import Path
 from typing import List, Optional
 
-from .honcho_client import CONDUCTOR_PEER, OWNER_PEER, HonchoBackend
+from .honcho_client import (CONDUCTOR_PEER, OWNER_PEER, HonchoBackend,
+                            session_prefix)
 from .project import (daily_dir, diary_dir, docs_dir, find_project_root,
                       force_utf8, journal_dir, memory_dir, read_config,
                       records_dir)
@@ -50,8 +51,7 @@ TYPE_TO_SESSION = {dtype: suffix for _, suffix, _, dtype in INGEST_ROUTES}
 def _session_id(config: dict, override: Optional[str]) -> str:
     if override:
         return override
-    prefix = config.get("honcho", {}).get("session_prefix", "cdt")
-    return f"{prefix}-{datetime.date.today().isoformat()}"
+    return f"{session_prefix(config)}-{datetime.date.today().isoformat()}"
 
 
 def _mirror_path(root: Path, session_id: str) -> Path:
@@ -76,10 +76,6 @@ def _read_mirror(path: Path) -> List[dict]:
             except ValueError:
                 pass
     return out
-
-
-def _session_prefix(config: dict) -> str:
-    return config.get("honcho", {}).get("session_prefix", "cdt")
 
 
 def _content_hash(text: str) -> str:
@@ -116,6 +112,29 @@ def _doc_area(subtree: str, rel: str) -> Optional[str]:
     return parts[1] if len(parts) >= 3 and parts[0] == "docs" else None
 
 
+def _iter_ingestable(mem: Path):
+    """Yield `(subtree, suffix, peer, dtype, md, rel)` for every ingestable
+    markdown file under `.cdt/memory/` (INGEST_ROUTES, minus `_index.md` stubs).
+    Single source of truth shared by `cmd_ingest` and `_scan_markdown`."""
+    for subtree, suffix, peer, dtype in INGEST_ROUTES:
+        base = mem / Path(subtree)
+        if not base.is_dir():
+            continue
+        for md in sorted(base.rglob("*.md")):
+            if md.name == "_index.md":
+                continue
+            yield subtree, suffix, peer, dtype, md, md.relative_to(mem).as_posix()
+
+
+def _read_md(md: Path) -> Optional[str]:
+    """Read a markdown file as UTF-8, or None on any OS error (clear warning)."""
+    try:
+        return md.read_text(encoding="utf-8")
+    except OSError as e:
+        print(f"WARNING: cannot read {md} ({e})", file=sys.stderr)
+        return None
+
+
 def cmd_ingest(root: Path, config: dict, args) -> int:
     """Walk `docs/` + `records/`, ingest changed files into Honcho (hash-idempotent).
 
@@ -130,42 +149,32 @@ def cmd_ingest(root: Path, config: dict, args) -> int:
         return 2
     manifest = _load_manifest(root)
     backend = HonchoBackend.from_config(config)
-    prefix = _session_prefix(config)
+    prefix = session_prefix(config)
     changed = skipped = failed = 0
     first_error: Optional[str] = None
     seen: set[str] = set()
 
-    for subtree, suffix, peer, dtype in INGEST_ROUTES:
-        base = mem / Path(subtree)
-        if not base.is_dir():
+    for subtree, suffix, peer, dtype, md, rel in _iter_ingestable(mem):
+        seen.add(rel)
+        text = _read_md(md)
+        if text is None or not text.strip():
             continue
-        for md in sorted(base.rglob("*.md")):
-            if md.name == "_index.md":
-                continue
-            rel = md.relative_to(mem).as_posix()
-            seen.add(rel)
-            try:
-                text = md.read_text(encoding="utf-8")
-            except OSError:
-                continue
-            if not text.strip():
-                continue
-            h = _content_hash(text)
-            if manifest.get(rel) == h and not args.force:
-                skipped += 1
-                continue
-            meta = {"type": dtype, "path": rel, "hash": h}
-            area = _doc_area(subtree, rel)
-            if area:
-                meta["area"] = area
-            res = backend.add_doc(f"{prefix}-{suffix}", text,
-                                  peer=peer, metadata=meta)
-            if res.ok:
-                manifest[rel] = h
-                changed += 1
-            else:
-                failed += 1
-                first_error = first_error or res.detail
+        h = _content_hash(text)
+        if manifest.get(rel) == h and not args.force:
+            skipped += 1
+            continue
+        meta = {"type": dtype, "path": rel, "hash": h}
+        area = _doc_area(subtree, rel)
+        if area:
+            meta["area"] = area
+        res = backend.add_doc(f"{prefix}-{suffix}", text,
+                              peer=peer, metadata=meta)
+        if res.ok:
+            manifest[rel] = h
+            changed += 1
+        else:
+            failed += 1
+            first_error = first_error or res.detail
 
     # Prune manifest entries for files that no longer exist.
     pruned = [rel for rel in manifest if rel not in seen]
@@ -270,7 +279,7 @@ def cmd_recall(root: Path, config: dict, args) -> int:
             print(f"unknown --type '{args.type}'; choose from "
                   f"{', '.join(sorted(TYPE_TO_SESSION))}", file=sys.stderr)
             return 2
-        session_id = f"{_session_prefix(config)}-{suffix}"
+        session_id = f"{session_prefix(config)}-{suffix}"
     else:
         session_id = _session_id(config, args.session)
 
@@ -288,10 +297,8 @@ def cmd_recall(root: Path, config: dict, args) -> int:
     # Fallback A: the markdown memory (docs/records), honoring --type/--area.
     md_hits = _scan_markdown(root, terms, args.type, args.area)
     # Fallback B: the diary mirror (skipped when a doc-only filter is set).
-    try:
-        kinds = _parse_kinds(getattr(args, "kind", None))
-    except ValueError as e:
-        print(f"ERROR: {e}", file=sys.stderr)
+    kinds, ok = _resolve_kinds(args)
+    if not ok:
         return 2
     diary_hits = ([] if (args.type or args.area)
                   else _scan_diary(root, terms, args.gate, kinds))
@@ -302,9 +309,7 @@ def cmd_recall(root: Path, config: dict, args) -> int:
     for path, snippet in md_hits[:args.k]:
         print(f"[{path}] {snippet}")
     for e in diary_hits[-args.k:]:
-        g = f"gate {e['gate']}" if e.get("gate") is not None else "-"
-        print(f"[{e.get('ts','')}] {e.get('author','')}/{e.get('kind','')}/{g}: "
-              f"{e.get('text','')}")
+        print(_format_diary_entry(e))
     return 0
 
 
@@ -332,29 +337,21 @@ def _scan_markdown(root: Path, terms: List[str], dtype: Optional[str],
     """
     mem = memory_dir(root)
     hits: List[tuple] = []
-    for subtree, _suffix, _peer, route_type in INGEST_ROUTES:
+    for subtree, _suffix, _peer, route_type, md, rel in _iter_ingestable(mem):
         if dtype and route_type != dtype:
             continue
-        base = mem / Path(subtree)
-        if not base.is_dir():
+        if area and _doc_area(subtree, rel) != area:
             continue
-        for md in sorted(base.rglob("*.md")):
-            if md.name == "_index.md":
-                continue
-            rel = md.relative_to(mem).as_posix()
-            if area and _doc_area(subtree, rel) != area:
-                continue
-            try:
-                text = md.read_text(encoding="utf-8")
-            except OSError:
-                continue
-            low = text.lower()
-            if terms and not any(t in low for t in terms):
-                continue
-            snippet = next((ln.strip() for ln in text.splitlines()
-                            if ln.strip() and (not terms
-                            or any(t in ln.lower() for t in terms))), "")
-            hits.append((rel, snippet[:160]))
+        text = _read_md(md)
+        if text is None:
+            continue
+        low = text.lower()
+        if terms and not any(t in low for t in terms):
+            continue
+        snippet = next((ln.strip() for ln in text.splitlines()
+                        if ln.strip() and (not terms
+                        or any(t in ln.lower() for t in terms))), "")
+        hits.append((rel, snippet[:160]))
     return hits
 
 
@@ -370,14 +367,30 @@ def _parse_kinds(raw: Optional[str]) -> Optional[set]:
     return kinds
 
 
+def _resolve_kinds(args) -> tuple[Optional[set], bool]:
+    """Parse `args.kind`, printing a clear stderr error on a bad value. Returns
+    (kinds, ok); ok=False means the caller should return exit code 2. Shared by
+    `recall` and `log`, which both accept a `--kind` filter."""
+    try:
+        return _parse_kinds(getattr(args, "kind", None)), True
+    except ValueError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        return None, False
+
+
+def _format_diary_entry(e: dict) -> str:
+    """Render one diary entry as a single `log`/`recall`-fallback line."""
+    g = f"gate {e['gate']}" if e.get("gate") is not None else "-"
+    return (f"[{e.get('ts','')}] {e.get('author','')}/{e.get('kind','')}/{g}: "
+            f"{e.get('text','')}")
+
+
 def cmd_log(root: Path, config: dict, args) -> int:
     session_id = _session_id(config, args.session) if args.session else None
     files = ([_mirror_path(root, session_id)] if session_id
              else sorted(journal_dir(root).glob("*.jsonl")))
-    try:
-        kinds = _parse_kinds(getattr(args, "kind", None))
-    except ValueError as e:
-        print(f"ERROR: {e}", file=sys.stderr)
+    kinds, ok = _resolve_kinds(args)
+    if not ok:
         return 2
     gate = getattr(args, "gate", None)
     n = 0
@@ -387,8 +400,7 @@ def cmd_log(root: Path, config: dict, args) -> int:
                 continue
             if gate is not None and e.get("gate") != gate:
                 continue
-            g = f"gate {e['gate']}" if e.get("gate") is not None else "-"
-            print(f"[{e.get('ts','')}] {e.get('author','')}/{e.get('kind','')}/{g}: {e.get('text','')}")
+            print(_format_diary_entry(e))
             n += 1
     if n == 0:
         sel = (f" matching kind={','.join(sorted(kinds))}" if kinds else "") \
@@ -425,6 +437,18 @@ def _observations_path(root: Path) -> Path:
     return memory_dir(root) / ".observations.jsonl"
 
 
+def _read_observation_lines(path: Path) -> List[str]:
+    """Non-empty raw lines of the observation log, or [] if absent/unreadable."""
+    if not path.is_file():
+        return []
+    try:
+        return [ln for ln in path.read_text(encoding="utf-8").splitlines()
+                if ln.strip()]
+    except OSError as e:
+        print(f"WARNING: cannot read {path} ({e})", file=sys.stderr)
+        return []
+
+
 def cmd_observe(root: Path, config: dict, args) -> int:
     """UserPromptSubmit hook: append the user's prompt locally (no network).
 
@@ -440,9 +464,7 @@ def cmd_observe(root: Path, config: dict, args) -> int:
            "text": prompt, "synced": False}
     p = _observations_path(root)
     p.parent.mkdir(parents=True, exist_ok=True)
-    lines = []
-    if p.is_file():
-        lines = [ln for ln in p.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    lines = _read_observation_lines(p)
     lines.append(json.dumps(rec, ensure_ascii=False))
     p.write_text("\n".join(lines[-_OBS_KEEP:]) + "\n", encoding="utf-8")
     return 0  # silent: never add noise to the user's prompt turn
@@ -451,16 +473,12 @@ def cmd_observe(root: Path, config: dict, args) -> int:
 def _flush_observations(root: Path, config: dict) -> int:
     """Best-effort: push unsynced observations to Honcho (owner peer), batched."""
     p = _observations_path(root)
-    if not p.is_file():
-        return 0
     recs = []
-    for ln in p.read_text(encoding="utf-8").splitlines():
-        ln = ln.strip()
-        if ln:
-            try:
-                recs.append(json.loads(ln))
-            except ValueError:
-                pass
+    for ln in _read_observation_lines(p):
+        try:
+            recs.append(json.loads(ln))
+        except ValueError:
+            pass
     pending = [r for r in recs if not r.get("synced")]
     if not pending:
         return 0

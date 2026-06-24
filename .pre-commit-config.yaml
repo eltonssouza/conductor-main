@@ -1,7 +1,22 @@
-# Optional local quality gate (Gate 7). Enable with:
+# Local quality gate (Gate 7). Enable with:
 #   pip install pre-commit && pre-commit install
-# Then `python tools/validate.py` runs automatically before each commit.
+# Runs the same checks as CI before each commit: the ruff linter and the
+# invariant validator. ruff reads its config from pyproject.toml ([tool.ruff])
+# so local and CI behaviour stay consistent.
+#
+# NOTE: ruff-format is intentionally NOT enabled. The existing source predates
+# ruff and is not ruff-formatted; a `ruff format --check` hook would fail on a
+# clean tree. Linting (E,F,I, calibrated green) is the agreed baseline; adopt
+# ruff-format later once the codebase is reformatted in a dedicated change.
 repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.19
+    hooks:
+      # Lint (no autofix here — fail and let the developer review the change).
+      - id: ruff
+        args: ["check", "conductor", "tools", "tests"]
+        pass_filenames: false
+
   - repo: local
     hooks:
       - id: conductor-validate

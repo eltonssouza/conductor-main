@@ -10,6 +10,7 @@ import json
 import os
 import re
 import sys
+import tempfile
 from pathlib import Path
 from typing import List, Optional
 
@@ -17,6 +18,16 @@ CDT_DIRNAME = ".cdt"
 # Markers that identify a project root when walking up from the cwd.
 ROOT_MARKERS = (".cdt", ".git", "package.json", "pyproject.toml", "go.mod",
                 "pom.xml", "build.gradle", "Cargo.toml", "pubspec.yaml")
+
+# Directories never worth scanning for manifests (vendored deps, build output,
+# virtualenvs). Hidden dirs (.git, .cdt, .vercel, ...) are skipped separately.
+SKIP_DIRS = frozenset({
+    "node_modules", "dist", "build", "out", "target", "bin", "obj",
+    "vendor", "coverage", "tmp", "temp", "__pycache__",
+    "venv", ".venv", "env", "site-packages",
+})
+# How deep below a root to look for manifests (root=0).
+MAX_DEPTH = 2
 
 # Global registry of enrolled projects (outside any single project).
 REGISTRY_DIR = Path(os.environ.get("CONDUCTOR_HOME",
@@ -37,6 +48,21 @@ def force_utf8() -> None:
             pass
 
 
+def debug_trace(context: str) -> None:
+    """Print the current exception traceback to stderr when `CONDUCTOR_DEBUG` is set.
+
+    Best-effort `except` blocks swallow errors so an optional backend being down
+    never breaks the CLI — but that also hides real bugs. Call this inside such
+    blocks so `CONDUCTOR_DEBUG=1` surfaces what was swallowed, with no change to
+    the default (silent) behavior.
+    """
+    if not os.environ.get("CONDUCTOR_DEBUG"):
+        return
+    import traceback
+    print(f"cdt: debug: swallowed error in {context}:", file=sys.stderr)
+    traceback.print_exc()
+
+
 def slugify(name: str) -> str:
     """kebab-case slug safe for a Honcho workspace id."""
     s = re.sub(r"[^a-z0-9]+", "-", name.strip().lower()).strip("-")
@@ -53,6 +79,34 @@ def find_project_root(start: Optional[Path] = None) -> Path:
         if any((d / m).exists() for m in ROOT_MARKERS):
             return d
     return start
+
+
+def search_roots(root: Path) -> List[Path]:
+    """Root plus its subdirectories up to MAX_DEPTH, skipping noise/hidden dirs.
+
+    Monorepo-aware manifest search base: a fullstack repo with `backend/` and
+    `frontend/` packages is discovered even when the root holds only a thin
+    shell. Shared by detect.py so the walk-down lives in one place.
+    """
+    roots = [root]
+
+    def walk(d: Path, depth: int) -> None:
+        if depth > MAX_DEPTH:
+            return
+        try:
+            children = sorted(d.iterdir())
+        except OSError:
+            return
+        for child in children:
+            if not child.is_dir():
+                continue
+            if child.name.startswith(".") or child.name in SKIP_DIRS:
+                continue
+            roots.append(child)
+            walk(child, depth + 1)
+
+    walk(root, 1)
+    return roots
 
 
 # --- per-project paths -------------------------------------------------------
@@ -123,10 +177,27 @@ def read_config(root: Path) -> Optional[dict]:
         return None
 
 
+def _atomic_write(path: Path, text: str) -> None:
+    """Write `text` to `path` atomically (temp file in the same dir + os.replace).
+
+    A crash mid-write can no longer truncate or corrupt the JSON state files —
+    the reader sees either the old file or the fully-written new one, never a
+    half-written one. Same-directory temp keeps `os.replace` on one filesystem.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=f".{path.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(text)
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+
+
 def write_config(root: Path, config: dict) -> None:
-    cdt_dir(root).mkdir(parents=True, exist_ok=True)
-    config_path(root).write_text(
-        json.dumps(config, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    _atomic_write(config_path(root),
+                  json.dumps(config, indent=2, ensure_ascii=False) + "\n")
 
 
 # --- global registry ---------------------------------------------------------
@@ -138,7 +209,9 @@ def _load_registry() -> dict:
         data = json.loads(REGISTRY_FILE.read_text(encoding="utf-8"))
         data.setdefault("projects", [])
         return data
-    except (ValueError, OSError):
+    except (ValueError, OSError) as e:
+        print(f"cdt: warning: project registry unreadable at {REGISTRY_FILE} "
+              f"({e}); starting from empty", file=sys.stderr)
         return {"projects": []}
 
 
@@ -150,8 +223,8 @@ def register_project(root: Path, slug: str, ptype: str) -> None:
     entry = {"path": path, "slug": slug, "type": ptype}
     others = [p for p in data["projects"] if p.get("path") != path]
     data["projects"] = sorted([*others, entry], key=lambda p: p["path"])
-    REGISTRY_FILE.write_text(
-        json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    _atomic_write(REGISTRY_FILE,
+                  json.dumps(data, indent=2, ensure_ascii=False) + "\n")
 
 
 def list_projects() -> List[dict]:

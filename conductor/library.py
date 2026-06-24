@@ -13,7 +13,8 @@ import json
 import sys
 from typing import List
 
-from .rag.core import embed, force_utf8, get_collection
+from .rag.core import (BackendUnreachable, CHROMA_HTTP, embed, force_utf8,
+                       get_collection)
 
 
 def _log_telemetry(question: str, k: int, category: str, hits: List[dict],
@@ -48,14 +49,25 @@ def _log_telemetry(question: str, k: int, category: str, hits: List[dict],
 
 
 def search(question: str, k: int = 5, category: str = "") -> List[dict]:
-    coll = get_collection(create=False)
+    coll = get_collection(create=False)  # raises BackendUnreachable if Chroma is down
     where = {"category": category} if category else None
-    res = coll.query(
-        query_embeddings=embed([question]),
-        n_results=k,
-        where=where,
-        include=["documents", "metadatas", "distances"],
-    )
+    # embed() raises BackendUnreachable if Ollama is down; coll.query() if Chroma
+    # drops mid-request — both carry an actionable message naming the URL + fix.
+    try:
+        embeddings = embed([question])
+        res = coll.query(
+            query_embeddings=embeddings,
+            n_results=k,
+            where=where,
+            include=["documents", "metadatas", "distances"],
+        )
+    except BackendUnreachable:
+        raise
+    except Exception as e:  # noqa: BLE001 — Chroma query failure mid-request
+        raise BackendUnreachable(
+            f"Library backend unreachable at http://{CHROMA_HTTP}. "
+            f"Is the stack up? Try: cdt up  ({e})"
+        ) from e
     out = []
     docs = res.get("documents", [[]])[0]
     metas = res.get("metadatas", [[]])[0]
@@ -128,7 +140,10 @@ def cmd_status(argv: List[str]) -> int:
     try:
         coll = get_collection(create=False)
         total = coll.count()
-    except Exception as e:  # noqa: BLE001 — Chroma down / collection missing
+    except BackendUnreachable as e:  # Chroma down — message is self-contained
+        print(str(e), file=sys.stderr)
+        return 1
+    except Exception as e:  # noqa: BLE001 — collection missing / index malformed
         print(f"Library index not reachable: {e}\n"
               "Hint: start the stack with `cdt up` first.", file=sys.stderr)
         return 1
@@ -306,8 +321,11 @@ def main(argv: List[str]) -> int:
 
     try:
         hits = search(args.question, k=args.k, category=args.category)
-    except Exception as e:  # missing collection, Ollama down, etc.
-        print(f"Search failed: {e}\nHint: run `python -m rag.ingest` and check Ollama.",
+    except BackendUnreachable as e:  # Chroma or Ollama down — message is self-contained
+        print(str(e), file=sys.stderr)
+        return 1
+    except Exception as e:  # missing collection, malformed index, etc.
+        print(f"Search failed: {e}\nHint: run `cdt up`, then `cdt library reindex`.",
               file=sys.stderr)
         return 1
 

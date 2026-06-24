@@ -30,9 +30,11 @@ def has_nvidia_gpu() -> bool:
     if not shutil.which("nvidia-smi"):
         return False
     try:
+        # 5s: nvidia-smi answers instantly when healthy; a hung driver/probe
+        # would otherwise block `cdt up` at startup, so keep this short.
         return subprocess.run(["nvidia-smi"], capture_output=True,
-                              timeout=15).returncode == 0
-    except Exception:
+                              timeout=5).returncode == 0
+    except Exception:  # incl. subprocess.TimeoutExpired
         return False
 
 
@@ -141,7 +143,10 @@ def main(argv: list) -> int:
     full = ["docker", "compose", *files, *cmd]
     print("+ " + " ".join(full))
     sys.stdout.flush()  # flush our notices before docker inherits stdout
-    return subprocess.call(full, cwd=str(infra), env=env)
+    # No timeout: this is the user-facing stack command. Attached `cdt up`
+    # streams logs and blocks until the user stops it, and image
+    # builds/pulls are legitimately long — a timeout here would be a bug.
+    return subprocess.run(full, cwd=str(infra), env=env).returncode
 
 
 if __name__ == "__main__":
