@@ -48,7 +48,14 @@ def main(argv: list) -> int:
 
     branch = _current_branch()
     print(f"Updating {REPO_ROOT} (branch: {branch}) ...")
-    rc = subprocess.call(["git", "pull", "--ff-only"], cwd=str(REPO_ROOT))
+    try:
+        # git pull hits the network; 300s guards against a hung fetch.
+        rc = subprocess.run(["git", "pull", "--ff-only"],
+                            cwd=str(REPO_ROOT), timeout=300).returncode
+    except subprocess.TimeoutExpired:
+        print("git pull timed out after 300s — network or remote unreachable. "
+              "Re-run when connectivity is restored.", file=sys.stderr)
+        return 1
     if rc != 0:
         print("git pull failed — local changes or a diverged branch. "
               "Resolve manually, then re-run.", file=sys.stderr)
@@ -57,7 +64,12 @@ def main(argv: list) -> int:
     if reinstall:
         pip = [sys.executable, "-m", "pip", "install", "-e", ".[rag,honcho]"]
         print("+ " + " ".join(pip))
-        rc = subprocess.call(pip, cwd=str(REPO_ROOT))
+        # pip may build/download packages; 600s is generous but bounds a hang.
+        try:
+            rc = subprocess.run(pip, cwd=str(REPO_ROOT), timeout=600).returncode
+        except subprocess.TimeoutExpired:
+            print("pip install timed out after 600s.", file=sys.stderr)
+            return 1
         if rc != 0:
             return rc
     else:

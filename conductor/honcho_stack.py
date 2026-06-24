@@ -36,7 +36,16 @@ def _honcho_src() -> Path:
 def _ensure_clone(src: Path) -> bool:
     if not (src / ".git").is_dir():
         print(f"cloning Honcho -> {src}")
-        if subprocess.call(["git", "clone", "--depth", "1", HONCHO_REPO, str(src)]) != 0:
+        try:
+            # Shallow clone over the network; 300s bounds a hung fetch.
+            rc = subprocess.run(
+                ["git", "clone", "--depth", "1", HONCHO_REPO, str(src)],
+                timeout=300).returncode
+        except subprocess.TimeoutExpired:
+            print("ERROR: git clone timed out after 300s — network or remote "
+                  "unreachable.", file=sys.stderr)
+            return False
+        if rc != 0:
             print("ERROR: git clone failed", file=sys.stderr)
             return False
     # Windows clones give the entrypoint CRLF endings -> `set: Illegal option`.
@@ -52,9 +61,18 @@ def _ensure_clone(src: Path) -> bool:
 
 def _compose(src: Path, *args: str) -> int:
     env = {**os.environ, "HONCHO_SRC": str(src)}
-    return subprocess.call(
-        ["docker", "compose", "-f", str(INFRA / "docker-compose.yml"), *args],
-        cwd=str(INFRA), env=env)
+    # All callers use detached/`down` forms (never foreground `up`), so the
+    # command should return promptly. `up -d --build` can still pull and build
+    # images, so 1800s (30min) is generous headroom while still bounding a true
+    # hang (e.g. a stuck pull) instead of blocking forever.
+    try:
+        return subprocess.run(
+            ["docker", "compose", "-f", str(INFRA / "docker-compose.yml"), *args],
+            cwd=str(INFRA), env=env, timeout=1800).returncode
+    except subprocess.TimeoutExpired:
+        print(f"ERROR: `docker compose {' '.join(args)}` timed out after 1800s.",
+              file=sys.stderr)
+        return 1
 
 
 def _api_health() -> str:
@@ -93,11 +111,16 @@ def _configure_embeddings(src: Path) -> int:
     print("dimension mismatch — running configure_embeddings (one-time)...")
     env = {**os.environ, "HONCHO_SRC": str(src),
            "MSYS_NO_PATHCONV": "1", "MSYS2_ARG_CONV_EXCL": "*"}
-    return subprocess.call(
-        ["docker", "compose", "-f", str(INFRA / "docker-compose.yml"),
-         "run", "--rm", "--no-deps", "--entrypoint", "/app/.venv/bin/python",
-         "deriver", "scripts/configure_embeddings.py", "--yes"],
-        cwd=str(INFRA), env=env)
+    # One-shot reconfigure script; 600s is ample and bounds a hang.
+    try:
+        return subprocess.run(
+            ["docker", "compose", "-f", str(INFRA / "docker-compose.yml"),
+             "run", "--rm", "--no-deps", "--entrypoint", "/app/.venv/bin/python",
+             "deriver", "scripts/configure_embeddings.py", "--yes"],
+            cwd=str(INFRA), env=env, timeout=600).returncode
+    except subprocess.TimeoutExpired:
+        print("ERROR: configure_embeddings timed out after 600s.", file=sys.stderr)
+        return 1
 
 
 def main(argv: list) -> int:

@@ -12,9 +12,17 @@ Both `cdt` and `conductor` invoke this; `cdt` is canonical in the docs.
 """
 from __future__ import annotations
 
+import difflib
 import sys
 from pathlib import Path
 from typing import List, Optional
+
+# Valid top-level commands, used for unknown-command suggestions.
+COMMANDS = (
+    "init", "sync", "detect", "list", "library", "journal", "up", "down",
+    "ingest", "honcho", "honcho-setup", "update", "quickstart",
+    "cdt", "help",
+)
 
 USAGE = """cdt <command> [args]   (alias: conductor)
 
@@ -26,6 +34,7 @@ Commands:
   init | sync [path]         Aliases for `cdt init` / `cdt sync`.
   detect [path]              Show the detected type/tech and the library stacks
                              `cdt up` would auto-ingest for this project.
+  list                       List the projects enrolled with Conductor.
   library "<question>"       Semantic search over the reference books (RAG).
   library status             Show what is ingested (books, categories, chunk counts).
   library stacks             Choose which language/framework stacks to ingest (interactive).
@@ -112,6 +121,19 @@ def main(argv: Optional[List[str]] = None) -> int:
                   f"Force a set with:  CONDUCTOR_LIBRARY_STACKS={','.join(stacks)} cdt up")
         return 0
 
+    if cmd == "list":
+        from .project import force_utf8, list_projects
+        force_utf8()
+        projects = list_projects()
+        if not projects:
+            print("No projects enrolled yet. Run `cdt init` in a project.")
+            return 0
+        width = max(len(p["slug"]) for p in projects)
+        print(f"{len(projects)} enrolled project(s):")
+        for p in projects:
+            print(f"  {p['slug']:<{width}}  {p.get('type', '?'):<9}  {p['path']}")
+        return 0
+
     if cmd == "library":
         from .library import main as library_main
         return library_main(rest)
@@ -146,7 +168,11 @@ def main(argv: Optional[List[str]] = None) -> int:
         from .update import main as update_main
         return update_main(rest)
 
-    print(f"unknown command: {cmd}\n\n{USAGE}", file=sys.stderr)
+    print(f"cdt: unknown command: {cmd}", file=sys.stderr)
+    suggestions = difflib.get_close_matches(cmd, COMMANDS, n=1)
+    if suggestions:
+        print(f"did you mean '{suggestions[0]}'?", file=sys.stderr)
+    print("run `cdt --help` for the list of commands.", file=sys.stderr)
     return 2
 
 

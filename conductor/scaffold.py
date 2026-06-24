@@ -26,12 +26,11 @@ from typing import List, Optional
 from . import roles as roles_mod
 from . import targets as targets_mod
 from .detect import VALID_TYPES, detect, profile
+from .honcho_client import DEFAULT_BASE_URL as DEFAULT_HONCHO_URL
 from .targets import GuideContext
-from .project import (cdt_dir, config_path, diary_dir, find_project_root,
-                      force_utf8, memory_dir, read_config,
+from .project import (cdt_dir, config_path, debug_trace, diary_dir,
+                      find_project_root, force_utf8, memory_dir, read_config,
                       register_project, slugify, stack_dir, write_config)
-
-DEFAULT_HONCHO_URL = "http://localhost:8000"
 
 # The per-project memory tree (relative to `.cdt/memory/`): leaf dir -> purpose.
 # `diary/` and `daily/` are local-only (git-ignored); everything else is
@@ -165,8 +164,8 @@ def _auto_memory_sync(root: Path, config: dict) -> None:
         from . import journal
         journal.cmd_digest(root, config, argparse.Namespace(all=False, session=None))
         journal.cmd_ingest(root, config, argparse.Namespace(force=False))
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception:  # noqa: BLE001 — Honcho down only means the local mirror stays SoT
+        debug_trace("_auto_memory_sync")
 
 
 def _ensure_memory_gitignore(project: Path) -> None:
@@ -248,6 +247,34 @@ def _config_targets(root: Path, config: dict):
     return targets_mod.resolve(None, root)
 
 
+def _emit_targets(root: Path, tgts, selected: List[str], *,
+                  ptype: str = "", mode: str = "", verbose: bool = False) -> int:
+    """Emit roles + the `/cdt` driver + live-memory hooks for each target.
+
+    Shared by `init` (verbose: prints per-target detail) and `sync` (silent
+    refresh). Returns the per-target role count (all targets emit the same set).
+    """
+    n = 0
+    for t in tgts:
+        n = t.emit_roles(root, selected)
+        drv = t.emit_driver(root)
+        hooks = t.emit_hooks(root)
+        if verbose:
+            print(f"[2/4] {t.label}: {n} agents + {n} skills ({mode} for {ptype})"
+                  + (" + /cdt driver" if drv else "")
+                  + (f" + {hooks} live-memory hook(s)" if hooks else ""))
+    return n
+
+
+def _write_stack_file(root: Path, ptype: str, techs: List[str],
+                      evidence: List[str], prof: Optional[dict]) -> None:
+    """Write `.cdt/stack/<TYPE>.md` from the detection result (idempotent)."""
+    sd = stack_dir(root)
+    sd.mkdir(parents=True, exist_ok=True)
+    (sd / f"{ptype}.md").write_text(
+        _stack_md(ptype, techs, evidence, prof), encoding="utf-8")
+
+
 def refresh_claude_md(root: Path) -> bool:
     """Best-effort live refresh of each target's guide (called after journal writes).
 
@@ -268,7 +295,7 @@ def refresh_claude_md(root: Path) -> bool:
             t.emit_guide(ctx)
             ok = True
         except Exception:  # noqa: BLE001 — refresh is best-effort
-            pass
+            debug_trace(f"refresh_claude_md:{t.key}")
     return ok
 
 
@@ -304,18 +331,10 @@ def cmd_init(args) -> int:
     print(f"[1/4] analyzing {project.name}: type={ptype}"
           + (f", detected={', '.join(techs)}" if techs else "")
           + f" -> {', '.join(t.label for t in tgts)}")
-    for t in tgts:
-        n = t.emit_roles(project, selected)
-        drv = t.emit_driver(project)
-        hooks = t.emit_hooks(project)
-        print(f"[2/4] {t.label}: {n} agents + {n} skills ({mode} for {ptype})"
-              + (" + /cdt driver" if drv else "")
-              + (f" + {hooks} live-memory hook(s)" if hooks else ""))
+    _emit_targets(project, tgts, selected, ptype=ptype, mode=mode, verbose=True)
 
-    stack_dir(project).mkdir(parents=True, exist_ok=True)
     leaves = _scaffold_memory_tree(project)
-    (stack_dir(project) / f"{ptype}.md").write_text(
-        _stack_md(ptype, techs, evidence, prof), encoding="utf-8")
+    _write_stack_file(project, ptype, techs, evidence, prof)
     _ensure_memory_gitignore(project)
     write_config(project, {
         "project": slug, "type": ptype, "roles": selected, "roles_mode": mode,
@@ -367,17 +386,11 @@ def cmd_sync(args) -> int:
     else:
         tgts = _config_targets(root, config)
 
-    n = 0
-    for t in tgts:
-        n = t.emit_roles(root, selected)
-        t.emit_driver(root)               # keep the /cdt flow driver current
-        t.emit_hooks(root)                # ensure the live-memory hooks
+    n = _emit_targets(root, tgts, selected)  # roles + /cdt driver + live-memory hooks
     leaves = _scaffold_memory_tree(root)  # ensure/upgrade the memory tree (idempotent)
     _ensure_memory_gitignore(root)
     migrated = _migrate_legacy_diary(root)  # pre-0.2.20 journal/ -> memory/diary/
-    stack_dir(root).mkdir(parents=True, exist_ok=True)
-    (stack_dir(root) / f"{ptype}.md").write_text(
-        _stack_md(ptype, techs, evidence, prof), encoding="utf-8")
+    _write_stack_file(root, ptype, techs, evidence, prof)
     config.update({"type": ptype, "roles": selected, "roles_mode": mode,
                    "targets": [t.key for t in tgts]})
     write_config(root, config)
