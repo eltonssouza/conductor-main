@@ -61,5 +61,57 @@ class CodexTarget:
     def emit_hooks(self, project: Path) -> int:
         return 0  # Codex has no prompt-capture event to bind live memory to
 
+    def emit_automations(self, project: Path) -> int:
+        text = base.automation_text("triage")
+        if text is None:
+            return 0
+        dst = project.joinpath(*SKILLS_REL, "cdt-triage")
+        dst.mkdir(parents=True, exist_ok=True)
+        (dst / "SKILL.md").write_text(text, encoding="utf-8")
+        return 1
+
+    def emit_mcp(self, project: Path) -> int:
+        """Register MCP connectors in Codex's `.codex/config.toml`.
+
+        Hand-writes minimal TOML (`[mcp_servers.<name>]` blocks) — stdlib has no
+        TOML writer. `conductor` is an active block; the disabled third-party
+        connectors are emitted as commented-out blocks (each line prefixed `# `)
+        so they don't auto-start — the user uncomments and fills the env to wire
+        one in. Idempotent: a simple substring guard skips appending when an
+        active `[mcp_servers.conductor]` block already exists.
+        """
+        cfg = project / ".codex" / "config.toml"
+        existing = cfg.read_text(encoding="utf-8") if cfg.is_file() else ""
+        if "[mcp_servers.conductor]" in existing:
+            return 0  # already wired in — don't duplicate
+
+        blocks = []
+        for name, c in base.CONNECTORS.items():
+            block = self._toml_block(name, c)
+            if not c.get("enabled"):
+                block = "\n".join(("# " + ln if ln else "#") for ln in block.splitlines())
+            blocks.append(block)
+        addition = "\n\n".join(blocks) + "\n"
+        text = (existing.rstrip("\n") + "\n\n" + addition) if existing.strip() else addition
+
+        cfg.parent.mkdir(parents=True, exist_ok=True)
+        cfg.write_text(text, encoding="utf-8")
+        return 1
+
+    @staticmethod
+    def _toml_block(name: str, c: dict) -> str:
+        def quote(s: str) -> str:
+            return '"' + str(s).replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+        args = ", ".join(quote(a) for a in c["args"])
+        lines = [f"[mcp_servers.{name}]",
+                 f"command = {quote(c['command'])}",
+                 f"args = [{args}]"]
+        env = c.get("env") or {}
+        if env:
+            lines.append(f"[mcp_servers.{name}.env]")
+            lines.extend(f"{k} = {quote(v)}" for k, v in env.items())
+        return "\n".join(lines)
+
     def emit_guide(self, ctx: GuideContext) -> str:
         return base.write_guide(ctx.root / "AGENTS.md", ctx, "AGENTS.md.tmpl")

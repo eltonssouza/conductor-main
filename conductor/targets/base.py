@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Protocol, Tuple
+from typing import Any, Dict, List, Optional, Protocol, Tuple
 
 from .. import roles as roles_mod
 from ..project import journal_dir
@@ -86,6 +86,40 @@ def render_guide(ctx: GuideContext, template: str = "CLAUDE.md.tmpl") -> str:
             .replace("{roles_table}", roles_table(ctx.selected))
             .replace("{project_memory}", project_memory(ctx.root))
             .replace("{flow}", flow))
+
+
+# --- shared automation rendering (the neutral discovery/triage automation) -----
+
+AUTOMATIONS = ("triage",)  # known automation template stems
+
+
+def automation_text(name: str = "triage") -> Optional[str]:
+    """Raw text of templates/automations/<name>.md, or None if missing."""
+    src = TEMPLATES / "automations" / f"{name}.md"
+    return src.read_text(encoding="utf-8") if src.is_file() else None
+
+
+# --- shared MCP connector catalog (harness-neutral) --------------------------
+#
+# The "connectors" piece of loop engineering: the live tools the loop can reach.
+# `conductor` registers the `cdt mcp` stdio server (Conductor's own library RAG +
+# journal as MCP tools) and is enabled by default. The third-party stubs are
+# disabled and carry placeholder env values (each contains "<your") so they never
+# trip the secrets validator; the user fills a token and flips `enabled` to wire
+# one in. Targets project this catalog into each harness's native MCP format.
+CONNECTORS: Dict[str, Dict[str, Any]] = {
+    "conductor": {"command": "cdt", "args": ["mcp"], "env": {},
+                  "enabled": True,
+                  "note": "Conductor's own memories (library RAG + journal) as MCP tools."},
+    "github":    {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-github"],
+                  "env": {"GITHUB_PERSONAL_ACCESS_TOKEN": "<your-token>"},
+                  "enabled": False,
+                  "note": "Open PRs / read issues. Fill the token and set enabled to wire it in."},
+    "slack":     {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-slack"],
+                  "env": {"SLACK_BOT_TOKEN": "<your-token>", "SLACK_TEAM_ID": "<your-team-id>"},
+                  "enabled": False,
+                  "note": "Post to a channel when CI is green."},
+}
 
 
 def _managed_slice(text: str) -> Optional[Tuple[int, int]]:
@@ -202,6 +236,16 @@ class Target(Protocol):
 
     def emit_hooks(self, project: Path) -> int:
         """Wire the live-memory (Honcho) capture/inject hooks. Returns count added."""
+        ...
+
+    def emit_automations(self, project: Path) -> int:
+        """Project the scheduled discovery/triage automation(s) into the harness's
+        native command/skill location. Returns the number written."""
+        ...
+
+    def emit_mcp(self, project: Path) -> int:
+        """Scaffold MCP connector config (incl. Conductor's own server) into the
+        harness's native location. Returns the number of files written/updated."""
         ...
 
     def emit_guide(self, ctx: GuideContext) -> str:

@@ -95,5 +95,56 @@ class ClaudeTarget:
                           encoding="utf-8")
         return added
 
+    def emit_automations(self, project: Path) -> int:
+        text = base.automation_text("triage")
+        if text is None:
+            return 0
+        dst = project / ".claude" / "commands"
+        dst.mkdir(parents=True, exist_ok=True)
+        (dst / "cdt-triage.md").write_text(text, encoding="utf-8")
+        return 1
+
+    def emit_mcp(self, project: Path) -> int:
+        """Register MCP connectors in Claude Code's native `.mcp.json` (project root).
+
+        Claude's format has no `enabled` flag, so only enabled connectors (just
+        `conductor`) land in `.mcp.json` — merged into any existing `mcpServers`
+        without disturbing other keys or servers. The disabled third-party stubs
+        are written to a companion `.mcp.connectors.example.json` (same shape) the
+        user can copy entries from. Both files are counted.
+        """
+        written = 0
+        active = {name: {"command": c["command"], "args": c["args"], "env": c["env"]}
+                  for name, c in base.CONNECTORS.items() if c.get("enabled")}
+        stubs = {name: {"command": c["command"], "args": c["args"], "env": c["env"]}
+                 for name, c in base.CONNECTORS.items() if not c.get("enabled")}
+
+        mp = project / ".mcp.json"
+        data: dict = {}
+        if mp.is_file():
+            try:
+                data = json.loads(mp.read_text(encoding="utf-8"))
+            except (ValueError, OSError):
+                data = {}
+        if not isinstance(data, dict):
+            data = {}
+        servers = data.setdefault("mcpServers", {})
+        if isinstance(servers, dict):
+            added = False
+            for name, spec in active.items():
+                if name not in servers:           # add only if absent (merge-not-clobber)
+                    servers[name] = spec
+                    added = True
+            if added or not mp.is_file():
+                mp.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n",
+                              encoding="utf-8")
+                written += 1
+
+        ex = project / ".mcp.connectors.example.json"
+        ex.write_text(json.dumps({"mcpServers": stubs}, indent=2, ensure_ascii=False) + "\n",
+                      encoding="utf-8")
+        written += 1
+        return written
+
     def emit_guide(self, ctx: GuideContext) -> str:
         return base.write_guide(ctx.root / "CLAUDE.md", ctx, "CLAUDE.md.tmpl")

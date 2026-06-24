@@ -415,6 +415,92 @@ def check_secrets(ctx: Context) -> List[Violation]:
     return v
 
 
+# --- R12: triage automation template + scaffold wiring -----------------------
+
+AUTOMATION = TEMPLATES / "automations" / "triage.md"
+AUTOMATION_ANCHORS = ("When to use", "journal", "worktree", "unattended")
+MIN_AUTOMATION_STEPS = 4
+
+
+@rule("R12-automation", "triage automation template exists with frontmatter + loop anchors, and scaffold emits it")
+def check_automation(ctx: Context) -> List[Violation]:
+    rel = "conductor/templates/automations/triage.md"
+    if not AUTOMATION.is_file():
+        return [Violation("R12-automation", rel, "triage automation template not found")]
+    text = AUTOMATION.read_text(encoding="utf-8")
+    fm, body = split_frontmatter(text)
+    v: List[Violation] = []
+    name = frontmatter_field(fm, "name")
+    if name is None or _strip_quotes(name) != "triage":
+        v.append(Violation("R12-automation", rel, "frontmatter 'name' must be 'triage'"))
+    desc = frontmatter_field(fm, "description")
+    if desc is None or not _strip_quotes(desc).strip():
+        v.append(Violation("R12-automation", rel, "frontmatter missing non-empty 'description'"))
+    for anchor in AUTOMATION_ANCHORS:
+        if anchor not in text:
+            v.append(Violation("R12-automation", rel,
+                               f"automation missing anchor: '{anchor}'"))
+    if len(NUM_STEP_RE.findall(text)) < MIN_AUTOMATION_STEPS:
+        v.append(Violation("R12-automation", rel,
+                           f"insufficient numbered steps (< {MIN_AUTOMATION_STEPS})"))
+    scaffold = ROOT / "conductor" / "scaffold.py"
+    if scaffold.is_file() and "emit_automations" not in scaffold.read_text(encoding="utf-8"):
+        v.append(Violation("R12-automation", "conductor/scaffold.py",
+                           "scaffold.py does not call emit_automations"))
+    return v
+
+
+# --- R13: MCP connectors catalog + targets emit + scaffold wiring ------------
+
+@rule("R13-mcp", "targets expose emit_mcp; base has a CONNECTORS catalog incl. the conductor server; scaffold emits it")
+def check_mcp(ctx: Context) -> List[Violation]:
+    try:
+        from conductor.targets import available, get
+        from conductor.targets import base as tb
+    except Exception as e:  # noqa: BLE001
+        return [Violation("R13-mcp", "conductor/targets", f"cannot import: {e}")]
+
+    v: List[Violation] = []
+    base_rel = "conductor/targets/base.py"
+    connectors = getattr(tb, "CONNECTORS", None)
+    if connectors is None:
+        v.append(Violation("R13-mcp", base_rel, "base has no CONNECTORS catalog"))
+    elif not isinstance(connectors, dict):
+        v.append(Violation("R13-mcp", base_rel, "CONNECTORS is not a dict"))
+    elif "conductor" not in connectors:
+        v.append(Violation("R13-mcp", base_rel,
+                           "CONNECTORS missing the 'conductor' server entry"))
+    else:
+        entry = connectors["conductor"]
+        if not _connector_attr(entry, "enabled"):
+            v.append(Violation("R13-mcp", base_rel,
+                               "CONNECTORS['conductor'].enabled must be True"))
+        if _connector_attr(entry, "command") != "cdt":
+            v.append(Violation("R13-mcp", base_rel,
+                               "CONNECTORS['conductor'].command must be 'cdt'"))
+        if _connector_attr(entry, "args") != ["mcp"]:
+            v.append(Violation("R13-mcp", base_rel,
+                               "CONNECTORS['conductor'].args must be ['mcp']"))
+
+    for key in available():
+        if not hasattr(get(key), "emit_mcp"):
+            v.append(Violation("R13-mcp", f"conductor/targets/{key}.py",
+                               f"target '{key}' has no emit_mcp method"))
+
+    scaffold = ROOT / "conductor" / "scaffold.py"
+    if scaffold.is_file() and "emit_mcp" not in scaffold.read_text(encoding="utf-8"):
+        v.append(Violation("R13-mcp", "conductor/scaffold.py",
+                           "scaffold.py does not call emit_mcp"))
+    return v
+
+
+def _connector_attr(entry: object, key: str):
+    """Read a connector field whether it's a dict or an object with attrs."""
+    if isinstance(entry, dict):
+        return entry.get(key)
+    return getattr(entry, key, None)
+
+
 # --- runner ------------------------------------------------------------------
 
 def run() -> List[Violation]:
