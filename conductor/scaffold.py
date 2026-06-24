@@ -259,10 +259,14 @@ def _emit_targets(root: Path, tgts, selected: List[str], *,
         n = t.emit_roles(root, selected)
         drv = t.emit_driver(root)
         hooks = t.emit_hooks(root)
+        autos = t.emit_automations(root)
+        mcps = t.emit_mcp(root)
         if verbose:
             print(f"[2/4] {t.label}: {n} agents + {n} skills ({mode} for {ptype})"
                   + (" + /cdt driver" if drv else "")
-                  + (f" + {hooks} live-memory hook(s)" if hooks else ""))
+                  + (f" + {hooks} live-memory hook(s)" if hooks else "")
+                  + (f" + {autos} automation(s)" if autos else "")
+                  + (f" + {mcps} MCP file(s)" if mcps else ""))
     return n
 
 

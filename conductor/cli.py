@@ -21,7 +21,7 @@ from typing import List, Optional
 COMMANDS = (
     "init", "sync", "detect", "list", "library", "journal", "up", "down",
     "ingest", "honcho", "honcho-setup", "update", "quickstart",
-    "cdt", "help",
+    "mcp", "cdt", "help",
 )
 
 USAGE = """cdt <command> [args]   (alias: conductor)
@@ -47,6 +47,7 @@ Commands:
   honcho up | down           Start / stop the Honcho diary backend (Docker).
   update [--reinstall]       Pull the latest source (editable/source install).
   quickstart                 Print the ordered path: install -> first /cdt feature.
+  mcp                        Run Conductor's memories (library + journal) as an MCP stdio server.
 
 Run `cdt <command> --help` for command options.
 """
@@ -167,6 +168,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "update":
         from .update import main as update_main
         return update_main(rest)
+
+    if cmd == "mcp":
+        from .mcp_server import main as mcp_main
+        return mcp_main(rest)
 
     print(f"cdt: unknown command: {cmd}", file=sys.stderr)
     suggestions = difflib.get_close_matches(cmd, COMMANDS, n=1)

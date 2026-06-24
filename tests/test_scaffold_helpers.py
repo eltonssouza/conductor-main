@@ -51,7 +51,8 @@ class _FakeTarget:
 
     def __init__(self, label="Fake"):
         self.label = label
-        self.calls = {"roles": 0, "driver": 0, "hooks": 0}
+        self.calls = {"roles": 0, "driver": 0, "hooks": 0, "automations": 0,
+                      "mcp": 0}
 
     def emit_roles(self, root, selected):
         self.calls["roles"] += 1
@@ -65,6 +66,14 @@ class _FakeTarget:
         self.calls["hooks"] += 1
         return 2
 
+    def emit_automations(self, root):
+        self.calls["automations"] += 1
+        return 1
+
+    def emit_mcp(self, root):
+        self.calls["mcp"] += 1
+        return 1
+
 
 class TestEmitTargets(unittest.TestCase):
     def test_emits_each_target_and_returns_role_count(self):
@@ -72,7 +81,9 @@ class TestEmitTargets(unittest.TestCase):
         n = scaffold._emit_targets(Path("."), [t1, t2], ["a", "b", "c"])
         self.assertEqual(n, 3)
         for t in (t1, t2):
-            self.assertEqual(t.calls, {"roles": 1, "driver": 1, "hooks": 1})
+            self.assertEqual(t.calls,
+                             {"roles": 1, "driver": 1, "hooks": 1, "automations": 1,
+                              "mcp": 1})
 
 
 if __name__ == "__main__":

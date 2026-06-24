@@ -137,6 +137,55 @@ class OpenCodeTarget:
         dst.write_text(HONCHO_PLUGIN, encoding="utf-8")
         return 1
 
+    def emit_automations(self, project: Path) -> int:
+        text = base.automation_text("triage")
+        if text is None:
+            return 0
+        dst = project / ".opencode" / "commands"
+        dst.mkdir(parents=True, exist_ok=True)
+        (dst / "cdt-triage.md").write_text(text, encoding="utf-8")
+        return 1
+
+    def emit_mcp(self, project: Path) -> int:
+        """Register MCP connectors under `opencode.json`'s `mcp` key.
+
+        OpenCode supports a per-server `enabled` boolean, so all connectors are
+        emitted — `conductor` enabled, the third-party stubs disabled — and the
+        user just flips a flag (and fills the env) to wire one in. Merged into any
+        existing config without disturbing other keys or servers (mirrors
+        `_register_instructions`); a server already present is left untouched.
+        """
+        cfg = project / "opencode.json"
+        data: dict = {}
+        if cfg.is_file():
+            try:
+                data = json.loads(cfg.read_text(encoding="utf-8"))
+            except (ValueError, OSError):
+                return 0  # don't clobber an unparseable (e.g. jsonc) config
+        if not isinstance(data, dict):
+            return 0
+        mcp = data.get("mcp")
+        if not isinstance(mcp, dict):
+            mcp = {}
+        added = False
+        for name, c in base.CONNECTORS.items():
+            if name in mcp:                       # merge-not-clobber: keep user's entry
+                continue
+            mcp[name] = {
+                "type": "local",
+                "command": [c["command"], *c["args"]],
+                "environment": c["env"],
+                "enabled": bool(c.get("enabled")),
+            }
+            added = True
+        if not added and cfg.is_file():
+            return 0
+        data["mcp"] = mcp
+        data.setdefault("$schema", "https://opencode.ai/config.json")
+        cfg.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n",
+                       encoding="utf-8")
+        return 1
+
     def emit_guide(self, ctx: GuideContext) -> str:
         state = base.write_guide(ctx.root / "AGENTS.md", ctx, "AGENTS.md.tmpl")
         self._register_instructions(ctx.root)

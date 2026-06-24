@@ -29,6 +29,11 @@ The diary is **live memory**: harness hooks installed by Conductor (on Claude Co
 and Pi) capture your prompts and inject what Honcho remembers back into each new
 session, so the project's memory grows as you work and follows you across sessions.
 
+For **loop engineering**, Conductor also scaffolds an autonomous counterpart —
+**`/cdt-triage`**, a scheduled discovery loop — and **MCP connectors** (including
+Conductor's own memories as a `cdt mcp` server) so the loop can act on real tools.
+See [Loop engineering](#loop-engineering--autonomous-triage--mcp).
+
 ---
 
 ## Quickstart
@@ -100,6 +105,7 @@ cdt sync                               # after upgrading Conductor: refresh an e
    - [Targeting a harness — `--target`](#targeting-a-harness----target)
    - [`cdt sync` — the living CLAUDE.md](#cdt-sync--the-living-claudemd)
 6. [The 11-gate flow](#the-11-gate-flow)
+7. [Loop engineering — autonomous triage & MCP](#loop-engineering--autonomous-triage--mcp)
 7. [The library (Chroma) — grounding answers](#the-library-chroma--grounding-answers)
 8. [The diary (Honcho) — project memory](#the-diary-honcho--project-memory)
 9. [CLI reference](#cli-reference)
@@ -372,7 +378,10 @@ Maven/Gradle/Go/Python/.NET/Rust, Flutter/React-Native/Xcode…) and generates,
     agents/<role>.md            # a relevant subset of role Agents (Claude Code loads these)
     skills/<skill>/SKILL.md     # the matching Skills
     commands/cdt.md             # the /cdt flow driver (the interactive gate loop)
+    commands/cdt-triage.md      # the /cdt-triage autonomous discovery loop (loop engineering)
     settings.local.json         # machine-local hooks: Honcho capture + context injection
+  .mcp.json                     # MCP: Conductor's memories as a server (cdt mcp)
+  .mcp.connectors.example.json  # disabled stubs for GitHub/Slack/... connectors to copy in
   .cdt/
     config.json                 # enrollment: slug, type, selected roles, Honcho workspace
     stack/<TYPE>.md             # the detected technologies (steers RAG queries)
@@ -504,6 +513,44 @@ and each loop lowers the defect rate.
 
 ---
 
+## Loop engineering — autonomous triage & MCP
+
+`/cdt` is interactive (it stops at every gate). Its **scheduled counterpart** is
+**`/cdt-triage`** — an autonomous discovery loop you run unattended on a cadence
+(`/loop`, a cron task, or a harness automation like Codex's Automations tab). It:
+
+1. **recalls** prior state from the diary,
+2. **scans** recent CI failures, open issues, and recent commits (Gate 1),
+3. **triages** each finding into `worth-doing | needs-human | noise`,
+4. hands actionable work to a **maker** subagent **in an isolated git worktree**
+   (so parallel work can't collide) and a **separate checker** (Gates 7–8), and
+5. records everything to the **journal** instead of pausing for you — the journal
+   is the on-disk state, so the next run resumes where this one stopped.
+
+You review the journal, not every step. *Build the loop, stay the engineer:*
+verification still belongs to you. The automation is emitted per harness by
+`cdt init/sync` (Claude: `.claude/commands/cdt-triage.md`; Codex: `$cdt-triage`
+skill; etc.).
+
+**MCP connectors — the loop touches real tools.** `cdt init/sync` also scaffolds
+MCP configuration into the project:
+
+- **Conductor's own memories as an MCP server** — `cdt mcp` runs a stdio MCP
+  server exposing `library_search`, `journal_recall`, and `journal_add`. It is
+  registered **live** in the harness's native MCP config (`.mcp.json` for Claude,
+  the `mcp` key in `opencode.json` for OpenCode, `[mcp_servers.*]` in
+  `.codex/config.toml` for Codex). The server needs the optional extra:
+  `pip install 'conductor[mcp]'`.
+- **Third-party connector stubs** (GitHub, Slack, …) ship **disabled** — for
+  Claude in a companion `.mcp.connectors.example.json`, elsewhere as a disabled
+  entry. Fill the token and enable one to let the loop open PRs / post to a
+  channel when CI is green.
+
+Emitting is idempotent and merge-not-clobber: re-running `cdt sync` never
+duplicates entries or wipes your existing MCP config.
+
+---
+
 ## The library (Chroma) — grounding answers
 
 The **library** is a RAG over a corpus of reference books. It is *static
@@ -611,13 +658,14 @@ the underlying LLM without losing what it has learned.
 
 | Command | What it does |
 |---------|--------------|
-| `cdt init [path]` | Enroll a project: generate the harness config (role subset + the `/cdt` driver + hooks), `.cdt/` (stack, memory tree), and the project guide. Flags: `--target claude\|opencode\|codex\|pi\|all`, `--all`, `--roles a,b`, `--type T`, `--force`. |
+| `cdt init [path]` | Enroll a project: generate the harness config (role subset + the `/cdt` driver + `/cdt-triage` automation + hooks + MCP config), `.cdt/` (stack, memory tree), and the project guide. Flags: `--target claude\|opencode\|codex\|pi\|all`, `--all`, `--roles a,b`, `--type T`, `--force`. |
 | `cdt sync [path]` | Refresh the managed region of `CLAUDE.md` and the scaffolded driver/hooks/memory tree (re-detect stack, roles, pull diary memory). |
 | `cdt library "<q>"` | Semantic search over the reference books. Flags: `-k N`, `--json`, `--category C`, `--gate N`. |
 | `cdt library reindex` | Index any library files not yet in ChromaDB (incremental, content-hash skip). |
 | `cdt library add <file.md> …` | Index specific `.md` file(s) already under the library directory. |
 | `cdt journal add\|recall\|log` | The per-project development diary. `recall --type/--area`, `log --kind error,solution --gate N`. |
 | `cdt journal ingest\|digest` | Ingest `docs/`+`records/` into Honcho; regenerate the `daily/` digests. |
+| `cdt mcp` | Run Conductor's memories (library + journal) as an MCP stdio server (tools `library_search`, `journal_recall`, `journal_add`). Needs the `[mcp]` extra. |
 | `cdt up` / `down` | Start / stop the Docker RAG stack (GPU auto-detected). |
 | `cdt ingest` | (Re)build the library index in the running stack. **Incremental** (content-hash skip). Flags: `--force` (re-embed all), `--quiet` (no telemetry), `--batch N`, `--limit N`. |
 | `cdt honcho setup` | Choose the Honcho reasoning provider and write its `.env`. |
@@ -658,10 +706,12 @@ the underlying LLM without losing what it has learned.
     `roles.py` (the 36-role registry: role → skill / area / project types),
     `scaffold.py` (the `.claude/` + `CLAUDE.md` generator), `project.py`,
     `library.py`, `journal.py`, `honcho_client.py`, `honcho_setup.py`,
-    `honcho_stack.py`, and `rag/` (`core`, `ingest`, `bootstrap`, `stack`).
+    `honcho_stack.py`, `mcp_server.py` (the `cdt mcp` stdio server), and `rag/`
+    (`core`, `ingest`, `bootstrap`, `stack`).
   - `conductor/templates/` — the 36 role **Agents** + 36 **Skills**,
-    `CLAUDE.md.tmpl`, `flow.md` (the 11-gate flow), and `commands/cdt.md` (the
-    `/cdt` flow driver). These are copied into target projects.
+    `CLAUDE.md.tmpl`, `flow.md` (the 11-gate flow), `commands/cdt.md` (the `/cdt`
+    flow driver), and `automations/triage.md` (the `/cdt-triage` autonomous loop).
+    These are copied into target projects.
   - `conductor/infra/conductor/` — the Docker RAG stack (Ollama + bge-m3 + Chroma).
   - `conductor/infra/honcho/` — the self-hosted Honcho diary backend.
 - `tools/validate.py` — the invariant validator over the templates (the CI gate).
@@ -670,7 +720,7 @@ the underlying LLM without losing what it has learned.
 
 ## Invariants / quality gate
 
-`python tools/validate.py` enforces 11 golden rules (R1–R11) over the templates,
+`python tools/validate.py` enforces 13 golden rules (R1–R13) over the templates,
 the role registry, and the repository. R1–R8 cover the 36 agents + 36 skills
 parity, frontmatter and YAML safety, semver, agent anchoring in reference books,
 skill structure, the `roles.py` ↔ template registry plus the 11-gate flow, and
@@ -678,7 +728,10 @@ valid `model:` tiers. The newer rules add: **R9** — the memory-tree ingestion
 routes stay consistent with the scaffolded folders (and `refs/` is never
 ingested); **R10** — the `/cdt` driver exists and keeps its enforcement anchors
 (RAG citation, subagent delegation, the user checkpoint); **R11** — no real API
-keys or tokens are committed to tracked files. It runs in CI
+keys or tokens are committed to tracked files; **R12** — the `/cdt-triage`
+automation template exists with its loop anchors and is wired into the scaffold;
+**R13** — the MCP `CONNECTORS` catalog (incl. the `conductor` server) exists and
+every target implements `emit_mcp`. It runs in CI
 (`.github/workflows/`) and is also Conductor's own Gate 7 for this repository. See
 [`tools/README.md`](tools/README.md).
 

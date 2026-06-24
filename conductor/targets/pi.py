@@ -84,5 +84,17 @@ class PiTarget:
         dst.write_text(HONCHO_EXT, encoding="utf-8")
         return 1
 
+    def emit_automations(self, project: Path) -> int:
+        text = base.automation_text("triage")
+        if text is None:
+            return 0
+        dst = project / ".pi" / "prompts"
+        dst.mkdir(parents=True, exist_ok=True)
+        (dst / "cdt-triage.md").write_text(text, encoding="utf-8")
+        return 1
+
+    def emit_mcp(self, project: Path) -> int:
+        return 0  # Pi has no MCP support (see module docstring) — nothing to emit
+
     def emit_guide(self, ctx: GuideContext) -> str:
         return base.write_guide(ctx.root / "AGENTS.md", ctx, "AGENTS.md.tmpl")

@@ -20,6 +20,12 @@ Codex, Pi) and this `AGENTS.md` is loaded automatically as the project guide.
   Driving a demand any other way leaves the flow as passive guidance, which a
   normal task prompt will bypass. Avoid pairing it with "run autonomously /
   commit each step" — that disables the per-gate checkpoint.
+- **Autonomous loop — `$cdt-triage`:** the scheduled counterpart to `/cdt`. It
+  runs **unattended** (discovery → a maker subagent in an isolated worktree → a
+  separate checker), recording findings to the diary instead of pausing for you.
+  Schedule it via your harness's automation (e.g. Codex Automations tab); you
+  review the **journal** afterwards, not every step — **verification still
+  belongs to you.**
 
 ## Roles in this project
 
@@ -45,6 +51,11 @@ _Synced from the development diary (`cdt journal`); newest first._
 
   Kinds: `reasoning | decision | plan | error | solution`. Recording also keeps
   this guide's project memory up to date.
+- **MCP connectors (the loop touches real tools):** `cdt init/sync` registers
+  Conductor's own memories as an MCP server (`cdt mcp` — exposes
+  `library_search`, `journal_recall`, `journal_add`) in your harness's MCP
+  config, plus **disabled** stubs for third-party connectors (GitHub, Slack, …).
+  Fill the token and enable a stub to let the loop open PRs / post to a channel.
 - **Backends (Docker):** `cdt up` starts Ollama + ChromaDB (and the Honcho
   diary if configured); `cdt down` stops them. GPU is auto-detected.
 - **Keep this file live:** `cdt sync` re-detects the stack, refreshes
