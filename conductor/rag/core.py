@@ -15,10 +15,20 @@ import json
 import os
 import re
 import sys
+import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, List, Optional
+
+
+class BackendUnreachable(RuntimeError):
+    """A RAG backend (Ollama embeddings or ChromaDB) could not be reached.
+
+    Carries a self-contained, actionable message (names the URL and the fix) so
+    callers can print it straight to stderr instead of an opaque urllib/Chroma
+    traceback. Raised by `embed()` and the Chroma client helpers.
+    """
 
 
 def force_utf8() -> None:
@@ -337,8 +347,18 @@ def embed(texts: List[str]) -> List[List[float]]:
         f"{OLLAMA_URL}/api/embed", data=payload,
         headers={"Content-Type": "application/json"},
     )
-    with urllib.request.urlopen(req, timeout=300) as resp:
-        data = json.loads(resp.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(req, timeout=300) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError:
+        # Ollama answered with an error status (e.g. 400/404) — it IS reachable;
+        # this is a real model/payload problem, so let it surface as-is.
+        raise
+    except urllib.error.URLError as e:  # connection refused, DNS, timeout
+        raise BackendUnreachable(
+            f"Embedding backend (Ollama) unreachable at {OLLAMA_URL}. "
+            f"Is the stack up? Try: cdt up  (reason: {e.reason})"
+        ) from e
     embs = data.get("embeddings")
     if not embs or len(embs) != len(texts):
         raise RuntimeError(f"Ollama returned {len(embs or [])} embeddings for {len(texts)} texts")
@@ -347,14 +367,28 @@ def embed(texts: List[str]) -> List[List[float]]:
 
 # --- ChromaDB ----------------------------------------------------------------
 
+def _chroma_down(e: Exception) -> "BackendUnreachable":
+    """Builds the actionable 'backend unreachable' error for a Chroma failure."""
+    where = f"http://{CHROMA_HTTP}" if CHROMA_HTTP else str(CHROMA_DIR)
+    return BackendUnreachable(
+        f"Library backend (ChromaDB) unreachable at {where}. "
+        f"Is the stack up? Try: cdt up  ({e})"
+    )
+
+
 def _client():
     """Chroma client: resident HTTP server if CONDUCTOR_CHROMA_HTTP is set,
-    otherwise the local persistent client."""
+    otherwise the local persistent client. A connection failure to the HTTP
+    server is reported as BackendUnreachable (named URL + fix), not a raw
+    Chroma/connection traceback."""
     import chromadb  # late import: heavy dependency
 
     if CHROMA_HTTP:
         host, _, port = CHROMA_HTTP.partition(":")
-        return chromadb.HttpClient(host=host or "localhost", port=int(port or "8000"))
+        try:
+            return chromadb.HttpClient(host=host or "localhost", port=int(port or "8000"))
+        except Exception as e:  # noqa: BLE001 — server down / connection refused
+            raise _chroma_down(e) from e
     CHROMA_DIR.mkdir(parents=True, exist_ok=True)
     return chromadb.PersistentClient(path=str(CHROMA_DIR))
 
@@ -363,12 +397,45 @@ def get_collection(create: bool = True):
     """Opens (or creates) the library collection.
 
     On create, applies the tuned HNSW_CONFIG; falls back to cosine-only if the
-    installed chromadb rejects the extra keys.
+    installed chromadb rejects the extra keys. A connection failure to a resident
+    Chroma server raises BackendUnreachable with an actionable message; a genuinely
+    missing collection (server up, never ingested) is left to propagate as-is.
     """
     client = _client()
     if not create:
-        return client.get_collection(COLLECTION)
+        try:
+            return client.get_collection(COLLECTION)
+        except BackendUnreachable:
+            raise
+        except Exception as e:  # noqa: BLE001
+            # Distinguish "server unreachable" from "collection does not exist":
+            # a connection error means the backend is down; anything else (e.g.
+            # the collection was never created) is a real, different problem.
+            if _is_connection_error(e):
+                raise _chroma_down(e) from e
+            raise
     try:
         return client.get_or_create_collection(COLLECTION, metadata=dict(HNSW_CONFIG))
     except Exception:  # noqa: BLE001 — older/newer chromadb metadata schema
-        return client.get_or_create_collection(COLLECTION, metadata={"hnsw:space": "cosine"})
+        try:
+            return client.get_or_create_collection(COLLECTION, metadata={"hnsw:space": "cosine"})
+        except Exception as e:  # noqa: BLE001 — server unreachable on create
+            if _is_connection_error(e):
+                raise _chroma_down(e) from e
+            raise
+
+
+def _is_connection_error(e: Exception) -> bool:
+    """Heuristic: does this Chroma exception indicate the server is unreachable
+    (vs. a missing collection or a schema error)? Chroma wraps httpx/requests
+    connection failures in its own types, so we match on type name + message
+    rather than importing those optional libraries."""
+    name = type(e).__name__.lower()
+    if "connect" in name or name in ("connecterror", "connectionerror"):
+        return True
+    msg = str(e).lower()
+    return any(s in msg for s in (
+        "connection refused", "failed to connect", "max retries",
+        "connection error", "could not connect", "[errno 111]", "[errno 61]",
+        "connection aborted", "name or service not known", "timed out",
+    ))

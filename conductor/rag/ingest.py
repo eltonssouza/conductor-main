@@ -45,7 +45,11 @@ def _filter_unchanged(coll, batch: List[Chunk]) -> List[Chunk]:
     ids = [c.chunk_id for c in batch]
     try:
         existing = coll.get(ids=ids, include=["metadatas"])
-    except Exception:  # noqa: BLE001 — never let the lookup block ingest
+    except Exception as e:  # noqa: BLE001 — never let the lookup block ingest
+        # Conservative: re-embed the whole batch. Surface a warning so a backend
+        # problem isn't mistaken for a silent perf regression (dedup disabled).
+        print(f"  ! dedup lookup failed ({e}); re-embedding this batch",
+              file=sys.stderr)
         return batch
     have = {i: (m or {}).get("chash")
             for i, m in zip(existing.get("ids", []), existing.get("metadatas", []))}
@@ -81,14 +85,23 @@ def _upsert_pairs(coll, pairs: List[Pair]) -> int:
     if not pairs:
         return 0
     chunks = [c for c, _ in pairs]
-    coll.upsert(
-        ids=[c.chunk_id for c in chunks],
-        embeddings=[e for _, e in pairs],
-        documents=[c.text for c in chunks],
-        metadatas=[{"source": c.source, "category": c.category,
-                    "section": c.section, "path": c.path,
-                    "chash": _chash(c.text)} for c in chunks],
-    )
+    try:
+        coll.upsert(
+            ids=[c.chunk_id for c in chunks],
+            embeddings=[e for _, e in pairs],
+            documents=[c.text for c in chunks],
+            metadatas=[{"source": c.source, "category": c.category,
+                        "section": c.section, "path": c.path,
+                        "chash": _chash(c.text)} for c in chunks],
+        )
+    except Exception as e:  # noqa: BLE001 — a swallowed upsert silently loses data
+        # Never hide data loss: this batch of embeddings did NOT land in the
+        # index. Surface it loudly and abort — a partial, silent index is worse
+        # than a failed run the user can retry with `cdt up` / `cdt library reindex`.
+        raise RuntimeError(
+            f"Failed to upsert {len(chunks)} chunk(s) into ChromaDB — these are "
+            f"NOT indexed. Is the stack up? Try: cdt up  ({e})"
+        ) from e
     return len(chunks)
 
 

@@ -18,6 +18,28 @@ from typing import Optional
 CONDUCTOR_PEER = "conductor"
 OWNER_PEER = "owner"
 
+DEFAULT_SESSION_PREFIX = "cdt"
+DEFAULT_BASE_URL = "http://localhost:8000"
+
+
+def honcho_config(config: Optional[dict]) -> dict:
+    """The project's `honcho` config block, or an empty dict.
+
+    Canonical accessor so every call site reads the same (defensively coerced)
+    shape regardless of how the config was loaded.
+    """
+    h = (config or {}).get("honcho", {})
+    return h if isinstance(h, dict) else {}
+
+
+def session_prefix(config: Optional[dict]) -> str:
+    """The session-id prefix for this workspace (default ``cdt``).
+
+    Single source of truth shared by the diary (journal.py) and the backend so
+    session ids and workspace routing never drift apart.
+    """
+    return honcho_config(config).get("session_prefix", DEFAULT_SESSION_PREFIX)
+
 
 @dataclass
 class HonchoResult:
@@ -37,9 +59,9 @@ class HonchoBackend:
 
     @classmethod
     def from_config(cls, config: dict) -> "HonchoBackend":
-        h = (config or {}).get("honcho", {})
-        return cls(workspace=h.get("workspace") or config.get("project", "project"),
-                   base_url=h.get("base_url", "http://localhost:8000"))
+        h = honcho_config(config)
+        return cls(workspace=h.get("workspace") or (config or {}).get("project", "project"),
+                   base_url=h.get("base_url", DEFAULT_BASE_URL))
 
     def _connect(self):
         if self._client is not None or self._error is not None:

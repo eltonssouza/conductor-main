@@ -77,7 +77,7 @@ def step_extract() -> None:
     marker = LIBRARY / _SEL_MARKER
     populated = any(LIBRARY.rglob("*.md"))
     if populated and marker.is_file() and marker.read_text(encoding="utf-8").strip() == key:
-        log("1/4", f"library already populated for this selection; skipping fetch")
+        log("1/4", "library already populated for this selection; skipping fetch")
         return
     if ARCHIVE and ARCHIVE.is_file():
         _extract_archive()        # offline 7z: extracts all; the ingest filters
@@ -91,8 +91,18 @@ def step_extract() -> None:
 
 
 def _extract_archive() -> None:
-    """Offline override: extract books from a local .7z (CONDUCTOR_LIBRARY_ARCHIVE)."""
-    import py7zr
+    """Offline override: extract books from a local .7z (CONDUCTOR_LIBRARY_ARCHIVE).
+
+    `py7zr` is an optional, undeclared dependency only needed for this offline
+    path; if it is missing we warn and leave the library empty (the ingest then
+    no-ops) instead of crashing the stack with an ImportError.
+    """
+    try:
+        import py7zr
+    except ImportError:
+        log("1/4", f"WARNING: CONDUCTOR_LIBRARY_ARCHIVE={ARCHIVE} is set but py7zr "
+                   "is not installed (`pip install py7zr`); library left empty")
+        return
     LIBRARY.mkdir(parents=True, exist_ok=True)
     log("1/4", f"extracting {ARCHIVE.name} -> {LIBRARY}")
     with py7zr.SevenZipFile(ARCHIVE, mode="r") as z:
