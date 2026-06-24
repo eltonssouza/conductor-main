@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Protocol, Tuple
+from typing import Any, Dict, List, Optional, Protocol, Tuple
 
 from .. import roles as roles_mod
 from ..project import journal_dir
@@ -107,7 +107,7 @@ def automation_text(name: str = "triage") -> Optional[str]:
 # disabled and carry placeholder env values (each contains "<your") so they never
 # trip the secrets validator; the user fills a token and flips `enabled` to wire
 # one in. Targets project this catalog into each harness's native MCP format.
-CONNECTORS = {
+CONNECTORS: Dict[str, Dict[str, Any]] = {
     "conductor": {"command": "cdt", "args": ["mcp"], "env": {},
                   "enabled": True,
                   "note": "Conductor's own memories (library RAG + journal) as MCP tools."},
