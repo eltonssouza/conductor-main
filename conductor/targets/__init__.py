@@ -12,12 +12,13 @@ from typing import List
 from .base import GuideContext, Target
 from .claude import ClaudeTarget
 from .codex import CodexTarget
+from .odysseus import OdysseusTarget
 from .opencode import OpenCodeTarget
 from .pi import PiTarget
 
 # Registration order is the precedence used when auto-detecting.
 _REGISTRY = {t.key: t for t in
-             (ClaudeTarget(), OpenCodeTarget(), CodexTarget(), PiTarget())}
+             (ClaudeTarget(), OpenCodeTarget(), CodexTarget(), PiTarget(), OdysseusTarget())}
 
 DEFAULT_TARGET = "claude"
 

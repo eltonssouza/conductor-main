@@ -62,15 +62,21 @@ def main(argv: list) -> int:
         return rc
 
     if reinstall:
-        pip = [sys.executable, "-m", "pip", "install", "-e", ".[rag,honcho]"]
-        print("+ " + " ".join(pip))
+        pip = [sys.executable, "-m", "pip", "install", "-q", "-e", ".[rag,honcho]"]
+        print("Reinstalling dependencies ...")
         # pip may build/download packages; 600s is generous but bounds a hang.
+        # Capture stderr so pip's resolver warnings about unrelated packages
+        # (e.g. moviepy/pillow conflicts) don't print as scary red ERROR lines.
+        # We only surface stderr when the exit code signals a real failure.
         try:
-            rc = subprocess.run(pip, cwd=str(REPO_ROOT), timeout=600).returncode
+            result = subprocess.run(pip, cwd=str(REPO_ROOT), timeout=600,
+                                    capture_output=True, text=True)
+            rc = result.returncode
         except subprocess.TimeoutExpired:
             print("pip install timed out after 600s.", file=sys.stderr)
             return 1
         if rc != 0:
+            sys.stderr.write(result.stderr)
             return rc
     else:
         print("Code is live (editable install). If pyproject deps changed, run "
