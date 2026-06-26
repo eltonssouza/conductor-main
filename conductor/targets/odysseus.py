@@ -80,6 +80,11 @@ def _skill_frontmatter(name: str, description: str, owner: Optional[str]) -> dic
         "description": description,
         "version": "1.0.0",
         "category": "conductor",
+        # Unique tags (incl. the slug) keep Odysseus's UI/API dedup (Jaccard on
+        # name+desc+tags) from collapsing near-similar Conductor skills like the
+        # several design-* ones. Direct file writes bypass dedup anyway; this
+        # protects against a later re-import through the UI.
+        "tags": f"[conductor, {name}]",
         "status": "published",
         "source": "imported",
         "confidence": "0.9",
@@ -167,6 +172,15 @@ class OdysseusTarget:
         dst = skills_dir / "cdt"
         dst.mkdir(parents=True, exist_ok=True)
         (dst / "SKILL.md").write_text(base.join_frontmatter(fm, body), encoding="utf-8")
+        intake = base.command_as_skill("intake", "cdt-intake")
+        if intake is not None:
+            _, idesc, ibody = intake
+            idst = skills_dir / "cdt-intake"
+            idst.mkdir(parents=True, exist_ok=True)
+            (idst / "SKILL.md").write_text(
+                base.join_frontmatter(_skill_frontmatter("cdt-intake", idesc, owner), ibody),
+                encoding="utf-8",
+            )
         return True
 
     def emit_hooks(self, project: Path) -> int:

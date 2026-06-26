@@ -501,6 +501,36 @@ def _connector_attr(entry: object, key: str):
     return getattr(entry, key, None)
 
 
+# --- R14: intake command (triage + rich spec skeleton + library grounding) ---
+
+_INTAKE_ANCHORS = (
+    "## Step 1 — Triage",      # demand classification
+    "## 2. Telas",             # screens -> behavior in the spec skeleton
+    "### Regras de neg",       # backend business rules
+    "### Validaç",             # validations
+    "Given/When/Then",         # acceptance criteria
+    "cdt library",             # library grounding mandated
+    "cdt doc",                 # .docx export offered
+)
+
+
+@rule("R14-intake", "intake command exists with triage + spec skeleton (screens/rules/validations) + library grounding")
+def check_intake(ctx: Context) -> List[Violation]:
+    rel = "conductor/templates/commands/intake.md"
+    path = TEMPLATES / "commands" / "intake.md"
+    if not path.is_file():
+        return [Violation("R14-intake", rel, "intake command template not found")]
+    text = path.read_text(encoding="utf-8")
+    fm, _ = split_frontmatter(text)
+    v: List[Violation] = []
+    if frontmatter_field(fm, "description") is None:
+        v.append(Violation("R14-intake", rel, "frontmatter missing 'description'"))
+    for anchor in _INTAKE_ANCHORS:
+        if anchor not in text:
+            v.append(Violation("R14-intake", rel, f"intake missing anchor: '{anchor}'"))
+    return v
+
+
 # --- runner ------------------------------------------------------------------
 
 def run() -> List[Violation]:

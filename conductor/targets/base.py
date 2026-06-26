@@ -199,6 +199,24 @@ def merge_role_skill(role_slug: str) -> Optional[Tuple[str, str, str]]:
     return skill_slug, description, body
 
 
+def command_as_skill(stem: str, name: str) -> Optional[Tuple[str, str, str]]:
+    """Fold a command template (`templates/commands/<stem>.md`) into a skill,
+    for harnesses with no command surface (Codex, Odysseus) where a skill is the
+    native invocation point.
+
+    Returns (name, description, body): the command's body with a skill name and a
+    safely-quoted description (the command frontmatter's `description:`). Returns
+    None if the template is missing.
+    """
+    src = TEMPLATES / "commands" / f"{stem}.md"
+    if not src.is_file():
+        return None
+    meta, body = split_frontmatter(src.read_text(encoding="utf-8"))
+    raw = meta.get("description", "").strip()
+    description = json.dumps(raw) if raw else '""'
+    return name, description, body
+
+
 def join_frontmatter(meta: Dict[str, str], body: str) -> str:
     """Inverse of split_frontmatter: emit `--- key: value --- \\n body`.
 

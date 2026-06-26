@@ -64,40 +64,63 @@ def _render_override(mounts: List[tuple]) -> str:
         "    volumes:",
     ]
     for source, target in mounts:
-        lines += [
-            "      - type: bind",
-            f"        source: {source}",
-            f"        target: {target}",
-        ]
+        lines += ["      - type: bind",
+                  f"        source: {source}",
+                  f"        target: {target}"]
     return "\n".join(lines) + "\n"
 
 
-def _write_compose_override(root: Path, host: Path, mount: str) -> str:
-    """Add a bind-mount of `host` → `mount` to docker-compose.override.yml.
-
-    Returns one of: 'created', 'updated', 'exists' (already present), or
-    'skipped' (a non-managed override file is in the way).
+def _write_compose_override(root: Path, mounts: List[tuple]) -> str:
+    """Write docker-compose.override.yml with the given bind-mounts (merged with
+    any we wrote before). Returns 'created', 'updated', 'exists', or 'skipped'.
     """
     path = root / "docker-compose.override.yml"
-    source = str(host)
+    desired = list(mounts)
     if path.is_file():
         text = path.read_text(encoding="utf-8")
         if _OVERRIDE_MARKER not in text:
-            print(
-                f"[odysseus] {path.name} exists and was not written by Conductor; "
-                f"not touching it. Add this bind-mount manually:\n"
-                f"    {source} -> {mount}",
-                file=sys.stderr,
-            )
+            print(f"[odysseus] {path.name} exists and was not written by Conductor; "
+                  f"not touching it. Add the mounts manually.", file=sys.stderr)
             return "skipped"
-        mounts = _existing_mounts(text)
-        if (source, mount) in mounts:
+        for m in _existing_mounts(text):       # merge prior mounts (dedup)
+            if m not in desired:
+                desired.insert(0, m)
+        new = _render_override(desired)
+        if new == text:
             return "exists"
-        mounts.append((source, mount))
-        path.write_text(_render_override(mounts), encoding="utf-8")
+        path.write_text(new, encoding="utf-8")
         return "updated"
-    path.write_text(_render_override([(source, mount)]), encoding="utf-8")
+    path.write_text(_render_override(desired), encoding="utf-8")
     return "created"
+
+
+def _seed_mcp_http(root: Path, url: str) -> str:
+    """Seed/replace the `conductor` MCP server row pointing at the standalone
+    Conductor MCP server (streamable-http; see infra/mcp/). Returns 'seeded' or
+    a short error string."""
+    import sqlite3
+    db = root / "data" / "app.db"
+    if not db.is_file():
+        return "no app.db (start Odysseus once first)"
+    now = _utcnow()
+    try:
+        con = sqlite3.connect(str(db))
+        with con:
+            con.execute(
+                """INSERT OR REPLACE INTO mcp_servers
+                   (id, name, transport, command, args, env, url, is_enabled,
+                    created_at, updated_at)
+                   VALUES ('conductor','conductor','http',NULL,NULL,'{}',?,1,?,?)""",
+                (url, now, now))
+        con.close()
+        return "seeded"
+    except sqlite3.Error as e:
+        return f"db error: {e}"
+
+
+def _utcnow() -> str:
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S.%f")
 
 
 # --- data/settings.json patch (tool_path_extra_roots) ------------------------
@@ -139,65 +162,152 @@ def _patch_extra_roots(root: Path, mount: str) -> str:
 
 # --- command entry point -----------------------------------------------------
 
+def _doctor(root: Path) -> int:
+    """Validate a Conductor↔Odysseus install without changing anything.
+
+    Checks the things that silently break the integration: skills present and
+    framed so Odysseus surfaces them (published + owned + category), the MCP row,
+    and the Docker/settings wiring. Returns 0 if no problems, else 1.
+    """
+    import sqlite3
+    problems = 0
+
+    def ok(msg): print(f"  [OK  ] {msg}")
+    def warn(msg):
+        nonlocal problems
+        problems += 1
+        print(f"  [WARN] {msg}")
+
+    print(f"Odysseus doctor — {root}")
+
+    sk = root / "data" / "skills" / "conductor"
+    skills = sorted(sk.glob("*/SKILL.md")) if sk.is_dir() else []
+    if not skills:
+        warn("no Conductor skills in data/skills/conductor — run `cdt odysseus install`")
+    else:
+        ok(f"{len(skills)} Conductor skills on disk")
+        sample = skills[0].read_text(encoding="utf-8")
+        for need in ("status: published", "category: conductor", "owner:"):
+            if need not in sample:
+                warn(f"sample skill {skills[0].parent.name} missing '{need}' "
+                     f"(Odysseus would hide it)")
+        if all(n in sample for n in ("status: published", "category: conductor", "owner:")):
+            ok("skill frontmatter is surfaceable (published + owner + category)")
+
+    db = root / "data" / "app.db"
+    if not db.is_file():
+        warn("data/app.db absent (start Odysseus once) — MCP cannot be seeded")
+    else:
+        try:
+            con = sqlite3.connect(str(db))
+            rows = list(con.execute(
+                "SELECT transport, is_enabled FROM mcp_servers WHERE id='conductor'"))
+            con.close()
+            if rows:
+                ok(f"MCP row present (transport={rows[0][0]}, enabled={rows[0][1]})")
+            else:
+                print("  [info] no Conductor MCP row (optional; add with --with-mcp)")
+        except sqlite3.Error as e:
+            warn(f"cannot read mcp_servers: {e}")
+
+    ov = root / "docker-compose.override.yml"
+    if ov.is_file() and _OVERRIDE_MARKER in ov.read_text(encoding="utf-8"):
+        ok("docker-compose.override.yml present (Conductor-managed)")
+    else:
+        warn("no Conductor docker-compose.override.yml (agent lacks host-folder access)")
+
+    sj = root / "data" / "settings.json"
+    try:
+        roots = json.loads(sj.read_text(encoding="utf-8")).get("tool_path_extra_roots")
+        if roots:
+            ok(f"tool_path_extra_roots = {roots}")
+        else:
+            warn("tool_path_extra_roots empty (agent file tools confined to data/)")
+    except (OSError, ValueError):
+        warn("data/settings.json unreadable")
+
+    print("OK" if problems == 0 else f"{problems} warning(s)")
+    return 0 if problems == 0 else 1
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="cdt odysseus install",
-        description="Install all Conductor skills into an Odysseus Brain (global).",
+        prog="cdt odysseus",
+        description="Integrate Conductor with an Odysseus workspace (global Brain).",
     )
-    parser.add_argument("action", choices=["install"], help="what to do")
-    parser.add_argument("--projects", metavar="HOST_PATH", required=True,
-                        help="host folder to expose to the Odysseus agent workspace")
+    parser.add_argument("action", choices=["install", "doctor"], help="what to do")
+    parser.add_argument("--projects", metavar="HOST_PATH", nargs="+",
+                        help="host folder(s) to expose to the agent workspace (install)")
     parser.add_argument("--home", metavar="ODYSSEUS_HOME",
                         help="Odysseus install dir (else $ODYSSEUS_HOME or auto-detect)")
     parser.add_argument("--mount", metavar="CONTAINER_PATH", default=_DEFAULT_MOUNT,
-                        help=f"where the host folder lands in the container (default {_DEFAULT_MOUNT})")
+                        help=f"container mount root (default {_DEFAULT_MOUNT}; with several "
+                             "--projects, each lands at <mount>/<basename>)")
     parser.add_argument("--owner", metavar="USER",
                         help="Brain owner for the skills (else from data/auth.json)")
+    parser.add_argument("--with-mcp", action="store_true", dest="with_mcp",
+                        help="also register the standalone Conductor MCP server "
+                             "(run it from infra/mcp/) in Odysseus's MCP servers")
+    parser.add_argument("--mcp-url", default="http://host.docker.internal:8808/mcp",
+                        help="URL of the running Conductor MCP server "
+                             "(default http://host.docker.internal:8808/mcp)")
     args = parser.parse_args(argv)
 
     root = _resolve_root(args.home)
     if root is None:
-        print(
-            "[odysseus] Odysseus install not found. Run from the Odysseus dir, "
-            "set ODYSSEUS_HOME, or pass --home <path>.",
-            file=sys.stderr,
-        )
+        print("[odysseus] Odysseus install not found. Run from the Odysseus dir, "
+              "set ODYSSEUS_HOME, or pass --home <path>.", file=sys.stderr)
         return 2
 
-    host = Path(args.projects).expanduser()
-    if not host.is_dir():
-        print(f"[odysseus] --projects folder does not exist: {host}", file=sys.stderr)
-        return 2
+    if args.action == "doctor":
+        return _doctor(root)
 
-    # Reuse the OdysseusTarget emitters via their env-based root/owner resolution.
+    # install
+    if not args.projects:
+        print("[odysseus] install needs --projects <host folder> [more...]", file=sys.stderr)
+        return 2
+    hosts = [Path(p).expanduser() for p in args.projects]
+    for h in hosts:
+        if not h.is_dir():
+            print(f"[odysseus] --projects folder does not exist: {h}", file=sys.stderr)
+            return 2
+    base_mount = args.mount.rstrip("/") or "/workspace"
+    mounts = [(str(h), base_mount if len(hosts) == 1 else f"{base_mount}/{h.name}")
+              for h in hosts]
+
     os.environ["ODYSSEUS_HOME"] = str(root)
     if args.owner:
         os.environ["ODYSSEUS_OWNER"] = args.owner
 
     target = OdysseusTarget()
-    all_slugs = select_roles("unknown", all_roles=True)
-    n_roles = target.emit_roles(root, all_slugs)
+    n_roles = target.emit_roles(root, select_roles("unknown", all_roles=True))
     driver_ok = target.emit_driver(root)
     n_autos = target.emit_automations(root)
 
-    override_state = _write_compose_override(root, host, args.mount)
-    settings_state = _patch_extra_roots(root, args.mount)
+    override_state = _write_compose_override(root, mounts)
+    settings_states = {m: _patch_extra_roots(root, m) for _, m in mounts}
+    mcp_state = _seed_mcp_http(root, args.mcp_url) if args.with_mcp else None
 
     owner = _resolve_owner(root)
     print(f"Conductor -> Odysseus Brain at {root}")
     print(f"  skills:   {n_roles} roles"
-          f"{' + cdt driver' if driver_ok else ''}"
+          f"{' + cdt driver + cdt-intake' if driver_ok else ''}"
           f"{f' + {n_autos} automation(s)' if n_autos else ''}"
           f"  (owner={owner or 'none'}, status=published, category=conductor)")
-    print(f"  docker:   docker-compose.override.yml {override_state} "
-          f"({host} -> {args.mount})")
-    print(f"  settings: tool_path_extra_roots {settings_state} ({args.mount})")
+    print(f"  docker:   docker-compose.override.yml {override_state}")
+    for src, m in mounts:
+        print(f"            mount {src} -> {m}  (extra_roots: {settings_states[m]})")
+    if args.with_mcp:
+        print(f"  mcp:      registered '{args.mcp_url}' (http) — db {mcp_state}")
     print()
-    print("Next: restart Odysseus so it picks up the mount + skills:")
+    print("Next: restart Odysseus so it picks up the mounts + skills:")
     print(f"    cd {root} && docker compose up -d")
-    print("Then open an agent-mode chat — the Conductor roles + /cdt appear in the "
-          "skills index, and the agent can read/write files under "
-          f"{args.mount}.")
+    if args.with_mcp:
+        print("Also start the Conductor MCP server it points at:")
+        print("    cd infra/mcp && docker compose up -d --build   (and `cdt up` for the RAG backend)")
+    print("Then open an agent-mode chat — the Conductor roles + /cdt + /cdt-intake "
+          "appear in the skills index; the agent can read/write the mounted folder(s).")
+    print("Tip: `cdt odysseus doctor` re-checks this install at any time.")
     return 0
 
 

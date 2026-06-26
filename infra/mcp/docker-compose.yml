@@ -1,0 +1,35 @@
+# Conductor MCP server (streamable-http) — server-only.
+#
+#   cd infra/mcp && docker compose up -d --build
+#
+# Endpoint:  http://<host>:8808/mcp   (from another container: host.docker.internal)
+# Tools:     library_search, journal_recall, journal_add
+#
+# Backends are external and reached over the network:
+#   - library_search -> ChromaDB (CONDUCTOR_CHROMA_HTTP) + Ollama (OLLAMA_HOST).
+#     Start them with `cdt up` (exposes Chroma on localhost:8001, Ollama 11434).
+#   - journal_*       -> needs a mounted, enrolled project (.cdt/) whose
+#     honcho.base_url is reachable from the container. Optional; if no project is
+#     mounted the journal tools reply "not an enrolled project" (library still works).
+services:
+  conductor-mcp:
+    build:
+      context: ../..
+      dockerfile: infra/mcp/Dockerfile
+    image: conductor-mcp:latest
+    ports:
+      - "${MCP_BIND:-127.0.0.1}:${MCP_PORT:-8808}:8808"
+    extra_hosts:
+      # lets the container reach Chroma/Ollama/Honcho running on the Docker host
+      - "host.docker.internal:host-gateway"
+    environment:
+      - CONDUCTOR_CHROMA_HTTP=${CONDUCTOR_CHROMA_HTTP:-host.docker.internal:8001}
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
+      - CONDUCTOR_EMBED_MODEL=${CONDUCTOR_EMBED_MODEL:-bge-m3}
+      - CONDUCTOR_LIBRARY_STACKS=${CONDUCTOR_LIBRARY_STACKS:-}
+    # Optional: mount one enrolled project to enable the journal_* tools, and run
+    # the server from it so find_project_root resolves there. Library needs none.
+    # volumes:
+    #   - ${CONDUCTOR_PROJECT:?set CONDUCTOR_PROJECT to an enrolled project}:/project
+    # working_dir: /project
+    restart: unless-stopped

@@ -55,15 +55,25 @@ Responda SEMPRE em pt-BR (português do Brasil), independentemente do idioma da 
   harness-neutral steps only), `targets/` (per-harness adapters: `base.py`
   Target protocol + shared guide render, `claude.py`, `opencode.py`, registry
   in `__init__.py`), `library.py`, `journal.py`, `honcho_client.py`,
-  `honcho_setup.py`, `mcp_server.py` (the `cdt mcp` stdio server), and `rag/`
-  (core/ingest/bootstrap/stack).
+  `honcho_setup.py`, `mcp_server.py` (the `cdt mcp` stdio server),
+  `install_odysseus.py` (the `cdt odysseus install` global Brain command),
+  `docgen.py` (the `cdt doc` Markdown→.docx/.pdf renderer, optional `[docs]`
+  extra: python-docx + reportlab),
+  and `rag/` (core/ingest/bootstrap/stack).
 - `conductor/templates/` — `agents/` (36), `skills/` (36), `commands/`
-  (`cdt.md` Claude driver, `cdt.opencode.md`/`cdt.codex.md`/`cdt.pi.md` variants),
+  (`cdt.md` Claude driver, `cdt.opencode.md`/`cdt.codex.md`/`cdt.pi.md` variants,
+  and `intake.md` — the `/cdt-intake` triage+spec front door: classify the demand,
+  optionally emit a pt-BR client-questions doc, write a rich spec (screens→behavior,
+  backend rules→validations) grounded in the library, then hand off to `/cdt`),
   `automations/` (`triage.md`, the `/cdt-triage` autonomous loop), `CLAUDE.md.tmpl`
   + `AGENTS.md.tmpl` (guide variants), `flow.md` (the 11-gate flow). Copied/
   translated into target projects per target.
-- `infra/conductor/` (RAG stack) and `infra/honcho/` (diary backend) — Docker.
-- `tools/validate.py` — invariant validator over the templates (CI gate, R1–R13).
+- `infra/conductor/` (RAG stack), `infra/honcho/` (diary backend), and
+  `infra/mcp/` (the standalone Conductor MCP server: `cdt mcp --transport
+  streamable-http` in Docker, exposes library+journal at `:8808/mcp` for a
+  networked harness like Odysseus) — Docker.
+- `tools/validate.py` — invariant validator over the templates (CI gate, R1–R14;
+  R14 = the `/cdt-intake` command has triage + the spec skeleton + library grounding).
 
 ## Conventions
 
@@ -71,7 +81,8 @@ Responda SEMPRE em pt-BR (português do Brasil), independentemente do idioma da 
   `99` → next minor. (There is no longer a `plugin.json` to keep in sync.)
 - **Language:** all project artifacts in English; chat responses in pt-BR (per
   Idioma above).
-- **Validation:** `python tools/validate.py` must exit 0 (R1–R13 over templates;
-  R12 = the triage automation template, R13 = MCP catalog + `emit_mcp` wiring).
+- **Validation:** `python tools/validate.py` must exit 0 (R1–R14 over templates;
+  R12 = the triage automation template, R13 = MCP catalog + `emit_mcp` wiring,
+  R14 = the `/cdt-intake` triage+spec command).
 - **Role↔skill pairing** is 1:1 and lives in `conductor/roles.py`; keep agent
   templates, skill templates, and that registry in sync (R7 enforces it).

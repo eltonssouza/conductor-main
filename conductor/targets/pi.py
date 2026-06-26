@@ -74,6 +74,9 @@ class PiTarget:
         dst = project / ".pi" / "prompts"
         dst.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(src, dst / "cdt.md")
+        intake = TEMPLATES / "commands" / "intake.md"
+        if intake.is_file():
+            shutil.copyfile(intake, dst / "cdt-intake.md")
         return True
 
     def emit_hooks(self, project: Path) -> int:

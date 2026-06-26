@@ -123,8 +123,27 @@ def _tool_journal_add(gate: int, kind: str, text: str) -> str:
 
 
 def main(argv: Optional[List[str]] = None) -> int:
-    """Build the FastMCP server and run it over stdio (default transport)."""
+    """Build the FastMCP server and run it.
+
+    Default transport is stdio (a harness spawns `cdt mcp` as a subprocess). For
+    a containerized sidecar that a harness reaches over the network — e.g. an
+    Odysseus install in Docker connecting by URL — run with `--transport sse`
+    (and optionally `--host`/`--port`).
+    """
+    import argparse
     force_utf8()
+    parser = argparse.ArgumentParser(prog="cdt mcp",
+                                     description="Run Conductor's memories as an MCP server.")
+    parser.add_argument("--transport", choices=["stdio", "sse", "streamable-http"],
+                        default="stdio",
+                        help="stdio (default, subprocess), or sse / streamable-http "
+                             "for a networked server a harness reaches by URL")
+    parser.add_argument("--host", default="0.0.0.0",
+                        help="bind host for networked transports (default 0.0.0.0)")
+    parser.add_argument("--port", type=int, default=8808,
+                        help="bind port for networked transports (default 8808)")
+    args = parser.parse_args(argv)
+
     try:
         from mcp.server.fastmcp import FastMCP
     except ImportError:
@@ -133,7 +152,9 @@ def main(argv: Optional[List[str]] = None) -> int:
               "pip install 'conductor[mcp]'", file=sys.stderr)
         return 1
 
-    server = FastMCP("conductor")
+    server = (FastMCP("conductor")
+              if args.transport == "stdio"
+              else FastMCP("conductor", host=args.host, port=args.port))
 
     @server.tool()
     def library_search(question: str) -> str:
@@ -154,7 +175,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         gate is the flow gate number (1-11). Returns a confirmation."""
         return _tool_journal_add(gate, kind, text)
 
-    server.run()
+    server.run(transport=args.transport)
     return 0
 
 

@@ -21,7 +21,7 @@ from typing import List, Optional
 COMMANDS = (
     "init", "sync", "detect", "list", "library", "journal", "up", "down",
     "ingest", "honcho", "honcho-setup", "update", "quickstart",
-    "mcp", "odysseus", "cdt", "help",
+    "mcp", "odysseus", "doc", "cdt", "help",
 )
 
 USAGE = """cdt <command> [args]   (alias: conductor)
@@ -48,9 +48,14 @@ Commands:
   update [--reinstall]       Pull the latest source (editable/source install).
   quickstart                 Print the ordered path: install -> first /cdt feature.
   mcp                        Run Conductor's memories (library + journal) as an MCP stdio server.
-  odysseus install --projects <dir> [--home <path>] [--mount /workspace]
+  doc <file.md> [--format docx|pdf|both] [--out FILE] [--title T]
+                             Render a Markdown spec/questions file to a .docx
+                             and/or .pdf deliverable (needs the [docs] extra).
+  odysseus install --projects <dir...> [--home <path>] [--mount /workspace] [--with-mcp <src>]
                              Install ALL Conductor skills into an Odysseus Brain
-                             (global, once) + give its agent access to a host folder.
+                             (global, once) + give its agent access to host folder(s).
+  odysseus doctor [--home <path>]
+                             Check an existing Conductor↔Odysseus install.
 
 Run `cdt <command> --help` for command options.
 """
@@ -179,6 +184,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "odysseus":
         from .install_odysseus import main as odysseus_main
         return odysseus_main(rest)
+
+    if cmd == "doc":
+        from .docgen import main as doc_main
+        return doc_main(rest)
 
     print(f"cdt: unknown command: {cmd}", file=sys.stderr)
     suggestions = difflib.get_close_matches(cmd, COMMANDS, n=1)

@@ -22,6 +22,20 @@ from .base import GuideContext, TEMPLATES
 SKILLS_REL = (".agents", "skills")
 
 
+def _emit_intake_skill(skills_root: Path) -> None:
+    """Write the /cdt-intake command as a Codex skill ($cdt-intake)."""
+    res = base.command_as_skill("intake", "cdt-intake")
+    if res is None:
+        return
+    name, description, body = res
+    dst = skills_root / "cdt-intake"
+    dst.mkdir(parents=True, exist_ok=True)
+    (dst / "SKILL.md").write_text(
+        base.join_frontmatter({"name": name, "description": description}, body),
+        encoding="utf-8",
+    )
+
+
 class CodexTarget:
     key = "codex"
     label = "Codex"
@@ -56,6 +70,7 @@ class CodexTarget:
         dst = project.joinpath(*SKILLS_REL, "cdt")
         dst.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(src, dst / "SKILL.md")
+        _emit_intake_skill(project.joinpath(*SKILLS_REL))
         return True
 
     def emit_hooks(self, project: Path) -> int:

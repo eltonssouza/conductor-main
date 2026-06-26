@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "conductor"
-version = "0.2.66"
+version = "0.2.69"
 description = "Global CLI that scaffolds Claude-Code-native config (role Agents + Skills + CLAUDE.md) into any project, with a library RAG and a per-project development diary."
 requires-python = ">=3.9"
 
@@ -19,6 +19,9 @@ honcho = ["honcho-ai>=1.0"]
 # mcp: expose the library + journal memories as an MCP stdio server (`cdt mcp`)
 # so any MCP-capable harness can call them natively — pip install 'conductor[mcp]'.
 mcp = ["mcp>=1.0"]
+# docs: render flow specs / client-questions Markdown to .docx deliverables
+# (`cdt doc`) deterministically in the CLI — pip install 'conductor[docs]'.
+docs = ["python-docx>=1.1", "reportlab>=4.0"]
 # dev: local quality tooling (lint + types), mirrored by CI and pre-commit.
 dev = ["ruff>=0.15", "mypy>=1.10"]
 
