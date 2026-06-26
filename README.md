@@ -25,6 +25,10 @@ long-term memories ground every decision:
 
 The work is driven by the **`/cdt` slash command**, an interactive control loop
 that walks a demand through the gates and **stops for your approval at each one**.
+A front-door companion, **`/cdt-intake`**, triages a raw demand (new feature /
+bug fix / app from scratch) and produces a precise spec — screens → behavior,
+backend rules → validations, grounded in the library — that `cdt doc` can render
+to a `.docx`/`.pdf` for a non-technical client.
 The diary is **live memory**: harness hooks installed by Conductor (on Claude Code
 and Pi) capture your prompts and inject what Honcho remembers back into each new
 session, so the project's memory grows as you work and follows you across sessions.
@@ -106,6 +110,8 @@ cdt sync                               # after upgrading Conductor: refresh an e
    - [`cdt sync` — the living CLAUDE.md](#cdt-sync--the-living-claudemd)
 6. [The 11-gate flow](#the-11-gate-flow)
 7. [Loop engineering — autonomous triage & MCP](#loop-engineering--autonomous-triage--mcp)
+7. [The intake front door — triage & spec documents](#the-intake-front-door--triage--spec-documents)
+7. [Odysseus (optional) + the standalone MCP server](#odysseus-optional--the-standalone-mcp-server)
 7. [The library (Chroma) — grounding answers](#the-library-chroma--grounding-answers)
 8. [The diary (Honcho) — project memory](#the-diary-honcho--project-memory)
 9. [CLI reference](#cli-reference)
@@ -551,6 +557,70 @@ duplicates entries or wipes your existing MCP config.
 
 ---
 
+## The intake front door — triage & spec documents
+
+`/cdt` conducts an *already-scoped* demand through the gates. **`/cdt-intake`** is
+the front door that scopes it first — emitted alongside `/cdt` into every harness:
+
+1. **Triage** the demand into *greenfield app* / *new feature* / *bug fix* and
+   route the effort accordingly.
+2. **(On demand) a client-questions document** — when you ask, it writes a
+   layman-friendly questionnaire (pt-BR, Mom Test style) for a non-technical
+   client into `.cdt/memory/records/discovery/`.
+3. **A rich spec** into `.cdt/memory/records/features/` — screens → behavior /
+   states / UI validations, backend → business rules (tables) → validations → API
+   → edge cases, Given/When/Then acceptance criteria, and the best practices
+   applied **with library citations** (Clean Code, DDD, Clean Architecture, TDD,
+   SOLID). Then it hands off to `/cdt`.
+
+Markdown is the source of truth (ingested into the diary). Turn a spec or
+questionnaire into an editable **client deliverable** with the CLI — deterministic,
+so it works the same on any harness/LLM (including ones that can't generate
+documents themselves):
+
+```bash
+cdt doc .cdt/memory/records/features/<slug>-spec.md --format both   # -> .docx + .pdf
+```
+
+The deliverable lands in `.cdt/deliverables/` (outside the memory tree → never
+ingested). Needs the optional `[docs]` extra (`python-docx` + `reportlab`):
+`pip install 'conductor[docs]'`.
+
+---
+
+## Odysseus (optional) + the standalone MCP server
+
+[Odysseus](https://github.com/pewdiepie-archdaemon/odysseus) is a self-hosted AI
+workspace (runs in Docker) — a path for teams on LLMs that lack a mature harness
+(DeepSeek, Qwen, GLM, …). Conductor integrates with it **globally**, not
+per-project:
+
+```bash
+cdt odysseus install --projects C:\path\to\projects   # all skills into the Brain, once
+cdt odysseus doctor                                   # re-check an install
+```
+
+`install` writes all Conductor skills (the 36 roles + `/cdt` + `/cdt-intake`) into
+Odysseus's "Brain" (`data/skills/`), framed so Odysseus surfaces them, and grants
+the agent access to your host project folder(s) via a non-invasive
+`docker-compose.override.yml` bind-mount + a `tool_path_extra_roots` patch. It
+**never modifies Odysseus itself**.
+
+**The Conductor MCP server in Docker** ([`infra/mcp/`](infra/mcp)) exposes the
+library + journal memories to any networked, MCP-capable harness:
+
+```bash
+cd infra/mcp && docker compose up -d --build   # serves http://<host>:8808/mcp (streamable-http)
+cdt up                                          # the RAG backend library_search needs
+```
+
+It runs `cdt mcp --transport streamable-http` and exposes `library_search`,
+`journal_recall`, `journal_add` at `/mcp`. Register it in Odysseus with
+`cdt odysseus install --with-mcp` (or point any MCP client at the URL). See
+[`infra/mcp/README.md`](infra/mcp/README.md).
+
+---
+
 ## The library (Chroma) — grounding answers
 
 The **library** is a RAG over a corpus of reference books. It is *static
@@ -665,7 +735,9 @@ the underlying LLM without losing what it has learned.
 | `cdt library add <file.md> …` | Index specific `.md` file(s) already under the library directory. |
 | `cdt journal add\|recall\|log` | The per-project development diary. `recall --type/--area`, `log --kind error,solution --gate N`. |
 | `cdt journal ingest\|digest` | Ingest `docs/`+`records/` into Honcho; regenerate the `daily/` digests. |
-| `cdt mcp` | Run Conductor's memories (library + journal) as an MCP stdio server (tools `library_search`, `journal_recall`, `journal_add`). Needs the `[mcp]` extra. |
+| `cdt doc <file.md>` | Render a flow spec / client-questions Markdown file to a `.docx` and/or `.pdf` deliverable. Flags: `--format docx\|pdf\|both`, `--out`, `--title`. Needs the `[docs]` extra. |
+| `cdt mcp` | Run Conductor's memories (library + journal) as an MCP server. `--transport stdio\|sse\|streamable-http` (+ `--host/--port` for the networked ones); tools `library_search`, `journal_recall`, `journal_add`. Needs the `[mcp]` extra. |
+| `cdt odysseus install\|doctor` | Integrate Conductor with an [Odysseus](https://github.com/pewdiepie-archdaemon/odysseus) workspace (optional): install ALL skills once into its global "Brain" and grant the agent host-folder access. `install --projects <dir…> [--with-mcp]`; `doctor` re-checks an install. |
 | `cdt up` / `down` | Start / stop the Docker RAG stack (GPU auto-detected). |
 | `cdt ingest` | (Re)build the library index in the running stack. **Incremental** (content-hash skip). Flags: `--force` (re-embed all), `--quiet` (no telemetry), `--batch N`, `--limit N`. |
 | `cdt honcho setup` | Choose the Honcho reasoning provider and write its `.env`. |
@@ -706,21 +778,25 @@ the underlying LLM without losing what it has learned.
     `roles.py` (the 36-role registry: role → skill / area / project types),
     `scaffold.py` (the `.claude/` + `CLAUDE.md` generator), `project.py`,
     `library.py`, `journal.py`, `honcho_client.py`, `honcho_setup.py`,
-    `honcho_stack.py`, `mcp_server.py` (the `cdt mcp` stdio server), and `rag/`
-    (`core`, `ingest`, `bootstrap`, `stack`).
+    `honcho_stack.py`, `mcp_server.py` (the `cdt mcp` server: stdio / sse /
+    streamable-http), `docgen.py` (the `cdt doc` Markdown→.docx/.pdf renderer),
+    `install_odysseus.py` (the `cdt odysseus` global Brain command), `targets/`
+    (per-harness adapters), and `rag/` (`core`, `ingest`, `bootstrap`, `stack`).
   - `conductor/templates/` — the 36 role **Agents** + 36 **Skills**,
-    `CLAUDE.md.tmpl`, `flow.md` (the 11-gate flow), `commands/cdt.md` (the `/cdt`
-    flow driver), and `automations/triage.md` (the `/cdt-triage` autonomous loop).
-    These are copied into target projects.
-  - `conductor/infra/conductor/` — the Docker RAG stack (Ollama + bge-m3 + Chroma).
-  - `conductor/infra/honcho/` — the self-hosted Honcho diary backend.
+    `CLAUDE.md.tmpl` / `AGENTS.md.tmpl`, `flow.md` (the 11-gate flow),
+    `commands/cdt.md` (the `/cdt` driver) + `commands/intake.md` (the `/cdt-intake`
+    triage+spec front door), and `automations/triage.md` (the `/cdt-triage`
+    autonomous loop). These are copied into target projects.
+  - `infra/conductor/` — the Docker RAG stack (Ollama + bge-m3 + Chroma).
+  - `infra/honcho/` — the self-hosted Honcho diary backend.
+  - `infra/mcp/` — the standalone Conductor MCP server (Docker, streamable-http).
 - `tools/validate.py` — the invariant validator over the templates (the CI gate).
 
 ---
 
 ## Invariants / quality gate
 
-`python tools/validate.py` enforces 13 golden rules (R1–R13) over the templates,
+`python tools/validate.py` enforces 14 golden rules (R1–R14) over the templates,
 the role registry, and the repository. R1–R8 cover the 36 agents + 36 skills
 parity, frontmatter and YAML safety, semver, agent anchoring in reference books,
 skill structure, the `roles.py` ↔ template registry plus the 11-gate flow, and
@@ -731,7 +807,9 @@ ingested); **R10** — the `/cdt` driver exists and keeps its enforcement anchor
 keys or tokens are committed to tracked files; **R12** — the `/cdt-triage`
 automation template exists with its loop anchors and is wired into the scaffold;
 **R13** — the MCP `CONNECTORS` catalog (incl. the `conductor` server) exists and
-every target implements `emit_mcp`. It runs in CI
+every target implements `emit_mcp`; **R14** — the `/cdt-intake` command carries
+the triage step, the spec skeleton (screens / business rules / validations), and
+the library-grounding mandate. It runs in CI
 (`.github/workflows/`) and is also Conductor's own Gate 7 for this repository. See
 [`tools/README.md`](tools/README.md).
 
