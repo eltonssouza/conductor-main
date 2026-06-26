@@ -26,7 +26,23 @@ COMMANDS = (
 
 
 def _version() -> str:
-    """Installed package version; falls back to reading pyproject for a source run."""
+    """The Conductor version.
+
+    Prefer the source `pyproject.toml` when it sits next to the package — for an
+    editable/source install that is the *live* version, which `git pull` /
+    `cdt update` change without a reinstall (installed metadata would be stale).
+    Fall back to installed package metadata for a wheel/pipx install with no
+    source tree alongside.
+    """
+    try:
+        import re
+        pp = Path(__file__).resolve().parent.parent / "pyproject.toml"
+        if pp.is_file():
+            m = re.search(r'^version = "([^"]+)"', pp.read_text(encoding="utf-8"), re.M)
+            if m:
+                return m.group(1)
+    except OSError:
+        pass
     try:
         from importlib.metadata import PackageNotFoundError, version
         try:
@@ -34,14 +50,6 @@ def _version() -> str:
         except PackageNotFoundError:
             pass
     except ImportError:
-        pass
-    try:
-        import re
-        pp = Path(__file__).resolve().parent.parent / "pyproject.toml"
-        m = re.search(r'^version = "([^"]+)"', pp.read_text(encoding="utf-8"), re.M)
-        if m:
-            return m.group(1)
-    except OSError:
         pass
     return "unknown"
 
