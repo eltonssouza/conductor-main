@@ -181,6 +181,55 @@ O fluxo vai parar e pedir sua aprovação a cada uma das 11 etapas antes de segu
 
 ---
 
+## Alternativa — usar o Conductor com o Odysseus (opcional)
+
+Os passos 4 a 6 acima assumem o **Claude Code** (ou OpenCode/Codex/Pi) como harness. Se você usa o **[Odysseus](https://github.com/pewdiepie-archdaemon/odysseus)** — um workspace de IA self-hosted em Docker, útil pra quem roda LLMs sem um harness maduro (DeepSeek, Qwen, GLM…) — o Conductor integra com ele de um jeito **diferente**:
+
+> ⚠️ **A integração com Odysseus é GLOBAL, feita uma única vez — NÃO use `cdt init`.**
+> O `cdt init` é por projeto (Claude/OpenCode/Codex/Pi). O Odysseus recebe **todas** as skills de uma vez no "Brain", e nunca é tocado por `init`/`sync`.
+
+### Pré-requisitos
+
+- **Odysseus já instalado** e rodando em Docker na sua máquina.
+- **`cdt up` rodando** — o Odysseus usa o mesmo backend RAG (biblioteca) do Conductor.
+
+### Passo único — instalar o Conductor no Brain do Odysseus
+
+Rode **de dentro da pasta de instalação do Odysseus** (ou aponte com `--home`), passando as pastas do host que o agente vai poder acessar:
+
+```bash
+# Instala TODAS as skills (36 roles + /cdt + /cdt-intake) no Brain do Odysseus
+# e libera o acesso do agente às suas pastas de projeto
+cdt odysseus install --projects C:\caminho\para\seus\projetos
+```
+
+Isso faz duas coisas, sem nunca modificar o Odysseus em si:
+
+1. Grava as skills do Conductor no Brain (`data/skills/conductor/`), formatadas para o Odysseus as exibir.
+2. Dá ao agente acesso às pastas do host via um `docker-compose.override.yml` (bind-mount) + um patch em `tool_path_extra_roots`.
+
+Depois disso, dentro do Odysseus, as skills do Conductor (`/cdt`, `/cdt-intake`, os 36 papéis) ficam disponíveis.
+
+### Opcional — expor as memórias via MCP
+
+Para o agente do Odysseus consultar a biblioteca e o diário ao vivo, suba o servidor MCP do Conductor e registre-o:
+
+```bash
+# 1. Sobe o servidor MCP do Conductor (biblioteca + diário) em http://<host>:8808/mcp
+cd infra/mcp && docker compose up -d --build
+
+# 2. Registra esse MCP no Odysseus durante o install
+cdt odysseus install --projects C:\caminho\para\seus\projetos --with-mcp
+```
+
+### Conferir a instalação
+
+```bash
+cdt odysseus doctor   # re-checa skills no Brain, acesso às pastas e o registro MCP
+```
+
+---
+
 ## Atualizando o Conductor
 
 O método de atualização depende de como você instalou:
@@ -309,6 +358,8 @@ cdt library status   # livros indexados, categorias, contagem de chunks
 | `cdt honcho down`                 | Para o backend Honcho                                                           |
 | `cdt update`                      | Atualiza o Conductor (git pull);`--reinstall` também reinstala dependências |
 | `cdt mcp`                         | Roda as memórias como servidor MCP (stdio)                                     |
+| `cdt odysseus install --projects <dir>` | Instala todas as skills no Brain do Odysseus + libera acesso às pastas (global; `--with-mcp` registra o MCP) |
+| `cdt odysseus doctor`             | Re-checa uma instalação do Odysseus                                             |
 | `cdt quickstart`                  | Imprime este fluxo resumido no terminal                                         |
 | `cdt --help`                      | Mostra a ajuda completa                                                         |
 
