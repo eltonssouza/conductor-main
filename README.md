@@ -1,5 +1,7 @@
 # Conductor
 
+> 🌐 **Language:** **English (this file)** · [Português](README.pt-BR.md)
+
 Conductor is a **global command-line tool** that turns any software project into a
 **harness-conducted** project. You run one command inside a project and Conductor
 scaffolds harness-native configuration into it: a relevant subset of
