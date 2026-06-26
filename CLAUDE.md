@@ -32,6 +32,16 @@ Responda SEMPRE em pt-BR (português do Brasil), independentemente do idioma da 
   `sync` re-emits them. Codex/Pi have no auto-subagents → a role's persona is
   folded into its skill (`base.merge_role_skill`); only Claude & Pi capture
   prompts for live memory (Pi via its `input` event → `cdt journal observe --text`).
+- **Odysseus (global, not per-project):** Odysseus (self-hosted AI workspace in
+  Docker) integrates via the dedicated `cdt odysseus install --projects <dir>`
+  command (`conductor/install_odysseus.py`), NOT `cdt init`. It installs ALL
+  skills once into the Odysseus "Brain" (`data/skills/conductor/`, frontmatter
+  `status: published` + `owner` + `category: conductor` so `index_for` surfaces
+  them), and wires the agent's host-folder access via a `docker-compose.override.yml`
+  bind-mount + a `data/settings.json` `tool_path_extra_roots` patch. It reuses
+  `OdysseusTarget` (in `targets/odysseus.py`) but that target is deliberately NOT
+  in the `targets/__init__.py` registry, so init/sync never touch Odysseus. MCP
+  (`cdt mcp` tools) is phase 2 — needs Conductor inside the container + backends.
 - **Two memories:** `cdt library` (RAG over reference books — bge-m3 +
   ChromaDB) and `cdt journal` (per-project diary — Honcho + local JSONL
   mirror). Backends run in Docker (`infra/`); `cdt up` starts them.

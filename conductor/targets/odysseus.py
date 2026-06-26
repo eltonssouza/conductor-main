@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import sqlite3
 import sys
 from datetime import datetime, timezone
@@ -36,6 +35,58 @@ def _is_odysseus(path: Path) -> bool:
 
 def _utcnow_str() -> str:
     return datetime.now(timezone.utc).replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S.%f")
+
+
+def _resolve_owner(root: Path) -> Optional[str]:
+    """The Odysseus username that should own the emitted skills.
+
+    Odysseus surfaces skills to the agent via SkillsManager.index_for(owner=...),
+    which strict-filters by owner (effective_user). An ownerless skill is hidden
+    from every authenticated user, so the persona/flow would land on disk but
+    never reach the agent. Resolution order:
+
+      1. ODYSSEUS_OWNER env var (explicit override).
+      2. data/auth.json — the lone admin, else the lone user, else first admin.
+      3. None (acceptable only for an auth-less single-user deployment).
+    """
+    env = os.environ.get("ODYSSEUS_OWNER")
+    if env:
+        return env
+    try:
+        users = json.loads((root / "data" / "auth.json").read_text(encoding="utf-8")).get("users", {})
+    except (OSError, ValueError):
+        return None
+    if not isinstance(users, dict) or not users:
+        return None
+    admins = [u for u, v in users.items() if isinstance(v, dict) and v.get("is_admin")]
+    if len(admins) == 1:
+        return admins[0]
+    if len(users) == 1:
+        return next(iter(users))
+    return admins[0] if admins else None
+
+
+def _skill_frontmatter(name: str, description: str, owner: Optional[str]) -> dict:
+    """Frontmatter Odysseus needs so an emitted skill actually surfaces to the
+    agent: `status: published` (drafts are excluded from the prompt index),
+    `category: conductor` (else it defaults to general and the file is relocated
+    on any rewrite), and `owner` (else the strict owner filter hides it).
+
+    `description` is passed through verbatim (already double-quoted by the
+    templates); join_frontmatter does not re-quote.
+    """
+    meta = {
+        "name": name,
+        "description": description,
+        "version": "1.0.0",
+        "category": "conductor",
+        "status": "published",
+        "source": "imported",
+        "confidence": "0.9",
+    }
+    if owner:
+        meta["owner"] = owner
+    return meta
 
 
 class OdysseusTarget:
@@ -81,6 +132,7 @@ class OdysseusTarget:
         if skills_dir is None:
             self._warn_no_root()
             return 0
+        owner = _resolve_owner(self._root(project))
         n = 0
         for slug in selected:
             merged = base.merge_role_skill(slug)
@@ -90,7 +142,7 @@ class OdysseusTarget:
             dest = skills_dir / skill_slug
             dest.mkdir(parents=True, exist_ok=True)
             (dest / "SKILL.md").write_text(
-                base.join_frontmatter({"name": skill_slug, "description": description}, body),
+                base.join_frontmatter(_skill_frontmatter(skill_slug, description, owner), body),
                 encoding="utf-8",
             )
             n += 1
@@ -105,9 +157,16 @@ class OdysseusTarget:
             src = TEMPLATES / "commands" / "cdt.codex.md"
         if not src.is_file():
             return False
+        meta, body = base.split_frontmatter(src.read_text(encoding="utf-8"))
+        owner = _resolve_owner(self._root(project))
+        fm = _skill_frontmatter(
+            meta.get("name", "cdt"),
+            meta.get("description", '"Conductor flow driver — runs a demand through the 11 gates."'),
+            owner,
+        )
         dst = skills_dir / "cdt"
         dst.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(src, dst / "SKILL.md")
+        (dst / "SKILL.md").write_text(base.join_frontmatter(fm, body), encoding="utf-8")
         return True
 
     def emit_hooks(self, project: Path) -> int:
@@ -120,9 +179,16 @@ class OdysseusTarget:
         text = base.automation_text("triage")
         if text is None:
             return 0
+        meta, body = base.split_frontmatter(text)
+        owner = _resolve_owner(self._root(project))
+        fm = _skill_frontmatter(
+            meta.get("name", "cdt-triage"),
+            meta.get("description", '"Autonomous discovery → maker → checker triage loop."'),
+            owner,
+        )
         dst = skills_dir / "cdt-triage"
         dst.mkdir(parents=True, exist_ok=True)
-        (dst / "SKILL.md").write_text(text, encoding="utf-8")
+        (dst / "SKILL.md").write_text(base.join_frontmatter(fm, body), encoding="utf-8")
         return 1
 
     def emit_mcp(self, project: Path) -> int:
@@ -169,10 +235,11 @@ class OdysseusTarget:
         c = base.CONNECTORS["conductor"]
         cmd = " ".join([c["command"]] + c["args"])
         content = base.join_frontmatter(
-            {
-                "name": "conductor-mcp",
-                "description": '"Setup guide: add the Conductor MCP server (library RAG + journal) to Odysseus."',
-            },
+            _skill_frontmatter(
+                "conductor-mcp",
+                '"Setup guide: add the Conductor MCP server (library RAG + journal) to Odysseus."',
+                _resolve_owner(odysseus_root),
+            ),
             f"""# Conductor MCP Setup
 
 Odysseus's database is not initialised yet (start Odysseus once first).
@@ -222,7 +289,7 @@ Once connected, Odysseus agents gain `library_search`, `journal_recall`, and
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(
             base.join_frontmatter(
-                {"name": "conductor-guide", "description": description},
+                _skill_frontmatter("conductor-guide", description, _resolve_owner(root)),
                 rendered,
             ),
             encoding="utf-8",

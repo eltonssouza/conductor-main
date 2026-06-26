@@ -12,13 +12,17 @@ from typing import List
 from .base import GuideContext, Target
 from .claude import ClaudeTarget
 from .codex import CodexTarget
-from .odysseus import OdysseusTarget
 from .opencode import OpenCodeTarget
 from .pi import PiTarget
 
 # Registration order is the precedence used when auto-detecting.
+#
+# Odysseus is intentionally NOT registered here: it is integrated globally via
+# the dedicated `cdt odysseus install` command (all skills into the Odysseus
+# Brain, once), not scaffolded per-project by `cdt init`/`sync`. The
+# OdysseusTarget class is still used directly by conductor/install_odysseus.py.
 _REGISTRY = {t.key: t for t in
-             (ClaudeTarget(), OpenCodeTarget(), CodexTarget(), PiTarget(), OdysseusTarget())}
+             (ClaudeTarget(), OpenCodeTarget(), CodexTarget(), PiTarget())}
 
 DEFAULT_TARGET = "claude"
 
