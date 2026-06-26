@@ -21,8 +21,29 @@ from typing import List, Optional
 COMMANDS = (
     "init", "sync", "detect", "list", "library", "journal", "up", "down",
     "ingest", "honcho", "honcho-setup", "update", "quickstart",
-    "mcp", "odysseus", "doc", "cdt", "help",
+    "mcp", "odysseus", "doc", "cdt", "version", "help",
 )
+
+
+def _version() -> str:
+    """Installed package version; falls back to reading pyproject for a source run."""
+    try:
+        from importlib.metadata import PackageNotFoundError, version
+        try:
+            return version("conductor")
+        except PackageNotFoundError:
+            pass
+    except ImportError:
+        pass
+    try:
+        import re
+        pp = Path(__file__).resolve().parent.parent / "pyproject.toml"
+        m = re.search(r'^version = "([^"]+)"', pp.read_text(encoding="utf-8"), re.M)
+        if m:
+            return m.group(1)
+    except OSError:
+        pass
+    return "unknown"
 
 USAGE = """cdt <command> [args]   (alias: conductor)
 
@@ -47,6 +68,7 @@ Commands:
   honcho up | down           Start / stop the Honcho diary backend (Docker).
   update [--reinstall]       Pull the latest source (editable/source install).
   quickstart                 Print the ordered path: install -> first /cdt feature.
+  version | --version        Print the installed Conductor version.
   mcp                        Run Conductor's memories (library + journal) as an MCP stdio server.
   doc <file.md> [--format docx|pdf|both] [--out FILE] [--title T]
                              Render a Markdown spec/questions file to a .docx
@@ -95,6 +117,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     if not argv or argv[0] in ("-h", "--help", "help"):
         print(USAGE)
+        return 0
+    if argv[0] in ("-V", "--version", "version"):
+        print(f"conductor {_version()}")
         return 0
 
     cmd, rest = argv[0], argv[1:]
