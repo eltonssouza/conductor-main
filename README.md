@@ -339,6 +339,23 @@ cdt honcho setup --provider ollama --model qwen2.5:3b   # or llama3.1, etc.
 cdt honcho up
 ```
 
+> The model is pulled **into the dockerized Ollama** (`conductor-ollama-1`, started
+> by `cdt up`) — not a host install — so the same Ollama serves both `bge-m3`
+> (embeddings) and your reasoning model.
+
+**Switching from an already-configured provider** (e.g. DeepSeek → Ollama). The
+`.env` already exists, so `cdt honcho setup` refuses to clobber it without `--force`:
+
+```bash
+docker exec conductor-ollama-1 ollama pull qwen2.5:3b           # model lives in the container
+cdt honcho setup --provider ollama --model qwen2.5:3b --force   # --force overwrites the existing .env
+cdt honcho down && cdt honcho up                               # the container reads .env only on startup
+```
+
+Switching between providers that share the **same embedding** (`bge-m3`, 1024-d —
+the default for every non-OpenAI provider) **does not require recreating the
+volume**; the diary is kept. Only changing the embedding dimension would.
+
 **Key resolution (any hosted provider).** When a key is needed, `cdt honcho setup`
 resolves it in this order and writes it into the (gitignored) Honcho `.env` — the
 key is never printed:
