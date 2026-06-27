@@ -117,8 +117,11 @@ def _write_compose_override(root: Path, mounts: List[tuple]) -> str:
             print(f"[odysseus] {path.name} exists and was not written by Conductor; "
                   f"not touching it. Add the mounts manually.", file=sys.stderr)
             return "skipped"
-        for m in _existing_mounts(text):       # merge prior mounts (dedup)
-            if m not in desired:
+        desired_sources = {s for s, _ in desired}
+        for m in _existing_mounts(text):       # merge prior mounts; one folder = one target
+            # Drop a stale prior entry for a folder we're (re)mounting now, so
+            # re-running with a new target doesn't double-mount the same source.
+            if m not in desired and m[0] not in desired_sources:
                 desired.insert(0, m)
         new = _render_override(desired)
         if new == text:
@@ -276,8 +279,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--home", metavar="ODYSSEUS_HOME",
                         help="Odysseus install dir (else $ODYSSEUS_HOME or auto-detect)")
     parser.add_argument("--mount", metavar="CONTAINER_PATH", default=_DEFAULT_MOUNT,
-                        help=f"container mount root (default {_DEFAULT_MOUNT}; with several "
-                             "--projects, each lands at <mount>/<basename>)")
+                        help=f"container mount root (default {_DEFAULT_MOUNT}; each "
+                             "--projects folder lands at <mount>/<basename>)")
     parser.add_argument("--owner", metavar="USER",
                         help="Brain owner for the skills (else from data/auth.json)")
     parser.add_argument("--with-mcp", action="store_true", dest="with_mcp",
@@ -308,8 +311,10 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(f"[odysseus] --projects folder does not exist: {h}", file=sys.stderr)
             return 2
     base_mount = args.mount.rstrip("/") or "/workspace"
-    mounts = [(str(h), base_mount if len(hosts) == 1 else f"{base_mount}/{h.name}")
-              for h in hosts]
+    # Always nest under the mount root by project name (e.g. /workspace/adonai),
+    # so the target path is consistent for one or many projects and the workspace
+    # picker lists each project as a visible folder under <mount>.
+    mounts = [(str(h), f"{base_mount}/{h.name}") for h in hosts]
 
     os.environ["ODYSSEUS_HOME"] = str(root)
     if args.owner:
