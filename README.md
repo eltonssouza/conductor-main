@@ -619,6 +619,10 @@ cdt odysseus install --projects C:\path\to\projects   # all skills into the Brai
 cdt odysseus doctor                                   # re-check an install
 ```
 
+When Odysseus runs in **Docker** the install dir is **auto-detected** from the
+running container, so the commands work from anywhere. Otherwise point at it with
+`--home <path>`, `ODYSSEUS_HOME`, or by running from the Odysseus directory.
+
 `install` writes all Conductor skills (the 36 roles + `/cdt` + `/cdt-intake`) into
 Odysseus's "Brain" (`data/skills/`), framed so Odysseus surfaces them, and grants
 the agent access to your host project folder(s) via a non-invasive

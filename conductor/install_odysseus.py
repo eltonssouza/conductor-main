@@ -21,6 +21,8 @@ import argparse
 import json
 import os
 import re
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 from typing import List, Optional
@@ -34,14 +36,47 @@ _OVERRIDE_MARKER = "# Managed by `cdt odysseus install` — Conductor external w
 _DEFAULT_MOUNT = "/workspace"
 
 
+def _detect_from_docker() -> Optional[Path]:
+    """Auto-detect the Odysseus host dir from a running container.
+
+    Odysseus usually runs via Docker Compose, so a live container carries the
+    host directory it was launched from in the `com.docker.compose.project
+    .working_dir` label. We read every running container's label and return the
+    first whose dir looks like an Odysseus install (`_is_odysseus`) — so
+    `cdt odysseus install --projects …` works from anywhere, no --home needed.
+    """
+    if not shutil.which("docker"):
+        return None
+    try:
+        out = subprocess.run(
+            ["docker", "ps", "--format",
+             '{{.Label "com.docker.compose.project.working_dir"}}'],
+            capture_output=True, text=True, encoding="utf-8",
+            errors="replace", timeout=10).stdout
+    except (OSError, subprocess.SubprocessError):
+        return None
+    seen: set = set()
+    for line in out.splitlines():
+        d = line.strip()
+        if not d or d in seen:
+            continue
+        seen.add(d)
+        root = Path(d)
+        if _is_odysseus(root):
+            return root
+    return None
+
+
 def _resolve_root(home: Optional[str]) -> Optional[Path]:
-    """Locate the Odysseus install: --home → $ODYSSEUS_HOME → cwd auto-detect."""
+    """Locate the Odysseus install: --home → $ODYSSEUS_HOME → cwd → running container."""
     cand = home or os.environ.get("ODYSSEUS_HOME")
     if cand:
         root = Path(cand).expanduser()
         return root if _is_odysseus(root) else None
     cwd = Path.cwd()
-    return cwd if _is_odysseus(cwd) else None
+    if _is_odysseus(cwd):
+        return cwd
+    return _detect_from_docker()
 
 
 # --- docker-compose.override.yml (bind-mount the external host folder) --------
@@ -255,7 +290,8 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     root = _resolve_root(args.home)
     if root is None:
-        print("[odysseus] Odysseus install not found. Run from the Odysseus dir, "
+        print("[odysseus] Odysseus install not found. With Odysseus running in "
+              "Docker it is auto-detected; otherwise run from the Odysseus dir, "
               "set ODYSSEUS_HOME, or pass --home <path>.", file=sys.stderr)
         return 2
 

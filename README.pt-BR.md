@@ -636,6 +636,11 @@ cdt odysseus install --projects C:\caminho\para\projetos   # todas as skills no 
 cdt odysseus doctor                                        # re-checa uma instalação
 ```
 
+Quando o Odysseus roda em **Docker**, o diretório de instalação é
+**auto-detectado** pelo container, então os comandos funcionam de qualquer lugar.
+Caso contrário, aponte com `--home <path>`, `ODYSSEUS_HOME`, ou rodando de dentro
+do diretório do Odysseus.
+
 `install` escreve todas as skills do Conductor (os 36 papéis + `/cdt` + `/cdt-intake`)
 no "Brain" do Odysseus (`data/skills/`), enquadradas para que o Odysseus as exiba, e
 concede ao agente acesso à(s) sua(s) pasta(s) de projeto do host via um

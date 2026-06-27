@@ -195,7 +195,7 @@ Os passos 4 a 6 acima assumem o **Claude Code** (ou OpenCode/Codex/Pi) como harn
 
 ### Passo único — instalar o Conductor no Brain do Odysseus
 
-Rode **de dentro da pasta de instalação do Odysseus** (ou aponte com `--home`), passando as pastas do host que o agente vai poder acessar:
+Se o Odysseus está rodando em **Docker**, o Conductor **auto-detecta** a pasta de instalação dele (pelo container) — você pode rodar de qualquer lugar. Caso contrário, rode de dentro da pasta do Odysseus, defina `ODYSSEUS_HOME`, ou aponte com `--home`. Passe as pastas do host que o agente vai poder acessar:
 
 ```bash
 # Instala TODAS as skills (36 roles + /cdt + /cdt-intake) no Brain do Odysseus
@@ -335,33 +335,33 @@ cdt library status   # livros indexados, categorias, contagem de chunks
 
 ## Referência rápida de todos os comandos
 
-| Comando                             | O que faz                                                                       |
-| ----------------------------------- | ------------------------------------------------------------------------------- |
-| `cdt init`                        | Enrola um projeto (gera`.claude/`, `.cdt/`, `CLAUDE.md`)                  |
-| `cdt sync`                        | Atualiza a config de um projeto já enrolado                                    |
-| `cdt detect`                      | Mostra o que o Conductor detecta no projeto atual                               |
-| `cdt list`                        | Lista todos os projetos enrolados                                               |
-| `cdt up`                          | Sobe os containers Docker (biblioteca + embeddings)                             |
-| `cdt down`                        | Para os containers Docker                                                       |
-| `cdt ingest`                      | Reindexar os livros da biblioteca manualmente                                   |
-| `cdt library "<pergunta>"`        | Busca semântica nos livros de referência                                      |
-| `cdt library status`              | Mostra o que está indexado                                                     |
-| `cdt library stacks`              | Menu para escolher linguagens/frameworks                                        |
-| `cdt library stacks --list`       | Lista stacks disponíveis e selecionadas                                        |
-| `cdt library reindex`             | Indexa arquivos novos ainda não no ChromaDB                                    |
-| `cdt library add <arquivo.md>`    | Adiciona um arquivo específico ao índice                                      |
-| `cdt journal add`                 | Adiciona entrada ao diário do projeto                                          |
-| `cdt journal recall "<pergunta>"` | Busca semântica no diário                                                     |
-| `cdt journal log`                 | Lista entradas do diário (suporta`--kind`)                                   |
-| `cdt honcho setup`                | Configura o provedor de IA do diário                                           |
-| `cdt honcho up`                   | Sobe o backend Honcho (diário)                                                 |
-| `cdt honcho down`                 | Para o backend Honcho                                                           |
-| `cdt update`                      | Atualiza o Conductor (git pull);`--reinstall` também reinstala dependências |
-| `cdt mcp`                         | Roda as memórias como servidor MCP (stdio)                                     |
-| `cdt odysseus install --projects <dir>` | Instala todas as skills no Brain do Odysseus + libera acesso às pastas (global; `--with-mcp` registra o MCP) |
-| `cdt odysseus doctor`             | Re-checa uma instalação do Odysseus                                             |
-| `cdt quickstart`                  | Imprime este fluxo resumido no terminal                                         |
-| `cdt --help`                      | Mostra a ajuda completa                                                         |
+| Comando                                   | O que faz                                                                                                      |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `cdt init`                              | Enrola um projeto (gera`.claude/`, `.cdt/`, `CLAUDE.md`)                                                 |
+| `cdt sync`                              | Atualiza a config de um projeto já enrolado                                                                   |
+| `cdt detect`                            | Mostra o que o Conductor detecta no projeto atual                                                              |
+| `cdt list`                              | Lista todos os projetos enrolados                                                                              |
+| `cdt up`                                | Sobe os containers Docker (biblioteca + embeddings)                                                            |
+| `cdt down`                              | Para os containers Docker                                                                                      |
+| `cdt ingest`                            | Reindexar os livros da biblioteca manualmente                                                                  |
+| `cdt library "<pergunta>"`              | Busca semântica nos livros de referência                                                                     |
+| `cdt library status`                    | Mostra o que está indexado                                                                                    |
+| `cdt library stacks`                    | Menu para escolher linguagens/frameworks                                                                       |
+| `cdt library stacks --list`             | Lista stacks disponíveis e selecionadas                                                                       |
+| `cdt library reindex`                   | Indexa arquivos novos ainda não no ChromaDB                                                                   |
+| `cdt library add <arquivo.md>`          | Adiciona um arquivo específico ao índice                                                                     |
+| `cdt journal add`                       | Adiciona entrada ao diário do projeto                                                                         |
+| `cdt journal recall "<pergunta>"`       | Busca semântica no diário                                                                                    |
+| `cdt journal log`                       | Lista entradas do diário (suporta`--kind`)                                                                  |
+| `cdt honcho setup`                      | Configura o provedor de IA do diário                                                                          |
+| `cdt honcho up`                         | Sobe o backend Honcho (diário)                                                                                |
+| `cdt honcho down`                       | Para o backend Honcho                                                                                          |
+| `cdt update`                            | Atualiza o Conductor (git pull);`--reinstall` também reinstala dependências                                |
+| `cdt mcp`                               | Roda as memórias como servidor MCP (stdio)                                                                    |
+| `cdt odysseus install --projects <dir>` | Instala todas as skills no Brain do Odysseus + libera acesso às pastas (global;`--with-mcp` registra o MCP) |
+| `cdt odysseus doctor`                   | Re-checa uma instalação do Odysseus                                                                          |
+| `cdt quickstart`                        | Imprime este fluxo resumido no terminal                                                                        |
+| `cdt --help`                            | Mostra a ajuda completa                                                                                        |
 
 ---
 
