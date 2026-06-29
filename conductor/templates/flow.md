@@ -1,9 +1,10 @@
-# The Conductor flow — role-driven, 11 gates
+# The Conductor flow — role-driven, 12 gates
 
 You are the **Conductor**: you conduct this project's roles (the Agents + Skills
-under `.claude/`) through an 11-gate flow synthesized from the reference books.
+under `.claude/`) through a 12-gate flow synthesized from the reference books.
 The general logic: the spec removes ambiguity (root cause of most defects),
 test-first locks regressions, the quality gate stops errors from advancing,
+penetration testing + VPS hardening verify the defenses hold before exposure,
 progressive delivery contains what escapes, and observability + postmortems feed
 back into the spec — **each loop lowers the defect rate**.
 
@@ -206,7 +207,31 @@ Example*.
 
 ---
 
-## Gate 9 — Progressive delivery
+## Gate 9 — Penetration testing and infrastructure hardening
+
+**Objective:** actively attack the built application and harden the production
+VPS **before exposing it**. Where Gate 3 designed security in, this gate verifies
+it holds against a real attacker: exploit the running app and probe the VPS
+attack surface (exposed ports, SSH, TLS, firewall, patch level, privilege
+escalation), then confirm every finding is remediated. This is the last line of
+defense before production.
+
+**Roles:** `application-security-engineer`, `security-engineer`,
+`site-reliability-engineer`, `ciso` (skills `review-app-security`,
+`model-threats`, `service-reliability`, `security-program`).
+
+**Quality gate:** the app pentested against OWASP Top 10 / ASVS with each finding
+rated (e.g. CVSS) and **remediated or explicitly risk-accepted by the CISO**; the
+VPS hardened (minimal exposed surface, hardened SSH, valid TLS, firewall, patched
+packages, least privilege) and re-scanned clean; **no open critical/high**.
+Nothing reaches production with an unresolved critical finding.
+
+**Reference books:** *Penetration Testing — Complete Professional Guide*,
+*Building Secure and Reliable Systems*, *Security Engineering*.
+
+---
+
+## Gate 10 — Progressive delivery
 
 **Objective:** canary, blue-green, feature flags, and automatic rollback to limit
 the blast radius of any defect that escapes.
@@ -224,7 +249,7 @@ It!*.
 
 ---
 
-## Gate 10 — Observability and operation
+## Gate 11 — Observability and operation
 
 **Objective:** SLOs, error budgets, monitoring, and performance to detect and
 contain production problems within minutes. Metrics, logs, and *traces* answer
@@ -241,7 +266,7 @@ user-facing symptoms; observable *failure modes*. Do not operate blind.
 
 ---
 
-## Gate 11 — Continuous learning
+## Gate 12 — Continuous learning
 
 **Objective:** blameless postmortems and the DevOps "Three Ways"; **every
 incident becomes a new spec/test**, closing the loop back to Gate 2.
@@ -258,7 +283,7 @@ Engineering*.
 
 ---
 
-> **End of flow.** 11 gates, drawing on the project's roles. The spec
+> **End of flow.** 12 gates, drawing on the project's roles. The spec
 > removes ambiguity, test-first locks regressions, the quality gate stops errors
 > from advancing, progressive delivery contains what escapes, and observability +
 > postmortems feed back into the spec.

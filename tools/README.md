@@ -29,7 +29,7 @@ violations = run()            # list of Violation; empty == all OK
 | **R4-version** | `pyproject.toml` has a valid `MAJOR.MINOR.PATCH` semver. |
 | **R5-agent-anchor** | Each agent has a substantial system prompt + a `**Reference books:**` line. |
 | **R6-skill-structure** | Each `SKILL.md` has a `When to use` section + numbered steps. |
-| **R7-roles-flow** | `conductor/roles.py` has 36 roles, each resolving 1:1 to an existing agent + skill template; `templates/flow.md` has all 11 gates. |
+| **R7-roles-flow** | `conductor/roles.py` has 36 roles, each resolving 1:1 to an existing agent + skill template; `templates/flow.md` has all 12 gates. |
 | **R8-agent-model** | Each agent declares a `model:` tier — one of `opus`, `sonnet`, `haiku` — so the generated subagents never fall back silently on a typo'd alias. |
 
 To add a rule: write a function decorated with `@rule("ID", "description")`

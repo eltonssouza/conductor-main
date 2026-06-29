@@ -7,7 +7,7 @@
   .cdt/config.json                  enrollment (slug, type, roles, Honcho workspace)
   .cdt/stack/<TYPE>.md              detected technologies (RAG-steering)
   .cdt/memory/                      project memory tree (diary/docs/records/refs)
-  CLAUDE.md                         project guide (roles + memory + 11-gate flow)
+  CLAUDE.md                         project guide (roles + memory + 12-gate flow)
 
 `sync` keeps CLAUDE.md **live**: it re-detects the stack, refreshes the roles,
 and pulls the latest diary memory — regenerating only the managed region
@@ -354,7 +354,7 @@ def cmd_init(args) -> int:
     for t in tgts:
         state = t.emit_guide(ctx)
         print(f"[4/4] {t.label} guide {state} "
-              f"({len(selected)} roles + memory + 11-gate flow)")
+              f"({len(selected)} roles + memory + 12-gate flow)")
     print("Done. `cdt sync` keeps the guide(s) live as the project evolves.")
     return 0
 

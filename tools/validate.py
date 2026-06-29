@@ -28,7 +28,7 @@ FLOW = TEMPLATES / "flow.md"
 PYPROJECT = ROOT / "pyproject.toml"
 
 EXPECTED_ROLES = 36
-EXPECTED_GATES = 11
+EXPECTED_GATES = 12
 SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
 
 
@@ -237,7 +237,7 @@ def check_skill_structure(ctx: Context) -> List[Violation]:
 GATE_RE = re.compile(r"(?m)^##\s*Gate\s+(\d+)\s*—")
 
 
-@rule("R7-roles-flow", "roles.py resolves to real templates; flow.md has 11 gates")
+@rule("R7-roles-flow", "roles.py resolves to real templates; flow.md has 12 gates")
 def check_roles_flow(ctx: Context) -> List[Violation]:
     v: List[Violation] = []
     try:

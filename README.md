@@ -6,9 +6,9 @@ Conductor is a **global command-line tool** that turns any software project into
 **harness-conducted** project. You run one command inside a project and Conductor
 scaffolds harness-native configuration into it: a relevant subset of
 **36 industry role Agents + Skills**, the project's detected **tech stack**, and a
-generated **project guide** that describes those roles and an **11-gate development
+generated **project guide** that describes those roles and a **12-gate development
 flow** (discovery → spec → security → architecture → test → code → quality gate →
-validation → delivery → observability → learning).
+validation → pentest → delivery → observability → learning).
 
 Conductor conducts a project through any of several **AI coding harnesses** —
 **Claude Code** is the default, and **OpenCode**, **Codex**, and **Pi** are
@@ -110,7 +110,7 @@ cdt sync                               # after upgrading Conductor: refresh an e
    - [`cdt init`](#cdt-init)
    - [Targeting a harness — `--target`](#targeting-a-harness----target)
    - [`cdt sync` — the living CLAUDE.md](#cdt-sync--the-living-claudemd)
-6. [The 11-gate flow](#the-11-gate-flow)
+6. [The 12-gate flow](#the-12-gate-flow)
 7. [Loop engineering — autonomous triage & MCP](#loop-engineering--autonomous-triage--mcp)
 7. [The intake front door — triage & spec documents](#the-intake-front-door--triage--spec-documents)
 7. [Odysseus (optional) + the standalone MCP server](#odysseus-optional--the-standalone-mcp-server)
@@ -398,7 +398,7 @@ Maven/Gradle/Go/Python/.NET/Rust, Flutter/React-Native/Xcode…) and generates,
 
 ```
 <project>/
-  CLAUDE.md                     # the project guide: roles + memory + the 11-gate flow + CLI
+  CLAUDE.md                     # the project guide: roles + memory + the 12-gate flow + CLI
   .claude/
     agents/<role>.md            # a relevant subset of role Agents (Claude Code loads these)
     skills/<skill>/SKILL.md     # the matching Skills
@@ -491,9 +491,9 @@ stays current as the project evolves.
 
 ---
 
-## The 11-gate flow
+## The 12-gate flow
 
-The generated `CLAUDE.md` instructs Claude to conduct each demand through 11 gates,
+The generated `CLAUDE.md` instructs Claude to conduct each demand through 12 gates,
 **in order**, delegating to the right roles at each step and refusing to advance
 until the gate's exit criterion is met.
 
@@ -507,9 +507,10 @@ until the gate's exit criterion is met.
 | 6 | Implementation (clean code) | SWE, FE, BE, FSE | green tests; readable, refactored code; edge cases handled |
 | 7 | CI + quality gate | DevOps, Platform Eng, SDET | pipeline green (build + tests + static analysis); blocks merge on failure |
 | 8 | Validation against the spec | QA, BA, PO | every acceptance criterion verified against the result |
-| 9 | Progressive delivery | DevOps, Platform Eng, SRE | rollout strategy (flag/canary/blue-green) with automatic rollback |
-| 10 | Observability & operation | SRE, DevOps | SLIs/SLOs instrumented; actionable, symptom-based alerts |
-| 11 | Continuous learning | SRE, Eng Manager, Agile Coach | blameless postmortem; each learning fed back as a new spec/test (loop → Gate 2) |
+| 9 | Penetration testing & infra hardening | AppSec, Security Eng, SRE, CISO | app pentested (OWASP/ASVS) & VPS hardened; no open critical/high; findings remediated or risk-accepted |
+| 10 | Progressive delivery | DevOps, Platform Eng, SRE | rollout strategy (flag/canary/blue-green) with automatic rollback |
+| 11 | Observability & operation | SRE, DevOps | SLIs/SLOs instrumented; actionable, symptom-based alerts |
+| 12 | Continuous learning | SRE, Eng Manager, Agile Coach | blameless postmortem; each learning fed back as a new spec/test (loop → Gate 2) |
 
 **Run it with `/cdt`.** The flow is driven by the **`/cdt <demand>`** slash
 command (installed into `.claude/commands/`). It is the control loop that turns
@@ -533,7 +534,7 @@ advancing — they are part of the exit criterion, not optional suggestions:
 5. **Halt** at a user checkpoint — present the decisions, citations, and open
    risks, then **ask you to approve** before the next gate begins.
 
-This closes the loop: Gate 11's learnings flow back into Gate 2 on the next cycle,
+This closes the loop: Gate 12's learnings flow back into Gate 2 on the next cycle,
 and each loop lowers the defect rate.
 
 ---
@@ -806,7 +807,7 @@ the underlying LLM without losing what it has learned.
     `install_odysseus.py` (the `cdt odysseus` global Brain command), `targets/`
     (per-harness adapters), and `rag/` (`core`, `ingest`, `bootstrap`, `stack`).
   - `conductor/templates/` — the 36 role **Agents** + 36 **Skills**,
-    `CLAUDE.md.tmpl` / `AGENTS.md.tmpl`, `flow.md` (the 11-gate flow),
+    `CLAUDE.md.tmpl` / `AGENTS.md.tmpl`, `flow.md` (the 12-gate flow),
     `commands/cdt.md` (the `/cdt` driver) + `commands/intake.md` (the `/cdt-intake`
     triage+spec front door), and `automations/triage.md` (the `/cdt-triage`
     autonomous loop). These are copied into target projects.
@@ -822,7 +823,7 @@ the underlying LLM without losing what it has learned.
 `python tools/validate.py` enforces 14 golden rules (R1–R14) over the templates,
 the role registry, and the repository. R1–R8 cover the 36 agents + 36 skills
 parity, frontmatter and YAML safety, semver, agent anchoring in reference books,
-skill structure, the `roles.py` ↔ template registry plus the 11-gate flow, and
+skill structure, the `roles.py` ↔ template registry plus the 12-gate flow, and
 valid `model:` tiers. The newer rules add: **R9** — the memory-tree ingestion
 routes stay consistent with the scaffolded folders (and `refs/` is never
 ingested); **R10** — the `/cdt` driver exists and keeps its enforcement anchors

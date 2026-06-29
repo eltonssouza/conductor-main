@@ -7,9 +7,9 @@ projeto de software em um projeto **conduzido pelo harness**. Você roda um coma
 dentro de um projeto e o Conductor faz o scaffold de configuração nativa do harness
 nele: um subconjunto relevante de **36 Agentes de papéis da indústria + Skills**, a
 **stack tecnológica** detectada do projeto, e um **guia de projeto** gerado que
-descreve esses papéis e um **fluxo de desenvolvimento de 11 gates** (descoberta →
+descreve esses papéis e um **fluxo de desenvolvimento de 12 gates** (descoberta →
 spec → segurança → arquitetura → teste → código → quality gate → validação →
-entrega → observabilidade → aprendizado).
+pentest → entrega → observabilidade → aprendizado).
 
 O Conductor conduz um projeto através de vários **harnesses de codificação com IA** —
 **Claude Code** é o padrão, e **OpenCode**, **Codex** e **Pi** são suportados via
@@ -114,7 +114,7 @@ cdt sync                               # depois de atualizar o Conductor: atuali
    - [`cdt init`](#cdt-init)
    - [Escolhendo um harness — `--target`](#escolhendo-um-harness----target)
    - [`cdt sync` — o CLAUDE.md vivo](#cdt-sync--o-claudemd-vivo)
-6. [O fluxo de 11 gates](#o-fluxo-de-11-gates)
+6. [O fluxo de 12 gates](#o-fluxo-de-12-gates)
 7. [Loop engineering — triagem autônoma & MCP](#loop-engineering--triagem-autônoma--mcp)
 8. [A porta de entrada intake — triagem & documentos de spec](#a-porta-de-entrada-intake--triagem--documentos-de-spec)
 9. [Odysseus (opcional) + o servidor MCP standalone](#odysseus-opcional--o-servidor-mcp-standalone)
@@ -412,7 +412,7 @@ projeto**:
 
 ```
 <projeto>/
-  CLAUDE.md                     # o guia do projeto: papéis + memória + o fluxo de 11 gates + CLI
+  CLAUDE.md                     # o guia do projeto: papéis + memória + o fluxo de 12 gates + CLI
   .claude/
     agents/<role>.md            # um subconjunto relevante dos Agentes de papéis (o Claude Code carrega)
     skills/<skill>/SKILL.md     # as Skills correspondentes
@@ -506,9 +506,9 @@ automaticamente, então o arquivo fica atual conforme o projeto evolui.
 
 ---
 
-## O fluxo de 11 gates
+## O fluxo de 12 gates
 
-O `CLAUDE.md` gerado instrui o Claude a conduzir cada demanda por 11 gates, **em
+O `CLAUDE.md` gerado instrui o Claude a conduzir cada demanda por 12 gates, **em
 ordem**, delegando aos papéis certos em cada passo e se recusando a avançar até o
 critério de saída do gate ser atendido.
 
@@ -522,9 +522,10 @@ critério de saída do gate ser atendido.
 | 6 | Implementação (clean code) | SWE, FE, BE, FSE | testes verdes; código legível, refatorado; edge cases tratados |
 | 7 | CI + quality gate | DevOps, Platform Eng, SDET | pipeline verde (build + testes + análise estática); bloqueia merge na falha |
 | 8 | Validação contra a spec | QA, BA, PO | cada critério de aceite verificado contra o resultado |
-| 9 | Entrega progressiva | DevOps, Platform Eng, SRE | estratégia de rollout (flag/canary/blue-green) com rollback automático |
-| 10 | Observabilidade & operação | SRE, DevOps | SLIs/SLOs instrumentados; alertas acionáveis, baseados em sintoma |
-| 11 | Aprendizado contínuo | SRE, Eng Manager, Agile Coach | postmortem sem culpa; cada aprendizado realimentado como nova spec/teste (loop → Gate 2) |
+| 9 | Pentest & hardening de infra | AppSec, Security Eng, SRE, CISO | app pentestado (OWASP/ASVS) & VPS endurecida; nenhum critical/high aberto; achados corrigidos ou risco aceito |
+| 10 | Entrega progressiva | DevOps, Platform Eng, SRE | estratégia de rollout (flag/canary/blue-green) com rollback automático |
+| 11 | Observabilidade & operação | SRE, DevOps | SLIs/SLOs instrumentados; alertas acionáveis, baseados em sintoma |
+| 12 | Aprendizado contínuo | SRE, Eng Manager, Agile Coach | postmortem sem culpa; cada aprendizado realimentado como nova spec/teste (loop → Gate 2) |
 
 **Rode com `/cdt`.** O fluxo é guiado pelo comando **`/cdt <demanda>`** (instalado em
 `.claude/commands/`). É o loop de controle que transforma o fluxo de orientação
@@ -548,7 +549,7 @@ avançar — eles são parte do critério de saída, não sugestões opcionais:
 5. **Parar** em um checkpoint do usuário — apresente as decisões, citações e riscos
    abertos, então **peça sua aprovação** antes do próximo gate começar.
 
-Isso fecha o loop: os aprendizados do Gate 11 fluem de volta para o Gate 2 no próximo
+Isso fecha o loop: os aprendizados do Gate 12 fluem de volta para o Gate 2 no próximo
 ciclo, e cada loop baixa a taxa de defeitos.
 
 ---
@@ -826,7 +827,7 @@ trocar o LLM subjacente sem perder o que ele aprendeu.
     `install_odysseus.py` (o comando global de Brain `cdt odysseus`), `targets/`
     (adaptadores por harness), e `rag/` (`core`, `ingest`, `bootstrap`, `stack`).
   - `conductor/templates/` — os 36 **Agentes** de papéis + 36 **Skills**,
-    `CLAUDE.md.tmpl` / `AGENTS.md.tmpl`, `flow.md` (o fluxo de 11 gates),
+    `CLAUDE.md.tmpl` / `AGENTS.md.tmpl`, `flow.md` (o fluxo de 12 gates),
     `commands/cdt.md` (o driver `/cdt`) + `commands/intake.md` (a porta de entrada
     `/cdt-intake` triagem+spec), e `automations/triage.md` (o loop autônomo
     `/cdt-triage`). Estes são copiados nos projetos alvo.

@@ -1,11 +1,11 @@
 ---
-description: Conduct a demand through the Conductor 11-gate flow — interactive, with a mandatory user checkpoint at every gate.
+description: Conduct a demand through the Conductor 12-gate flow — interactive, with a mandatory user checkpoint at every gate.
 argument-hint: <the demand / task to conduct>
 ---
 
 # /cdt — conduct "$ARGUMENTS" through the Conductor flow
 
-You are the **Conductor**. Drive the demand above through the 11-gate flow
+You are the **Conductor**. Drive the demand above through the 12-gate flow
 defined in `CLAUDE.md` (section "The Conductor flow"). This command is
 **interactive by design**: you STOP for the user's approval at every gate.
 

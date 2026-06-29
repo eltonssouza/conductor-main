@@ -166,7 +166,7 @@ class OdysseusTarget:
         owner = _resolve_owner(self._root(project))
         fm = _skill_frontmatter(
             meta.get("name", "cdt"),
-            meta.get("description", '"Conductor flow driver — runs a demand through the 11 gates."'),
+            meta.get("description", '"Conductor flow driver — runs a demand through the 12 gates."'),
             owner,
         )
         dst = skills_dir / "cdt"
@@ -288,7 +288,7 @@ Once connected, Odysseus agents gain `library_search`, `journal_recall`, and
         path = root.joinpath(*SKILLS_REL, "guide", "SKILL.md")
         rendered = base.render_guide(ctx, "AGENTS.md.tmpl")
         description = (
-            f'"Conductor project guide — roles, 11-gate flow, '
+            f'"Conductor project guide — roles, 12-gate flow, '
             f'and project memory for {ctx.slug}."'
         )
         if path.is_file():

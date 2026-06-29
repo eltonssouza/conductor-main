@@ -1,11 +1,11 @@
 ---
 name: cdt
-description: Conduct a demand through the Conductor 11-gate flow (discovery → spec → security → architecture → test → code → quality → validation → delivery → observability → learning). Use when the user runs `$cdt <demand>` or asks to drive work through the Conductor gates; stops for user approval at every gate.
+description: Conduct a demand through the Conductor 12-gate flow (discovery → spec → security → architecture → test → code → quality → validation → pentest → delivery → observability → learning). Use when the user runs `$cdt <demand>` or asks to drive work through the Conductor gates; stops for user approval at every gate.
 ---
 
 # Conduct "$ARGUMENTS" through the Conductor flow
 
-You are the **Conductor**. Drive the demand through the 11-gate flow defined in
+You are the **Conductor**. Drive the demand through the 12-gate flow defined in
 `AGENTS.md` (section "The Conductor flow"). This is **interactive by design**:
 you STOP for the user's approval at every gate.
 

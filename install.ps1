@@ -55,7 +55,7 @@ function Banner {
   Write-Host ''
   Write-Host '  ===========================================' -ForegroundColor $c
   Write-Host '   # Conductor Installer' -ForegroundColor $c
-  Write-Host '   conduct your project through 11 gates' -ForegroundColor $c
+  Write-Host '   conduct your project through 12 gates' -ForegroundColor $c
   Write-Host '  ===========================================' -ForegroundColor $c
   Write-Host ''
 }

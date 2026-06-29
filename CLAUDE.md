@@ -12,7 +12,7 @@ Responda SEMPRE em pt-BR (português do Brasil), independentemente do idioma da 
   NOT a Claude Code plugin (that model was dropped).
 - **What it does:** `cdt init` analyzes a project and scaffolds harness-native
   config into it — a relevant subset of 36 role Agents + Skills, the detected
-  stack under `.cdt/`, and a generated project guide (roles + the 11-gate flow +
+  stack under `.cdt/`, and a generated project guide (roles + the 12-gate flow +
   how to use the CLI). The reasoning happens in the user's harness, not inside
   Conductor.
 - **Loop engineering:** beyond the interactive `/cdt` driver, init scaffolds an
@@ -66,7 +66,7 @@ Responda SEMPRE em pt-BR (português do Brasil), independentemente do idioma da 
   optionally emit a pt-BR client-questions doc, write a rich spec (screens→behavior,
   backend rules→validations) grounded in the library, then hand off to `/cdt`),
   `automations/` (`triage.md`, the `/cdt-triage` autonomous loop), `CLAUDE.md.tmpl`
-  + `AGENTS.md.tmpl` (guide variants), `flow.md` (the 11-gate flow). Copied/
+  + `AGENTS.md.tmpl` (guide variants), `flow.md` (the 12-gate flow). Copied/
   translated into target projects per target.
 - `infra/conductor/` (RAG stack), `infra/honcho/` (diary backend), and
   `infra/mcp/` (the standalone Conductor MCP server: `cdt mcp --transport

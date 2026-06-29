@@ -69,7 +69,7 @@ ROLES: Dict[str, Role] = {r.slug: r for r in [
 PROJECT_TYPES = ("backend", "frontend", "mobile", "fullstack", "library",
                  "data", "unknown")
 
-# Always included, regardless of type — the spine of the 11-gate flow.
+# Always included, regardless of type — the spine of the 12-gate flow.
 CORE: List[str] = [
     "product-owner", "business-analyst", "software-architect",
     "software-engineer", "tech-lead", "quality-assurance",

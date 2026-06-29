@@ -42,7 +42,7 @@ banner() {
   printf '\n%s╔══════════════════════════════════════════╗%s\n' "$C_CYAN" "$C_RESET"
   printf '%s║%s  %s# Conductor Installer%s                   %s║%s\n' \
     "$C_CYAN" "$C_RESET" "$C_BOLD" "$C_RESET" "$C_CYAN" "$C_RESET"
-  printf '%s║%s  %sconduct your project through 11 gates%s   %s║%s\n' \
+  printf '%s║%s  %sconduct your project through 12 gates%s   %s║%s\n' \
     "$C_CYAN" "$C_RESET" "$C_DIM" "$C_RESET" "$C_CYAN" "$C_RESET"
   printf '%s╚══════════════════════════════════════════╝%s\n\n' "$C_CYAN" "$C_RESET"
 }
