@@ -185,10 +185,18 @@ def _ensure_memory_gitignore(project: Path) -> None:
 
 # --- rendering ---------------------------------------------------------------
 
-# Framework-keyed frontend conventions, emitted into the stack doc when the
-# matching tech is detected. Single Responsibility at the file level: keep
-# template, styles, logic, and tests in dedicated files per component.
+# Framework-keyed conventions (frontend + backend), emitted into the stack doc
+# when the matching tech is detected. Frontend: Single Responsibility at the file
+# level (template/styles/logic/tests in dedicated files). Backend: stack-idiomatic
+# practices the team must follow during development.
 FRAMEWORK_CONVENTIONS: Dict[str, List[str]] = {
+    "Java": [
+        "Use MapStruct for object mapping (DTO ↔ entity, bean ↔ bean): declare "
+        "`@Mapper` interfaces and let the compile-time annotation processor generate "
+        "the implementation — do not hand-write mapping code. Use "
+        "`componentModel = \"spring\"` for injection where Spring is present, and keep "
+        "mappers in a dedicated `mapper`/`mapping` package.",
+    ],
     "Angular": [
         "One component = four files: `*.component.ts` (logic), `*.component.html` "
         "(template, wired via `templateUrl`), `*.component.scss` (styles, via "
