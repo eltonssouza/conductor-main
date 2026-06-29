@@ -13,3 +13,7 @@ description: "Use to create or adjust a UI component by defining states (default
 3. Apply a robust, responsive layout and style.
 4. Wire data with the minimum necessary fetching.
 5. Test accessibility (keyboard, screen reader, contrast) and summarize results.
+6. Keep one responsibility per file — separate template, styles, component logic,
+   and tests into dedicated files (e.g. Angular `templateUrl`/`styleUrls` +
+   `.spec.ts`; React: component + CSS module + test). Inline template/styles only
+   for trivial components (icon, spinner, badge); split them out as they grow.

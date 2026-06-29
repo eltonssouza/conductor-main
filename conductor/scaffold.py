@@ -21,7 +21,7 @@ import json
 import shutil
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from . import roles as roles_mod
 from . import targets as targets_mod
@@ -185,11 +185,49 @@ def _ensure_memory_gitignore(project: Path) -> None:
 
 # --- rendering ---------------------------------------------------------------
 
+# Framework-keyed frontend conventions, emitted into the stack doc when the
+# matching tech is detected. Single Responsibility at the file level: keep
+# template, styles, logic, and tests in dedicated files per component.
+FRAMEWORK_CONVENTIONS: Dict[str, List[str]] = {
+    "Angular": [
+        "One component = four files: `*.component.ts` (logic), `*.component.html` "
+        "(template, wired via `templateUrl`), `*.component.scss` (styles, via "
+        "`styleUrls`), `*.component.spec.ts` (tests). Use inline `template`/`styles` "
+        "only for trivial components (icon, spinner, badge).",
+        "Group by feature — `features/<feature>/{pages,components,services,models,"
+        "store,pipes}`. Prefer small, reusable standalone components over monoliths; "
+        "extract shared styles into global SCSS or a design-system library.",
+    ],
+    "React": [
+        "Separate concerns per component: component logic, styles (CSS/SCSS module), "
+        "and tests in dedicated files (`Foo.tsx`, `Foo.module.scss`, `Foo.test.tsx`). "
+        "Inline styles only for trivial cases.",
+    ],
+    "Vue": [
+        "Keep the SFC's three blocks (`<template>`, `<script setup>`, `<style scoped>`) "
+        "focused; extract large logic into composables and shared styles into dedicated "
+        "files. One responsibility per component.",
+    ],
+}
+
+
+def _conventions_for(techs: List[str]) -> List[str]:
+    """Frontend file-separation conventions for the detected frameworks."""
+    out: List[str] = []
+    for key, bullets in FRAMEWORK_CONVENTIONS.items():
+        if any(key.lower() in t.lower() for t in techs):
+            out.extend(bullets)
+    return out
+
+
 def _stack_md(ptype: str, techs: List[str], evidence: List[str],
               prof: Optional[dict] = None) -> str:
     prof = prof or {}
     ev = ", ".join(evidence) if evidence else "none"
     tags = ", ".join(techs) if techs else "none"
+    conv = _conventions_for(techs)
+    conventions = ("\n## Conventions (detected)\n"
+                   + "\n".join(f"- {c}" for c in conv) + "\n") if conv else ""
 
     def line(label: str, key: str) -> str:
         items = prof.get(key) or []
@@ -213,7 +251,7 @@ Technologies this project uses. Agents read this so their `cdt library`
 
 ## Detected
 {detected}
-
+{conventions}
 ## To complete (owner / Conductor)
 - Architecture notes / constraints:
 - External integrations / APIs:
