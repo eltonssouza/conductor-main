@@ -149,5 +149,58 @@ def main(argv: list) -> int:
     return subprocess.run(full, cwd=str(infra), env=env).returncode
 
 
+def _project_name(env: dict, infra: Path) -> str:
+    """The Compose project name (volume prefix). Defaults to the compose dir name,
+    matching `docker compose`'s own default, unless COMPOSE_PROJECT_NAME overrides."""
+    return env.get("COMPOSE_PROJECT_NAME") or infra.name
+
+
+def update(rebuild: bool = False, detach: bool = False) -> int:
+    """Re-fetch the library repo and reindex, picking up improved book content.
+
+    A plain `cdt up` skips the fetch when the corpus is already present for the
+    current selection (a `.selection` marker in the `library` volume). This forces
+    a fresh pull of CONDUCTOR_LIBRARY_REPO@REF and re-runs the ingest, which
+    upserts the changed chunks. `rebuild` drops the index + library volumes first
+    (clearing chunks for books removed/renamed upstream) but keeps the `ollama`
+    volume, so bge-m3 is not re-downloaded.
+    """
+    if not shutil.which("docker"):
+        print("ERROR: docker not found on PATH.", file=sys.stderr)
+        return 2
+    infra = PACKAGE_INFRA / "conductor"
+    if not (infra / "docker-compose.yml").is_file():
+        print(f"ERROR: docker infra not found at {infra}. The Docker stack needs "
+              "a repo clone (build from source).", file=sys.stderr)
+        return 2
+
+    env = dict(os.environ)
+    env["CONDUCTOR_LIBRARY_FORCE_FETCH"] = "1"
+    auto_select_stacks(env)
+    resolve_library_source(env)
+    files = select_compose_files(infra)
+
+    if rebuild:
+        proj = _project_name(env, infra)
+        vols = [f"{proj}_chroma", f"{proj}_library"]
+        print(f"Rebuild: stopping the stack and dropping volumes {', '.join(vols)} "
+              "(ollama model is kept).")
+        subprocess.run(["docker", "compose", *files, "down"], cwd=str(infra), env=env)
+        for v in vols:
+            # Tolerate a missing volume (never created / already gone).
+            subprocess.run(["docker", "volume", "rm", v], cwd=str(infra), env=env,
+                           capture_output=True)
+        cmd = ["up"] + (["-d"] if detach else [])
+    else:
+        # Re-run only the one-shot `conductor` service: it re-fetches (force flag)
+        # and re-ingests. --no-deps leaves the running ollama/chroma untouched.
+        cmd = ["up", "--force-recreate", "--no-deps"] + (["-d"] if detach else []) + ["conductor"]
+
+    full = ["docker", "compose", *files, *cmd]
+    print("+ " + " ".join(full))
+    sys.stdout.flush()
+    return subprocess.run(full, cwd=str(infra), env=env).returncode
+
+
 if __name__ == "__main__":
     raise SystemExit(main(sys.argv[1:]))

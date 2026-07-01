@@ -693,6 +693,19 @@ cdt library add "<path/to/Book.md>" …     # index specific files already under
 Both reuse the incremental, content-hash-deduped indexer, so they only embed what
 is genuinely new.
 
+**Updating after the upstream library content improves.** The dockerized stack
+fetches the corpus from the library repo (`CONDUCTOR_LIBRARY_REPO@REF`), not from
+local disk — so `cdt library reindex` alone will *not* see edits you pushed there.
+Once the improved content is on the repo, force a fresh pull + reindex:
+
+```bash
+cdt library update             # re-fetch the repo and upsert the changed chunks
+cdt library update --rebuild   # also drop the index first (clears chunks for books removed/renamed upstream)
+```
+
+`update` re-runs only the one-shot ingest service, so Ollama and ChromaDB stay up
+and the bge-m3 model is never re-downloaded (even with `--rebuild`).
+
 > **The 3D viewer moved out.** The interactive 3D map of the library embeddings
 > (PCA scatter + force-directed graph) plus a token-economy view now live in the
 > separate **[`conductor-viewer`](https://github.com/eltonssouza/conductor-viewer)**
@@ -756,6 +769,7 @@ the underlying LLM without losing what it has learned.
 | `cdt sync [path]` | Refresh the managed region of `CLAUDE.md` and the scaffolded driver/hooks/memory tree (re-detect stack, roles, pull diary memory). |
 | `cdt library "<q>"` | Semantic search over the reference books. Flags: `-k N`, `--json`, `--category C`, `--gate N`. |
 | `cdt library reindex` | Index any library files not yet in ChromaDB (incremental, content-hash skip). |
+| `cdt library update [--rebuild]` | Re-fetch the library repo and reindex (after the upstream book content improves); `--rebuild` also drops the index to clear orphan chunks. Keeps the Ollama model. |
 | `cdt library add <file.md> …` | Index specific `.md` file(s) already under the library directory. |
 | `cdt journal add\|recall\|log` | The per-project development diary. `recall --type/--area`, `log --kind error,solution --gate N`. |
 | `cdt journal ingest\|digest` | Ingest `docs/`+`records/` into Honcho; regenerate the `daily/` digests. |

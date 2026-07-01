@@ -92,6 +92,27 @@ def cmd_reindex(argv: List[str]) -> int:
     return ingest_main(argv)
 
 
+def cmd_update(argv: List[str]) -> int:
+    """Re-fetch the library repo and reindex — picks up improved book content.
+
+    Plain `cdt up` skips the fetch when the corpus is already on disk for the
+    current selection; this forces a fresh pull of CONDUCTOR_LIBRARY_REPO@REF and
+    upserts the changed chunks. `--rebuild` drops the index first (clears chunks
+    for books removed/renamed upstream); the bge-m3 model is kept either way."""
+    force_utf8()
+    ap = argparse.ArgumentParser(
+        prog="cdt library update",
+        description="Re-fetch the library repo and reindex the books in Docker.")
+    ap.add_argument("--rebuild", action="store_true",
+                    help="drop the index + library volumes first (removes orphan "
+                         "chunks; full re-embed). Keeps the ollama model volume.")
+    ap.add_argument("-d", "--detach", action="store_true",
+                    help="run detached (don't stream the bootstrap progress)")
+    args = ap.parse_args(argv)
+    from .rag.stack import update as stack_update
+    return stack_update(rebuild=args.rebuild, detach=args.detach)
+
+
 def cmd_add(argv: List[str]) -> int:
     """Index one or more .md files already on disk under the library dir."""
     force_utf8()
@@ -303,6 +324,8 @@ def cmd_stacks(argv: List[str]) -> int:
 def main(argv: List[str]) -> int:
     if argv and argv[0] == "reindex":
         return cmd_reindex(argv[1:])
+    if argv and argv[0] == "update":
+        return cmd_update(argv[1:])
     if argv and argv[0] == "add":
         return cmd_add(argv[1:])
     if argv and argv[0] == "status":

@@ -72,11 +72,18 @@ def _selection_key() -> str:
     return f"tiers={','.join(LIBRARY_TIERS)};stacks={','.join(LIBRARY_STACKS)}"
 
 
+def _force_fetch() -> bool:
+    return os.environ.get("CONDUCTOR_LIBRARY_FORCE_FETCH", "").strip().lower() \
+        in ("1", "true", "yes")
+
+
 def step_extract() -> None:
     key = _selection_key()
     marker = LIBRARY / _SEL_MARKER
     populated = any(LIBRARY.rglob("*.md"))
-    if populated and marker.is_file() and marker.read_text(encoding="utf-8").strip() == key:
+    if _force_fetch():
+        log("1/4", "force-fetch requested (CONDUCTOR_LIBRARY_FORCE_FETCH); re-pulling repo")
+    elif populated and marker.is_file() and marker.read_text(encoding="utf-8").strip() == key:
         log("1/4", "library already populated for this selection; skipping fetch")
         return
     if ARCHIVE and ARCHIVE.is_file():

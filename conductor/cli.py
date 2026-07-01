@@ -68,6 +68,8 @@ Commands:
   library status             Show what is ingested (books, categories, chunk counts).
   library stacks             Choose which language/framework stacks to ingest (interactive).
   library reindex            Index any library files not yet in ChromaDB (incremental).
+  library update [--rebuild] Re-fetch the library repo and reindex (after improving
+                             the book content); --rebuild also clears orphan chunks.
   library add <file.md>      Index specific .md file(s) already under the library.
   journal add|recall|log     Per-project development diary.
   up | down                  Start / stop the Docker RAG stack (auto-detects GPU).

@@ -129,6 +129,17 @@ Depois de escolher, rode `cdt up` novamente para indexar os novos livros:
 cdt up
 ```
 
+### Atualizar depois que o conteúdo da biblioteca melhorar
+
+O stack Docker busca os livros do repositório da biblioteca (`CONDUCTOR_LIBRARY_REPO@REF`), **não** do disco local — então, se você melhorou o conteúdo e enviou (push) para esse repositório, `cdt up` sozinho não vê a mudança (ele pula o download quando a biblioteca já está preenchida). Force um novo download + reindexação:
+
+```bash
+cdt library update             # rebaixa o repositório e reindexa só os trechos que mudaram
+cdt library update --rebuild   # também zera o índice antes (limpa chunks de livros removidos/renomeados)
+```
+
+O `update` re-executa apenas o serviço de ingestão; o Ollama e o ChromaDB continuam de pé e o modelo bge-m3 nunca é rebaixado (mesmo com `--rebuild`).
+
 ---
 
 ## Passo 4 — Enrolar o seu projeto
@@ -349,6 +360,7 @@ cdt library status   # livros indexados, categorias, contagem de chunks
 | `cdt library stacks`                    | Menu para escolher linguagens/frameworks                                                                       |
 | `cdt library stacks --list`             | Lista stacks disponíveis e selecionadas                                                                       |
 | `cdt library reindex`                   | Indexa arquivos novos ainda não no ChromaDB                                                                   |
+| `cdt library update [--rebuild]`        | Rebaixa o repositório da biblioteca e reindexa (após melhorar o conteúdo); `--rebuild` zera o índice          |
 | `cdt library add <arquivo.md>`          | Adiciona um arquivo específico ao índice                                                                     |
 | `cdt journal add`                       | Adiciona entrada ao diário do projeto                                                                         |
 | `cdt journal recall "<pergunta>"`       | Busca semântica no diário                                                                                    |
