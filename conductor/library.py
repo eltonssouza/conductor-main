@@ -9,12 +9,60 @@ from __future__ import annotations
 
 import argparse
 import datetime
+import itertools
 import json
 import sys
+import threading
+import time
 from typing import List
 
 from .rag.core import (BackendUnreachable, CHROMA_HTTP, embed, force_utf8,
                        get_collection)
+
+
+class _Spinner:
+    """Visual 'consulting the library (RAG)' feedback around a blocking search.
+
+    Interactive terminal (stderr is a tty): animates a braille spinner in place,
+    then erases the line on exit — transient, no scrollback noise.
+    Non-tty (piped/captured by an AI harness): the animation can't render, so it
+    degrades to a single static start line; main() then prints a completion line.
+    Either way the user can see *when* the RAG index was consulted.
+    """
+
+    FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+
+    def __init__(self, text: str, stream=None):
+        self.text = text
+        self.stream = stream if stream is not None else sys.stderr
+        self.tty = bool(getattr(self.stream, "isatty", lambda: False)())
+        self._stop = threading.Event()
+        self._thread = None
+
+    def __enter__(self):
+        if self.tty:
+            self._thread = threading.Thread(target=self._spin, daemon=True)
+            self._thread.start()
+        else:
+            self.stream.write(f"🔎 {self.text}…\n")
+            self.stream.flush()
+        return self
+
+    def _spin(self):
+        for frame in itertools.cycle(self.FRAMES):
+            if self._stop.is_set():
+                break
+            self.stream.write(f"\r🔎 {frame} {self.text}…")
+            self.stream.flush()
+            time.sleep(0.08)
+
+    def __exit__(self, *exc):
+        if self.tty and self._thread:
+            self._stop.set()
+            self._thread.join()
+            self.stream.write("\r\033[K")  # carriage-return + clear to EOL
+            self.stream.flush()
+        return False
 
 
 def _log_telemetry(question: str, k: int, category: str, hits: List[dict],
@@ -342,8 +390,17 @@ def main(argv: List[str]) -> int:
     args = ap.parse_args(argv)
     force_utf8()
 
+    q = args.question if len(args.question) <= 60 else args.question[:57] + "…"
+    label = f"Consulting the library (RAG): {q!r}"
+    if args.category:
+        label += f" [{args.category}]"
     try:
-        hits = search(args.question, k=args.k, category=args.category)
+        # --json is machine-consumed → no spinner/banner noise on the stream.
+        if args.json:
+            hits = search(args.question, k=args.k, category=args.category)
+        else:
+            with _Spinner(label):
+                hits = search(args.question, k=args.k, category=args.category)
     except BackendUnreachable as e:  # Chroma or Ollama down — message is self-contained
         print(str(e), file=sys.stderr)
         return 1
@@ -353,6 +410,14 @@ def main(argv: List[str]) -> int:
         return 1
 
     _log_telemetry(args.question, args.k, args.category, hits, args.gate)
+
+    if not args.json:  # completion marker — visible in the harness transcript too
+        srcs = sorted({h["source"] for h in hits if h.get("source")})
+        top = f" · top {hits[0]['score']:.3f}" if hits else ""
+        src_txt = (" · sources: " + ", ".join(srcs[:4]) +
+                   ("…" if len(srcs) > 4 else "")) if srcs else ""
+        print(f"📚 Library consulted: {len(hits)} passage(s){top}{src_txt}",
+              file=sys.stderr)
 
     if args.json:
         print(json.dumps(hits, ensure_ascii=False, indent=2))

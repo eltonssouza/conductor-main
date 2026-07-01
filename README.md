@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/image/conductor_2026_16_06_12.png" alt="Conductor" width="100%">
+</p>
+
 # Conductor
 
 > 🌐 **Language:** **English (this file)** · [Português](README.pt-BR.md)
