@@ -7,8 +7,9 @@ present it adds the GPU compose override so Ollama runs bge-m3 on the GPU
 The book corpus is fetched from the public library repo by the `conductor`
 service (CONDUCTOR_LIBRARY_REPO@REF); no local archive is required.
 
-The Docker infra ships inside the package; the `conductor` image is built from
-the local source, so the Docker stack needs a repo clone (the CLI itself does not).
+The Docker infra ships inside the package; the `conductor` image is built from a
+git build context (the public repo), so the Docker stack needs no source clone —
+just the pipx/uv-installed CLI.
 
   cdt up            # attached (watch progress)
   cdt up -d         # detached
@@ -131,8 +132,8 @@ def main(argv: list) -> int:
         return 2
     infra = PACKAGE_INFRA / "conductor"
     if not (infra / "docker-compose.yml").is_file():
-        print(f"ERROR: docker infra not found at {infra}. The Docker stack needs "
-              "a repo clone (build from source).", file=sys.stderr)
+        print(f"ERROR: docker infra not found at {infra}. Reinstall Conductor "
+              "(`cdt update`) — the infra ships inside the package.", file=sys.stderr)
         return 2
     cmd = argv or ["up"]
     env = dict(os.environ)
@@ -170,8 +171,8 @@ def update(rebuild: bool = False, detach: bool = False) -> int:
         return 2
     infra = PACKAGE_INFRA / "conductor"
     if not (infra / "docker-compose.yml").is_file():
-        print(f"ERROR: docker infra not found at {infra}. The Docker stack needs "
-              "a repo clone (build from source).", file=sys.stderr)
+        print(f"ERROR: docker infra not found at {infra}. Reinstall Conductor "
+              "(`cdt update`) — the infra ships inside the package.", file=sys.stderr)
         return 2
 
     env = dict(os.environ)

@@ -34,8 +34,9 @@ REGISTRY_DIR = Path(os.environ.get("CONDUCTOR_HOME",
                                    str(Path.home() / ".claude" / "conductor")))
 REGISTRY_FILE = REGISTRY_DIR / "projects.json"
 
-# Docker infra ships inside the package. The `conductor` image is built from the
-# local source, so the Docker stack runs from a repo clone (the CLI does not).
+# Docker infra ships inside the package. The `conductor` image is built from a
+# git build context (the public repo — see the compose `context:`), so neither
+# the CLI nor the Docker stack needs a source clone on the host.
 PACKAGE_INFRA = Path(__file__).resolve().parent / "infra"
 
 

@@ -3,19 +3,20 @@
 #
 #   curl -fsSL https://raw.githubusercontent.com/eltonssouza/conductor-main/main/install.sh | sh
 #
-# Isolated, no sudo: installs (or reuses) uv, clones Conductor into a cache, and
-# installs the `cdt` / `conductor` commands as an editable uv tool — so the Docker
-# backends (`cdt up`, built from the clone) work too. Falls back to pipx if uv is
-# unavailable. Idempotent: re-run to update.
+# Isolated, no sudo: installs (or reuses) uv, then installs the `cdt` /
+# `conductor` commands as a real package straight from the public repo (pip's
+# git+https support) — NO source clone on the host. The Docker backends
+# (`cdt up`) fetch their own build context from the repo, so a clone is not
+# needed there either. Falls back to pipx if uv is unavailable. Idempotent:
+# re-run to update.
 #
-# Env overrides: CONDUCTOR_REPO, CONDUCTOR_REF, CONDUCTOR_SRC, CONDUCTOR_EXTRAS
-# (default "rag,honcho"; set empty for a core-only install), CONDUCTOR_DRY_RUN=1,
+# Env overrides: CONDUCTOR_REPO, CONDUCTOR_REF, CONDUCTOR_EXTRAS (default
+# "rag,honcho"; set empty for a core-only install), CONDUCTOR_DRY_RUN=1,
 # NO_COLOR=1.
 set -eu
 
 REPO="${CONDUCTOR_REPO:-https://github.com/eltonssouza/conductor-main.git}"
 REF="${CONDUCTOR_REF:-main}"
-SRC="${CONDUCTOR_SRC:-${HOME}/.conductor/src}"
 EXTRAS="${CONDUCTOR_EXTRAS-rag,honcho}"
 case "$EXTRAS" in none|core) EXTRAS="" ;; esac   # 'none'/'core' (or empty) -> core-only
 DRY="${CONDUCTOR_DRY_RUN:-0}"
@@ -60,13 +61,13 @@ trap 'st=$?; [ "$st" -ne 0 ] && err "install aborted (exit $st)"; exit $st' EXIT
 
 banner
 
-# [1/5] OS + prerequisites ----------------------------------------------------
+# [1/4] OS + prerequisites ----------------------------------------------------
 OS="$(uname -s 2>/dev/null || echo unknown)"
 step "Checking environment (${OS})..."
 have git || die "git not found. Install git first (e.g. 'xcode-select --install' on macOS, or your distro's package), then re-run."
 ok "git $(git --version 2>/dev/null | awk '{print $3}')"
 
-# [2/5] ensure uv (fast, isolated; can manage Python) — fall back to pipx ------
+# [2/4] ensure uv (fast, isolated; can manage Python) — fall back to pipx ------
 PM=""
 if have uv; then
   ok "uv $(uv --version 2>/dev/null | awk '{print $2}') (already installed)"
@@ -96,39 +97,28 @@ if [ -z "$PM" ]; then
   PM="pipx"
 fi
 
-# [3/5] clone (or update) the source ------------------------------------------
-if [ -d "${SRC}/.git" ]; then
-  step "Updating Conductor source at ${SRC}..."
-  run git -C "$SRC" fetch --depth 1 origin "$REF"
-  run git -C "$SRC" checkout -q "$REF"
-  run git -C "$SRC" reset --hard -q "origin/${REF}"
-else
-  step "Cloning Conductor into ${SRC}..."
-  run mkdir -p "$(dirname "$SRC")"
-  run git clone --depth 1 --branch "$REF" "$REPO" "$SRC"
-fi
-ok "source ready (${REPO}@${REF})"
-
-# [4/5] install the cdt / conductor commands (editable) -----------------------
-spec="$SRC"
-[ -n "$EXTRAS" ] && spec="${SRC}[${EXTRAS}]"
+# [3/4] install the cdt / conductor commands from the repo (no host clone) ----
+# pip's PEP 508 direct-reference form: `conductor[extras] @ git+URL@ref`.
+core="conductor @ git+${REPO}@${REF}"
+spec="$core"
+[ -n "$EXTRAS" ] && spec="conductor[${EXTRAS}] @ git+${REPO}@${REF}"
 step "Installing the cdt CLI via ${PM}${EXTRAS:+ (extras: ${EXTRAS})}..."
 if [ "$PM" = "uv" ]; then
-  if ! run uv tool install --force --editable "$spec"; then
+  if ! run uv tool install --force "$spec"; then
     warn "install with extras failed — retrying core-only"
-    run uv tool install --force --editable "$SRC"
+    run uv tool install --force "$core"
   fi
   [ "$NOPATH" = "1" ] || run uv tool update-shell || true
 else
-  if ! run pipx install --force --editable "$spec"; then
+  if ! run pipx install --force "$spec"; then
     warn "install with extras failed — retrying core-only"
-    run pipx install --force --editable "$SRC"
+    run pipx install --force "$core"
   fi
   [ "$NOPATH" = "1" ] || run pipx ensurepath || true
 fi
 ok "cdt installed"
 
-# [5/5] verify ----------------------------------------------------------------
+# [4/4] verify ----------------------------------------------------------------
 step "Verifying..."
 CDT=""
 if have cdt; then CDT="cdt"

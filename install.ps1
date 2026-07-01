@@ -3,12 +3,14 @@
 
     irm https://raw.githubusercontent.com/eltonssouza/conductor-main/main/install.ps1 | iex
 
-  Isolated, no admin: installs (or reuses) uv, clones Conductor into a cache, and
-  installs the `cdt` / `conductor` commands as an editable uv tool - so the Docker
-  backends (`cdt up`, built from the clone) work too. Falls back to pipx if uv is
-  unavailable. Idempotent: re-run to update.
+  Isolated, no admin: installs (or reuses) uv, then installs the `cdt` /
+  `conductor` commands as a real package straight from the public repo (pip's
+  git+https support) - NO source clone on the host. The Docker backends
+  (`cdt up`) fetch their own build context from the repo, so a clone is not
+  needed there either. Falls back to pipx if uv is unavailable. Idempotent:
+  re-run to update.
 
-  Env overrides: CONDUCTOR_REPO, CONDUCTOR_REF, CONDUCTOR_SRC, CONDUCTOR_EXTRAS
+  Env overrides: CONDUCTOR_REPO, CONDUCTOR_REF, CONDUCTOR_EXTRAS
   (default "rag,honcho"; set "none" for a core-only install), CONDUCTOR_DRY_RUN=1,
   CONDUCTOR_NO_PATH=1 (skip PATH edit), NO_COLOR=1.
 
@@ -20,7 +22,6 @@ try { [Console]::OutputEncoding = [Text.UTF8Encoding]::new() } catch {}
 
 $Repo   = if ($env:CONDUCTOR_REPO) { $env:CONDUCTOR_REPO } else { 'https://github.com/eltonssouza/conductor-main.git' }
 $Ref    = if ($env:CONDUCTOR_REF)  { $env:CONDUCTOR_REF }  else { 'main' }
-$Src    = if ($env:CONDUCTOR_SRC)  { $env:CONDUCTOR_SRC }  else { Join-Path $env:USERPROFILE '.conductor\src' }
 $Extras = if ($null -ne $env:CONDUCTOR_EXTRAS) { $env:CONDUCTOR_EXTRAS } else { 'rag,honcho' }
 if ($Extras -in @('none','core','')) { $Extras = '' }   # core-only (PS env can't hold "")
 $Dry    = $env:CONDUCTOR_DRY_RUN -eq '1'
@@ -62,12 +63,12 @@ function Banner {
 
 Banner
 
-# [1/5] prerequisites ---------------------------------------------------------
+# [1/4] prerequisites ---------------------------------------------------------
 Step "Checking environment (Windows)..."
 if (-not (Have git)) { Die "git not found. Install Git for Windows (https://git-scm.com/download/win) or 'winget install Git.Git', then re-run." }
 Ok ("git " + ((git --version) -replace 'git version ',''))
 
-# [2/5] ensure uv (isolated, can manage Python) - fall back to pipx -----------
+# [2/4] ensure uv (isolated, can manage Python) - fall back to pipx -----------
 $Pm = ''
 if (Have uv) {
   Ok ("uv " + ((uv --version) -replace 'uv ','') + " (already installed)")
@@ -92,34 +93,23 @@ if (-not $Pm) {
   $Pm = 'pipx'
 }
 
-# [3/5] clone (or update) the source -----------------------------------------
-if (Test-Path (Join-Path $Src '.git')) {
-  Step "Updating Conductor source at $Src..."
-  Run { git -C $Src fetch --depth 1 origin $Ref } "git fetch"
-  Run { git -C $Src checkout -q $Ref } "git checkout"
-  Run { git -C $Src reset --hard -q "origin/$Ref" } "git reset"
-} else {
-  Step "Cloning Conductor into $Src..."
-  Run { New-Item -ItemType Directory -Force -Path (Split-Path $Src) | Out-Null } "mkdir"
-  Run { git clone --depth 1 --branch $Ref $Repo $Src } "git clone"
-}
-Ok "source ready ($Repo@$Ref)"
-
-# [4/5] install the cdt / conductor commands (editable) ----------------------
-$spec = if ($Extras) { "$Src[$Extras]" } else { $Src }
+# [3/4] install the cdt / conductor commands from the repo (no host clone) ---
+# pip's PEP 508 direct-reference form: `conductor[extras] @ git+URL@ref`.
+$core = "conductor @ git+$Repo@$Ref"
+$spec = if ($Extras) { "conductor[$Extras] @ git+$Repo@$Ref" } else { $core }
 Step ("Installing the cdt CLI via $Pm" + $(if ($Extras) { " (extras: $Extras)" } else { '' }) + "...")
 if ($Pm -eq 'uv') {
-  try { Run { uv tool install --force --editable $spec } "uv tool install $spec" }
-  catch { Warn "install with extras failed - retrying core-only"; Run { uv tool install --force --editable $Src } "uv tool install core" }
+  try { Run { uv tool install --force $spec } "uv tool install $spec" }
+  catch { Warn "install with extras failed - retrying core-only"; Run { uv tool install --force $core } "uv tool install core" }
   if (-not $NoPath) { try { Run { uv tool update-shell } "uv tool update-shell" } catch {} }
 } else {
-  try { Run { pipx install --force --editable $spec } "pipx install $spec" }
-  catch { Warn "install with extras failed - retrying core-only"; Run { pipx install --force --editable $Src } "pipx install core" }
+  try { Run { pipx install --force $spec } "pipx install $spec" }
+  catch { Warn "install with extras failed - retrying core-only"; Run { pipx install --force $core } "pipx install core" }
   if (-not $NoPath) { try { Run { pipx ensurepath } "pipx ensurepath" } catch {} }
 }
 Ok "cdt installed"
 
-# [5/5] verify ---------------------------------------------------------------
+# [4/4] verify ---------------------------------------------------------------
 Step "Verifying..."
 $cdtExe = $null
 if (Have cdt) { $cdtExe = 'cdt' }

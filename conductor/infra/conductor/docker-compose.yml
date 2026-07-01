@@ -44,9 +44,16 @@ services:
 
   conductor:
     build:
-      # Repo root, three levels up from conductor/infra/conductor/.
-      context: ../../..
-      dockerfile: conductor/infra/conductor/Dockerfile
+      # Local context (this folder ships inside the pip/uv package). The
+      # Dockerfile pip-installs Conductor from the public repo (git+https), so
+      # `cdt up` needs NO host clone — only the installed CLI. Override
+      # CONDUCTOR_REPO/CONDUCTOR_REF to build a fork/branch; pin CONDUCTOR_REF to
+      # the installed tag to keep the image in lock-step with the CLI.
+      context: .
+      dockerfile: Dockerfile
+      args:
+        CONDUCTOR_REPO: ${CONDUCTOR_REPO:-https://github.com/eltonssouza/conductor-main.git}
+        CONDUCTOR_REF: ${CONDUCTOR_REF:-main}
     depends_on:
       ollama:
         condition: service_healthy

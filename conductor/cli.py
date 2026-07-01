@@ -28,11 +28,10 @@ COMMANDS = (
 def _version() -> str:
     """The Conductor version.
 
-    Prefer the source `pyproject.toml` when it sits next to the package — for an
-    editable/source install that is the *live* version, which `git pull` /
-    `cdt update` change without a reinstall (installed metadata would be stale).
-    Fall back to installed package metadata for a wheel/pipx install with no
-    source tree alongside.
+    A sibling `pyproject.toml` exists only in an editable dev clone, where it is
+    the *live* version a `git pull` / `cdt update` changes without a reinstall —
+    prefer it there. A normal pipx/uv package install has no such file alongside,
+    so fall back to installed package metadata.
     """
     try:
         import re
@@ -76,7 +75,8 @@ Commands:
   ingest                     (Re)build the index in the running stack.
   honcho setup               Choose the Honcho diary reasoning provider.
   honcho up | down           Start / stop the Honcho diary backend (Docker).
-  update [--reinstall]       Pull the latest source (editable/source install).
+  update [--reinstall]       Upgrade Conductor (uv tool / pipx upgrade; git pull
+                             for an editable dev clone).
   quickstart                 Print the ordered path: install -> first /cdt feature.
   version | --version        Print the installed Conductor version.
   mcp                        Run Conductor's memories (library + journal) as an MCP stdio server.

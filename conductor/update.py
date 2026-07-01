@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
-"""`cdt update` — pull the latest source of an editable/source install.
+"""`cdt update` — upgrade Conductor to the latest published source.
 
-An editable install (`pip install -e`) imports the package straight from the
-git clone, so `git pull` in that clone updates the CLI live — no reinstall
-needed unless the dependencies in pyproject.toml changed (then `--reinstall`).
+The installer puts Conductor on the machine as a real package straight from the
+public repo (`uv tool install` / `pipx install` of `conductor @ git+…`), with no
+source clone. So the update is a package upgrade:
 
-A non-editable install (pip/pipx from a built artifact) has no clone to pull;
-this prints the right upgrade command instead.
+  cdt update              # uv tool upgrade / pipx upgrade (re-pulls the git ref)
 
-  cdt update              # git pull the current branch (ff-only)
-  cdt update --reinstall  # then pip install -e ".[rag,honcho]"
+Contributor convenience: if the package is imported from an editable *git clone*
+(a `.git` sits next to it — e.g. `pip install -e .`), `cdt update` does a
+`git pull --ff-only` on that clone instead, so live edits keep working.
+
+  cdt update --reinstall  # after a pull, reinstall deps if pyproject changed
 """
 from __future__ import annotations
 
@@ -18,7 +20,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-# Package lives at <repo>/conductor/; the repo root (pyproject + .git) is its parent.
+# Package lives at <root>/conductor/; a dev clone has pyproject + .git one up.
 REPO_ROOT = Path(__file__).resolve().parent.parent
 REPO_URL = "https://github.com/eltonssouza/conductor-main.git"
 
@@ -32,57 +34,82 @@ def _current_branch() -> str:
         return "?"
 
 
+def _run(cmd: list, timeout: int = 600) -> int:
+    print("+ " + " ".join(cmd))
+    try:
+        return subprocess.run(cmd, timeout=timeout).returncode
+    except subprocess.TimeoutExpired:
+        print(f"'{cmd[0]}' timed out after {timeout}s — network or remote "
+              "unreachable. Re-run when connectivity is restored.", file=sys.stderr)
+        return 1
+
+
+def _installed_via_uv() -> bool:
+    """True if `conductor` is a uv-managed tool (so `uv tool upgrade` applies)."""
+    if not shutil.which("uv"):
+        return False
+    try:
+        r = subprocess.run(["uv", "tool", "list"], capture_output=True,
+                           text=True, timeout=20)
+        return any(line.split()[:1] == ["conductor"]
+                   for line in (r.stdout or "").splitlines())
+    except Exception:
+        return False
+
+
+def _package_upgrade() -> int:
+    """Upgrade the installed package via its manager (no clone present)."""
+    if _installed_via_uv():
+        return _run(["uv", "tool", "upgrade", "conductor"])
+    if shutil.which("pipx"):
+        return _run(["pipx", "upgrade", "conductor"])
+    # Neither manager found — tell the user how to upgrade by hand.
+    print("Installed as a package, but neither uv nor pipx is on PATH.")
+    print("Upgrade with one of:")
+    print("  uv tool upgrade conductor")
+    print("  pipx upgrade conductor")
+    print(f'  pip install --upgrade --force-reinstall "conductor @ git+{REPO_URL}@main"')
+    return 1
+
+
 def main(argv: list) -> int:
     reinstall = "--reinstall" in (argv or [])
 
-    if not (REPO_ROOT / ".git").exists():
-        print("Not a git source clone — this looks like a pip/pipx install.")
-        print("Update with one of:")
-        print("  pipx upgrade conductor")
-        print(f'  pip install --upgrade --force-reinstall "git+{REPO_URL}"')
+    # --- editable/dev clone: keep the fast git-pull path for contributors ----
+    if (REPO_ROOT / ".git").exists():
+        if not shutil.which("git"):
+            print("ERROR: git not found on PATH.", file=sys.stderr)
+            return 2
+        branch = _current_branch()
+        print(f"Updating {REPO_ROOT} (branch: {branch}) ...")
+        rc = _run(["git", "pull", "--ff-only"], timeout=300)
+        if rc != 0:
+            print("git pull failed — local changes or a diverged branch. "
+                  "Resolve manually, then re-run.", file=sys.stderr)
+            return rc
+        if reinstall:
+            print("Reinstalling dependencies ...")
+            pip = [sys.executable, "-m", "pip", "install", "-q", "-e", ".[rag,honcho]"]
+            try:
+                result = subprocess.run(pip, cwd=str(REPO_ROOT), timeout=600,
+                                        capture_output=True, text=True)
+                if result.returncode != 0:
+                    sys.stderr.write(result.stderr)
+                    return result.returncode
+            except subprocess.TimeoutExpired:
+                print("pip install timed out after 600s.", file=sys.stderr)
+                return 1
+        else:
+            print("Code is live (editable install). If pyproject deps changed, "
+                  "run `cdt update --reinstall`.")
+        print("Done.")
         return 0
 
-    if not shutil.which("git"):
-        print("ERROR: git not found on PATH.", file=sys.stderr)
-        return 2
-
-    branch = _current_branch()
-    print(f"Updating {REPO_ROOT} (branch: {branch}) ...")
-    try:
-        # git pull hits the network; 300s guards against a hung fetch.
-        rc = subprocess.run(["git", "pull", "--ff-only"],
-                            cwd=str(REPO_ROOT), timeout=300).returncode
-    except subprocess.TimeoutExpired:
-        print("git pull timed out after 300s — network or remote unreachable. "
-              "Re-run when connectivity is restored.", file=sys.stderr)
-        return 1
-    if rc != 0:
-        print("git pull failed — local changes or a diverged branch. "
-              "Resolve manually, then re-run.", file=sys.stderr)
-        return rc
-
-    if reinstall:
-        pip = [sys.executable, "-m", "pip", "install", "-q", "-e", ".[rag,honcho]"]
-        print("Reinstalling dependencies ...")
-        # pip may build/download packages; 600s is generous but bounds a hang.
-        # Capture stderr so pip's resolver warnings about unrelated packages
-        # (e.g. moviepy/pillow conflicts) don't print as scary red ERROR lines.
-        # We only surface stderr when the exit code signals a real failure.
-        try:
-            result = subprocess.run(pip, cwd=str(REPO_ROOT), timeout=600,
-                                    capture_output=True, text=True)
-            rc = result.returncode
-        except subprocess.TimeoutExpired:
-            print("pip install timed out after 600s.", file=sys.stderr)
-            return 1
-        if rc != 0:
-            sys.stderr.write(result.stderr)
-            return rc
-    else:
-        print("Code is live (editable install). If pyproject deps changed, run "
-              "`cdt update --reinstall`.")
-    print("Done.")
-    return 0
+    # --- normal case: installed package, no clone → manager upgrade ----------
+    rc = _package_upgrade()
+    if rc == 0:
+        print("Done. Conductor upgraded to the latest published source.")
+    return rc
 
 
 if __name__ == "__main__":
