@@ -34,10 +34,10 @@ def _current_branch() -> str:
         return "?"
 
 
-def _run(cmd: list, timeout: int = 600) -> int:
+def _run(cmd: list, timeout: int = 600, cwd: str | None = None) -> int:
     print("+ " + " ".join(cmd))
     try:
-        return subprocess.run(cmd, timeout=timeout).returncode
+        return subprocess.run(cmd, timeout=timeout, cwd=cwd).returncode
     except subprocess.TimeoutExpired:
         print(f"'{cmd[0]}' timed out after {timeout}s — network or remote "
               "unreachable. Re-run when connectivity is restored.", file=sys.stderr)
@@ -82,7 +82,7 @@ def main(argv: list) -> int:
             return 2
         branch = _current_branch()
         print(f"Updating {REPO_ROOT} (branch: {branch}) ...")
-        rc = _run(["git", "pull", "--ff-only"], timeout=300)
+        rc = _run(["git", "pull", "--ff-only"], timeout=300, cwd=str(REPO_ROOT))
         if rc != 0:
             print("git pull failed — local changes or a diverged branch. "
                   "Resolve manually, then re-run.", file=sys.stderr)
