@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from . import base
-from .base import GuideContext, TEMPLATES, _managed_slice
+from .base import TEMPLATES, GuideContext, _managed_slice
 
 SKILLS_REL = ("data", "skills", "conductor")  # Odysseus category = "conductor"
 

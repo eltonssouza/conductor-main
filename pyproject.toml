@@ -112,6 +112,7 @@ module = [
     "conductor.honcho_client",
     "conductor.project",
     "conductor.targets",
+    "conductor.targets.odysseus",
     "conductor.rag.core",
     "conductor.rag.bootstrap",
 ]
