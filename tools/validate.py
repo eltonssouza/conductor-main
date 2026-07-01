@@ -536,7 +536,7 @@ def check_intake(ctx: Context) -> List[Violation]:
 E2E_DIR = TEMPLATES / "e2e"
 
 
-@rule("R15-e2e", "portable Playwright e2e/smoke starter exists, the automate-tests skill mandates the CLI runner (no harness-exclusive plugin), and scaffold emits it")
+@rule("R15-e2e", "Playwright e2e/smoke starter + automate-tests skill (portable CLI runner) + scaffold wiring")
 def check_e2e(ctx: Context) -> List[Violation]:
     v: List[Violation] = []
     cfg = E2E_DIR / "playwright.config.ts"

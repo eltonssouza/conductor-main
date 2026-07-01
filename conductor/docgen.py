@@ -148,11 +148,10 @@ def _pdf_inline(text: str) -> str:
 
 
 def render_pdf(blocks: List[Dict], out: Path, title: Optional[str]) -> None:
+    from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import getSampleStyleSheet
-    from reportlab.lib import colors
-    from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer,
-                                    Table, TableStyle, ListFlowable, ListItem)
+    from reportlab.platypus import ListFlowable, ListItem, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
     styles = getSampleStyleSheet()
     flow = []
