@@ -7,6 +7,7 @@
   .cdt/config.json                  enrollment (slug, type, roles, Honcho workspace)
   .cdt/stack/<TYPE>.md              detected technologies (RAG-steering)
   .cdt/memory/                      project memory tree (diary/docs/records/refs)
+  .cdt/e2e/                         Playwright e2e/smoke starter (UI projects only)
   CLAUDE.md                         project guide (roles + memory + 12-gate flow)
 
 `sync` keeps CLAUDE.md **live**: it re-detects the stack, refreshes the roles,
@@ -325,6 +326,37 @@ def _write_stack_file(root: Path, ptype: str, techs: List[str],
         _stack_md(ptype, techs, evidence, prof), encoding="utf-8")
 
 
+# The harness-agnostic e2e/smoke starter (Playwright CLI, no browser plugin/MCP).
+# Same files for every target, so it's emitted ONCE as a neutral step into
+# `.cdt/e2e/` (never the project root — it never clobbers the user's setup).
+TEMPLATES_E2E = Path(__file__).resolve().parent / "templates" / "e2e"
+UI_TYPES = ("frontend", "fullstack")
+
+
+def _emit_e2e_starter(project: Path, ptype: str) -> int:
+    """Copy the Playwright e2e/smoke starter into `.cdt/e2e/` for a UI project.
+
+    Only for `frontend`/`fullstack` types (no browser = nothing to drive).
+    Idempotent and non-destructive: never overwrites a file a human may have
+    edited. Returns the number of files written (0 if not a UI project or already
+    present). The runner is `npx playwright test` — portable across all harnesses.
+    """
+    if ptype not in UI_TYPES or not TEMPLATES_E2E.is_dir():
+        return 0
+    dst_root = cdt_dir(project) / "e2e"
+    written = 0
+    for src in TEMPLATES_E2E.rglob("*"):
+        if not src.is_file():
+            continue
+        dst = dst_root / src.relative_to(TEMPLATES_E2E)
+        if dst.exists():
+            continue
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(src, dst)
+        written += 1
+    return written
+
+
 def refresh_claude_md(root: Path) -> bool:
     """Best-effort live refresh of each target's guide (called after journal writes).
 
@@ -385,6 +417,7 @@ def cmd_init(args) -> int:
 
     leaves = _scaffold_memory_tree(project)
     _write_stack_file(project, ptype, techs, evidence, prof)
+    e2e = _emit_e2e_starter(project, ptype)
     _ensure_memory_gitignore(project)
     write_config(project, {
         "project": slug, "type": ptype, "roles": selected, "roles_mode": mode,
@@ -395,7 +428,8 @@ def cmd_init(args) -> int:
     })
     register_project(project, slug, ptype)
     print(f"[3/4] .cdt/: enrolled '{slug}', stack -> {ptype}.md, "
-          f"memory tree -> {leaves} folders")
+          f"memory tree -> {leaves} folders"
+          + (f", e2e starter -> .cdt/e2e/ ({e2e} files)" if e2e else ""))
     ctx = GuideContext(project, slug, ptype, selected)
     for t in tgts:
         state = t.emit_guide(ctx)
@@ -441,6 +475,7 @@ def cmd_sync(args) -> int:
     _ensure_memory_gitignore(root)
     migrated = _migrate_legacy_diary(root)  # pre-0.2.20 journal/ -> memory/diary/
     _write_stack_file(root, ptype, techs, evidence, prof)
+    e2e = _emit_e2e_starter(root, ptype)  # UI project -> Playwright starter in .cdt/e2e/
     config.update({"type": ptype, "roles": selected, "roles_mode": mode,
                    "targets": [t.key for t in tgts]})
     write_config(root, config)
@@ -451,11 +486,12 @@ def cmd_sync(args) -> int:
     states = {t.label: t.emit_guide(ctx) for t in tgts}
 
     tree_note = f", memory tree +{leaves} folders" if leaves else ""
+    e2e_note = f", e2e starter +{e2e} file(s)" if e2e else ""
     mig_note = f", migrated {migrated} legacy diary file(s)" if migrated else ""
     guides = ", ".join(f"{label} {state}" for label, state in states.items())
     print(f"synced '{slug}' (type={ptype}, {n} roles, "
           f"targets={','.join(t.key for t in tgts)}): stack refreshed, "
-          f"diary memory pulled{tree_note}{mig_note}, {guides}.")
+          f"diary memory pulled{tree_note}{e2e_note}{mig_note}, {guides}.")
     return 0
 
 

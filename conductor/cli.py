@@ -52,6 +52,38 @@ def _version() -> str:
         pass
     return "unknown"
 
+def _installed_ref() -> Optional[str]:
+    """The git commit the running Conductor was installed from, if known.
+
+    A `pip install "conductor @ git+URL@ref"` records the resolved commit in the
+    dist-info `direct_url.json` (PEP 610, `vcs_info.commit_id`). Pinning the
+    `conductor` Docker image build to it (via CONDUCTOR_REF) keeps the image in
+    lock-step with the installed CLI, sidestepping the `@main` layer-cache skew.
+    Falls back to a dev clone's HEAD, else None (caller defaults to `main`).
+    """
+    try:
+        import json
+        from importlib.metadata import distribution
+        du = distribution("conductor").read_text("direct_url.json")
+        if du:
+            commit = (json.loads(du).get("vcs_info") or {}).get("commit_id")
+            if commit:
+                return commit
+    except Exception:  # noqa: BLE001 — best-effort; missing/odd metadata is fine
+        pass
+    try:
+        import subprocess
+        root = Path(__file__).resolve().parent.parent
+        if (root / ".git").exists():
+            r = subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(root),
+                               capture_output=True, text=True, timeout=10)
+            if r.returncode == 0 and r.stdout.strip():
+                return r.stdout.strip()
+    except Exception:  # noqa: BLE001
+        pass
+    return None
+
+
 USAGE = """cdt <command> [args]   (alias: conductor)
 
 Commands:

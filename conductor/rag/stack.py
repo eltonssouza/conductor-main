@@ -139,6 +139,15 @@ def main(argv: list) -> int:
     env = dict(os.environ)
     if cmd[0] not in ("down", "stop"):     # only when bringing the stack up
         auto_select_stacks(env)
+        # Pin the `conductor` image build to the installed commit (unless the user
+        # set CONDUCTOR_REF), so it never lags behind the CLI via `@main` caching.
+        if not env.get("CONDUCTOR_REF"):
+            from ..cli import _installed_ref
+            ref = _installed_ref()
+            if ref:
+                env["CONDUCTOR_REF"] = ref
+                print(f"Image ref: pinned to installed commit {ref[:12]} "
+                      "(override with CONDUCTOR_REF).")
     resolve_library_source(env)
     files = select_compose_files(infra)
     full = ["docker", "compose", *files, *cmd]

@@ -531,6 +531,43 @@ def check_intake(ctx: Context) -> List[Violation]:
     return v
 
 
+# --- R15: harness-agnostic e2e/smoke starter + skill + scaffold wiring -------
+
+E2E_DIR = TEMPLATES / "e2e"
+
+
+@rule("R15-e2e", "portable Playwright e2e/smoke starter exists, the automate-tests skill mandates the CLI runner (no harness-exclusive plugin), and scaffold emits it")
+def check_e2e(ctx: Context) -> List[Violation]:
+    v: List[Violation] = []
+    cfg = E2E_DIR / "playwright.config.ts"
+    smoke = E2E_DIR / "tests" / "smoke.spec.ts"
+    if not cfg.is_file():
+        v.append(Violation("R15-e2e", "conductor/templates/e2e/playwright.config.ts",
+                           "Playwright config starter not found"))
+    if not smoke.is_file():
+        v.append(Violation("R15-e2e", "conductor/templates/e2e/tests/smoke.spec.ts",
+                           "smoke spec starter not found"))
+    elif "@smoke" not in smoke.read_text(encoding="utf-8"):
+        v.append(Violation("R15-e2e", "conductor/templates/e2e/tests/smoke.spec.ts",
+                           "smoke spec must tag the merge-blocking subset '@smoke'"))
+
+    skill = SKILLS_DIR / "automate-tests" / "SKILL.md"
+    if skill.is_file():
+        low = skill.read_text(encoding="utf-8").lower()
+        if "e2e" not in low or "playwright" not in low:
+            v.append(Violation("R15-e2e", "conductor/templates/skills/automate-tests/SKILL.md",
+                               "automate-tests skill must cover e2e/smoke via Playwright"))
+        if "npx playwright test" not in low:
+            v.append(Violation("R15-e2e", "conductor/templates/skills/automate-tests/SKILL.md",
+                               "skill must name the portable CLI runner 'npx playwright test'"))
+
+    scaffold = ROOT / "conductor" / "scaffold.py"
+    if scaffold.is_file() and "_emit_e2e_starter" not in scaffold.read_text(encoding="utf-8"):
+        v.append(Violation("R15-e2e", "conductor/scaffold.py",
+                           "scaffold.py does not call _emit_e2e_starter"))
+    return v
+
+
 # --- runner ------------------------------------------------------------------
 
 def run() -> List[Violation]:

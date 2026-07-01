@@ -146,7 +146,12 @@ cycle; automated acceptance tests (ATDD). The test fails before any code exists.
 
 **Quality gate:** test cases derived from the acceptance criteria; tests written
 **failing** before implementation; the right pyramid levels chosen; no
-*flakiness*. Do not implement behavior without a test that describes it.
+*flakiness*. For a project with a UI (frontend/fullstack), the critical user
+journeys have an **e2e/smoke** test that drives the real browser via a portable
+CLI runner (`npx playwright test`) — never a harness-exclusive browser plugin, so
+the gate runs identically in Claude Code, Codex, OpenCode, and Pi. A scaffolded
+starter lives in `.cdt/e2e/`. Do not implement behavior without a test that
+describes it.
 
 **Reference books:** *Test-Driven Development by Example* (Beck), *Growing
 Object-Oriented Software, Guided by Tests*, *Unit Testing* (Khorikov), *xUnit
@@ -182,7 +187,9 @@ reproducible.
 `build-cicd-pipeline`, `build-platform-capability`, `automate-tests`).
 
 **Quality gate:** the pipeline runs build + tests + static analysis and is
-**green**; the gate blocks merge on failure; immutable artifacts.
+**green**; the **e2e/smoke** suite runs headless (`npx playwright test`) and its
+smoke subset is merge-blocking; the gate blocks merge on failure; traces/reports
+published on failure; immutable artifacts.
 
 **Reference books:** *Continuous Delivery* (Humble/Farley), *The DevOps
 Handbook*, *Accelerate*, *Spec-Driven Development* (ch. 20, Quality Gate).
