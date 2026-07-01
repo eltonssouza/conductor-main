@@ -156,6 +156,15 @@ Handy along the way:
 
 
 def main(argv: Optional[List[str]] = None) -> int:
+    # Windows consoles default to cp1252, which cannot encode the Unicode used
+    # in USAGE / guides (e.g. U+2194). Force UTF-8 so output never crashes.
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except (ValueError, OSError):
+                pass
     argv = list(sys.argv[1:] if argv is None else argv)
     if not argv or argv[0] in ("-h", "--help", "help"):
         print(USAGE)
